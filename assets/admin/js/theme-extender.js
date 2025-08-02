@@ -67,7 +67,7 @@
 
     const themeSlug = themeSlugInput.value;
     if (themeSlug) {
-        const loader = loadingIndicator(hooksLoading, wp_autoplugin.messages.extracting_hooks || 'Extracting theme hooks, please wait...');
+        const loader = loadingIndicator(hooksLoading, wp_autoplugin.messages.extracting_hooks_theme || 'Extracting theme hooks, please wait...');
         loader.start();
 
         const formData = new FormData();
@@ -87,12 +87,12 @@
                 const hooks = data.data;
                 extractedHooks = hooks; // Store hooks for later use
                 if (hooks.length > 0) {
-                    hooksSummary.textContent = `${hooks.length} hooks found in the theme code`;
+                    hooksSummary.textContent = `${hooks.length} ${wp_autoplugin.messages.hooks_found_theme}`;
                     hooksUl.innerHTML = hooks.map(hook => `<li>${hook.name} (${hook.type})</li>`).join('');
                     hooksContent.style.display = 'block';
                 } else {
                     // Info message, but allow proceeding
-                    hooksSummary.textContent = wp_autoplugin.messages.no_hooks_found || 'No hooks found in the theme code. You can still create an extension, but you may need to add hooks manually.';
+                    hooksSummary.textContent = wp_autoplugin.messages.no_hooks_found_theme || 'No hooks found in the theme code. You can still create an extension, but you may need to add hooks manually.';
                     hooksUl.innerHTML = '';
                     hooksContent.style.display = 'block';
                 }

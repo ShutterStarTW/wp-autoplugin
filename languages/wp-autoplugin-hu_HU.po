@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: WP-Autoplugin 1.0.5\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/wp-autoplugin\n"
 "POT-Creation-Date: 2025-03-17T02:01:54+00:00\n"
-"PO-Revision-Date: 2025-07-20 15:16+0000\n"
+"PO-Revision-Date: 2025-08-02 14:02+0000\n"
 "Last-Translator: \n"
 "Language-Team: Magyar\n"
 "Language: hu_HU\n"
@@ -15,7 +15,7 @@ msgstr ""
 "X-Generator: Loco https://localise.biz/\n"
 "X-Domain: wp-autoplugin\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Loco-Version: 2.8.0; wp-6.8.2; php-8.3.23"
+"X-Loco-Version: 2.8.0; wp-6.8.2; php-8.3.14"
 
 #: views/page-settings.php:81
 msgid "\"model\" Parameter Value"
@@ -25,12 +25,12 @@ msgstr "A \"model\" paraméter értéke"
 msgid "&laquo; Edit Description"
 msgstr "&laquo; Leírás szerkesztése"
 
-#: views/page-fix-plugin.php:73 views/page-extend-plugin.php:63
+#: views/page-extend-plugin.php:63 views/page-fix-plugin.php:73
 msgid "&laquo; Edit Issue"
 msgstr "&laquo; Probléma szerkesztése"
 
-#: views/page-generate-plugin.php:58 views/page-fix-plugin.php:94
-#: views/page-extend-plugin.php:84
+#: views/page-extend-plugin.php:84 views/page-fix-plugin.php:94
+#: views/page-generate-plugin.php:58
 msgid "&laquo; Edit Plan"
 msgstr "&laquo; Terv szerkesztése"
 
@@ -38,7 +38,7 @@ msgstr "&laquo; Terv szerkesztése"
 msgid "(Change)"
 msgstr "(Változtatás)"
 
-#: includes/admin/class-scripts.php:118
+#: includes/admin/class-scripts.php:120
 msgid "A custom post type for testimonials."
 msgstr "Egyéni bejegyzéstípus ajánlásokhoz."
 
@@ -47,15 +47,16 @@ msgstr "Egyéni bejegyzéstípus ajánlásokhoz."
 msgid "A plugin that generates other plugins on-demand using AI."
 msgstr "AI segítségével bővítményeket generáló bővítmény."
 
-#: includes/admin/class-scripts.php:117
+#: includes/admin/class-scripts.php:119
 msgid "A simple contact form with honeypot spam protection."
 msgstr "Egy egyszerű kapcsolatfelvételi űrlap honeypot spamvédelemmel."
 
-#: includes/admin/class-scripts.php:121
+#. ... more example descriptions ...
+#: includes/admin/class-scripts.php:123
 msgid "A simple image compression tool."
 msgstr "Egy egyszerű képtömörítő eszköz."
 
-#: includes/admin/class-scripts.php:119
+#: includes/admin/class-scripts.php:121
 msgid "A widget that displays recent posts."
 msgstr "Egy widget, ami megjeleníti a legutóbbi bejegyzéseket."
 
@@ -63,9 +64,9 @@ msgstr "Egy widget, ami megjeleníti a legutóbbi bejegyzéseket."
 msgid "Activate"
 msgstr "Bekapcsolás"
 
-#: includes/admin/class-scripts.php:114 includes/admin/class-scripts.php:175
-#: includes/admin/class-scripts.php:233 includes/admin/class-scripts.php:338
-#: includes/admin/class-scripts.php:387
+#: includes/admin/class-scripts.php:114 includes/admin/class-scripts.php:177
+#: includes/admin/class-scripts.php:235 includes/admin/class-scripts.php:340
+#: includes/admin/class-scripts.php:392
 msgid "Activate Plugin"
 msgstr "Bővítmény bekapcsolása"
 
@@ -91,8 +92,8 @@ msgstr "Egyéni modell hozzáadása"
 msgid "Additional Headers (one per line, name=value)"
 msgstr "További fejlécadatok (soronként egy, név=érték)"
 
-#: views/page-extend-theme.php:78 views/page-generate-plugin.php:54
-#: views/page-extend-hooks.php:74
+#: views/page-extend-hooks.php:74 views/page-extend-theme.php:78
+#: views/page-generate-plugin.php:54
 msgid ""
 "AI-generated code may be unstable or insecure; use only after careful review "
 "and testing."
@@ -154,11 +155,11 @@ msgstr "Mégsem"
 msgid "Code Quality"
 msgstr "Kódminőség"
 
-#: includes/admin/class-scripts.php:281
+#: includes/admin/class-scripts.php:283
 msgid "Code Quality Analysis"
 msgstr "Kódminőség-elemzés"
 
-#: views/page-extend-theme.php:42 views/page-extend-hooks.php:36
+#: views/page-extend-hooks.php:38 views/page-extend-theme.php:42
 msgid ""
 "Copy all hooks to clipboard, along with relevant context, to use with your "
 "LLM of choice."
@@ -166,7 +167,7 @@ msgstr ""
 "Másold az összes csatlakozási pontot a vágólapra a releváns kontextussal "
 "együtt, hogy a választott LLM-mel használhasd."
 
-#: views/page-extend-theme.php:40 views/page-extend-hooks.php:36
+#: views/page-extend-hooks.php:36 views/page-extend-theme.php:40
 msgid "Copy Hooks"
 msgstr "Csatlakozási pontok másolása"
 
@@ -174,11 +175,11 @@ msgstr "Csatlakozási pontok másolása"
 msgid "Copy to Clipboard"
 msgstr "Másolás a vágólapra"
 
-#: includes/admin/class-scripts.php:339 includes/admin/class-scripts.php:388
+#: includes/admin/class-scripts.php:341 includes/admin/class-scripts.php:393
 msgid "Creating the extension plugin."
 msgstr "Bővítménykibővítés létrehozása."
 
-#: includes/admin/class-scripts.php:234
+#: includes/admin/class-scripts.php:236
 msgid "Creating the plugin."
 msgstr "A bővítmény létrehozása."
 
@@ -253,7 +254,7 @@ msgstr ""
 "Adj meg egy konkrét kérdést ezzel a bővítménnyel kapcsolatban, vagy hagyd "
 "üresen az általános magyarázathoz:"
 
-#: includes/admin/class-scripts.php:341 includes/admin/class-scripts.php:390
+#: includes/admin/class-scripts.php:343 includes/admin/class-scripts.php:395
 msgid "Error activating the plugin."
 msgstr "Hiba a bővítmény aktiválásakor."
 
@@ -261,15 +262,15 @@ msgstr "Hiba a bővítmény aktiválásakor."
 msgid "Error communicating with the API."
 msgstr "Hiba történt az API-val való kommunikáció közben."
 
-#: includes/admin/class-scripts.php:231
+#: includes/admin/class-scripts.php:233
 msgid "Error creating the extended plugin."
 msgstr "Hiba történt a kibővített bővítmény létrehozása közben."
 
-#: includes/admin/class-scripts.php:336 includes/admin/class-scripts.php:385
+#: includes/admin/class-scripts.php:338 includes/admin/class-scripts.php:390
 msgid "Error creating the extension plugin."
 msgstr "Hiba történt a bővítménykibővítés létrehozásakor."
 
-#: includes/admin/class-scripts.php:172
+#: includes/admin/class-scripts.php:174
 msgid "Error creating the fixed plugin."
 msgstr "Hiba történt a javított bővítmény létrehozása közben."
 
@@ -277,28 +278,28 @@ msgstr "Hiba történt a javított bővítmény létrehozása közben."
 msgid "Error creating the plugin."
 msgstr "Hiba történt a bővítmény létrehozása közben."
 
-#: includes/admin/class-scripts.php:278
+#: includes/admin/class-scripts.php:280
 msgid "Error generating explanation."
 msgstr "Hiba történt a magyarázat generálása közben."
 
-#: includes/admin/class-scripts.php:228 includes/admin/class-scripts.php:333
-#: includes/admin/class-scripts.php:382
+#: includes/admin/class-scripts.php:230 includes/admin/class-scripts.php:335
+#: includes/admin/class-scripts.php:387
 msgid "Error generating the development plan."
 msgstr "Hiba történt a fejlesztési terv generálása közben."
 
-#: includes/admin/class-scripts.php:230
+#: includes/admin/class-scripts.php:232
 msgid "Error generating the extended code."
 msgstr "Hiba történt a kibővített kód generálása közben."
 
-#: includes/admin/class-scripts.php:335 includes/admin/class-scripts.php:384
+#: includes/admin/class-scripts.php:337 includes/admin/class-scripts.php:389
 msgid "Error generating the extension code."
 msgstr "Hiba történt a kibővítés kódjának generálása közben."
 
-#: includes/admin/class-scripts.php:174
+#: includes/admin/class-scripts.php:176
 msgid "Error generating the fixed code."
 msgstr "Hiba történt a javított kód generálása közben."
 
-#: includes/admin/class-scripts.php:171
+#: includes/admin/class-scripts.php:173
 msgid "Error generating the plan."
 msgstr "Hiba történt a terv generálása közben."
 
@@ -315,10 +316,14 @@ msgid "Error saving model"
 msgstr "Hiba történt a modell mentése közben."
 
 #. %s: error message.
-#: views/page-fix-plugin.php:39 views/page-extend-plugin.php:37
+#: views/page-extend-plugin.php:37 views/page-fix-plugin.php:39
 #, php-format
 msgid "Error while activating the plugin: %s"
 msgstr "Hiba történt a bővítmény aktiválása közben: %s"
+
+#: includes/admin/class-scripts.php:115
+msgid "Error: Invalid plan data."
+msgstr "Hiba: Érvénytelen terv adat."
 
 #: includes/admin/class-plugin-list-table.php:92
 msgid "Explain"
@@ -335,7 +340,7 @@ msgstr "Bővítmény magyarázata"
 msgid "Explain This Plugin: %s"
 msgstr "Bővítmény magyarázata: %s"
 
-#: includes/admin/class-scripts.php:284
+#: includes/admin/class-scripts.php:286
 msgid "Explanation copied to clipboard!"
 msgstr "Magyarázat a vágólapra másolva!"
 
@@ -349,8 +354,8 @@ msgstr "Magyarázat fókusza (opcionális):"
 msgid "Explanation for: %s"
 msgstr "Magyarázat a következőhöz: %s"
 
-#: includes/admin/class-plugin-list-table.php:91
 #: includes/admin/class-admin.php:219
+#: includes/admin/class-plugin-list-table.php:91
 msgid "Extend"
 msgstr "Kibővítés"
 
@@ -392,18 +397,18 @@ msgstr "Téma kibővítése: %s"
 msgid "Extended Plugin: %s"
 msgstr "Kibővített bővítmény: %s"
 
-#. %s: theme name.
 #. %s: plugin name.
-#: views/page-extend-theme.php:72 views/page-extend-hooks.php:68
+#. %s: theme name.
+#: views/page-extend-hooks.php:68 views/page-extend-theme.php:72
 #, php-format
 msgid "Extension Plugin for: %s"
 msgstr "Bővítménykibővítés a következőhöz: %s"
 
-#: views/page-extend-hooks.php:27
+#: views/page-extend-hooks.php:27 includes/admin/class-scripts.php:344
 msgid "Extracting plugin hooks, please wait..."
 msgstr "Bővítmény csatlakozási pontjainak kibontása, kérjük várj..."
 
-#: views/page-extend-theme.php:31 includes/admin/class-scripts.php:391
+#: views/page-extend-theme.php:31 includes/admin/class-scripts.php:396
 msgid "Extracting theme hooks, please wait..."
 msgstr "Téma csatlakozási pontjainak kibontása, kérjük várj..."
 
@@ -411,9 +416,13 @@ msgstr "Téma csatlakozási pontjainak kibontása, kérjük várj..."
 msgid "Failed to change model."
 msgstr "Nem sikerült módosítani a modellt."
 
-#: includes/admin/class-scripts.php:285
+#: includes/admin/class-scripts.php:287
 msgid "Failed to copy explanation."
 msgstr "Nem sikerült másolni a magyarázatot."
+
+#: includes/admin/class-scripts.php:116
+msgid "Failed to copy:"
+msgstr "Másolás sikertelen:"
 
 #: includes/admin/class-ajax.php:489 includes/admin/class-ajax.php:669
 msgid "Failed to decode the generated plan."
@@ -454,7 +463,7 @@ msgstr "Javított bővítmény: %s"
 msgid "Focus on the issue at hand"
 msgstr "Csak a megadott problémára koncentrálj"
 
-#: includes/admin/class-scripts.php:283
+#: includes/admin/class-scripts.php:285
 msgid "General Explanation"
 msgstr "Általános magyarázat"
 
@@ -466,11 +475,11 @@ msgstr "Általános magyarázat"
 msgid "General Overview"
 msgstr "Általános áttekintés"
 
-#: views/page-extend-theme.php:65 views/page-extend-hooks.php:61
+#: views/page-extend-hooks.php:61 views/page-extend-theme.php:65
 msgid "Generate Extension Code"
 msgstr "Kibővítés kódjának generálása"
 
-#: views/page-extend-theme.php:48 views/page-extend-hooks.php:44
+#: views/page-extend-hooks.php:44 views/page-extend-theme.php:48
 msgid "Generate Extension Plan"
 msgstr "Kibővítési terv létrehozása"
 
@@ -487,17 +496,17 @@ msgstr "Terv generálása"
 msgid "Generate Plugin"
 msgstr "Bővítmény generálása"
 
-#: views/page-generate-plugin.php:41 views/page-fix-plugin.php:74
-#: views/page-extend-plugin.php:64
+#: views/page-extend-plugin.php:64 views/page-fix-plugin.php:74
+#: views/page-generate-plugin.php:41
 msgid "Generate Plugin Code"
 msgstr "Bővítménykód generálása"
 
-#: views/page-extend-theme.php:55 views/page-extend-hooks.php:51
+#: views/page-extend-hooks.php:51 views/page-extend-theme.php:55
 msgid "Generated Extension Plan"
 msgstr "Generált kibővítési terv"
 
-#: views/page-generate-plugin.php:31 views/page-fix-plugin.php:67
-#: views/page-extend-plugin.php:57
+#: views/page-extend-plugin.php:57 views/page-fix-plugin.php:67
+#: views/page-generate-plugin.php:31
 msgid "Generated Plan"
 msgstr "Generált terv"
 
@@ -505,12 +514,12 @@ msgstr "Generált terv"
 msgid "Generated Plugin Code"
 msgstr "Generált bővítménykód"
 
-#: includes/admin/class-scripts.php:105 includes/admin/class-scripts.php:170
-#: includes/admin/class-scripts.php:227 includes/admin/class-scripts.php:332
+#: includes/admin/class-scripts.php:105 includes/admin/class-scripts.php:172
+#: includes/admin/class-scripts.php:229 includes/admin/class-scripts.php:334
 msgid "Generating a plan for your plugin."
 msgstr "Bővítményterv létrehozása."
 
-#: includes/admin/class-scripts.php:381
+#: includes/admin/class-scripts.php:386
 msgid "Generating a plan for your theme extension."
 msgstr "Terv létrehozása a témabővítményhez."
 
@@ -518,19 +527,19 @@ msgstr "Terv létrehozása a témabővítményhez."
 msgid "Generating code."
 msgstr "Kódgenerálás."
 
-#: includes/admin/class-scripts.php:277
+#: includes/admin/class-scripts.php:279
 msgid "Generating explanation..."
 msgstr "Magyarázat generálása..."
 
-#: includes/admin/class-scripts.php:229
+#: includes/admin/class-scripts.php:231
 msgid "Generating the extended plugin code."
 msgstr "A kibővített bővítménykód generálása."
 
-#: includes/admin/class-scripts.php:334 includes/admin/class-scripts.php:383
+#: includes/admin/class-scripts.php:336 includes/admin/class-scripts.php:388
 msgid "Generating the extension plugin code."
 msgstr "A bővítménykibővítés kódjának generálása."
 
-#: includes/admin/class-scripts.php:173
+#: includes/admin/class-scripts.php:175
 msgid "Generating the fixed plugin code."
 msgstr "Javított bővítménykód generálása."
 
@@ -541,6 +550,14 @@ msgstr "Google Gemini API-kulcs"
 #: views/page-settings.php:108
 msgid "Headers"
 msgstr "Fejlécek"
+
+#: includes/admin/class-scripts.php:346
+msgid "hooks found in the plugin code"
+msgstr "csatlakozási pont található a bővítmény kódjában"
+
+#: includes/admin/class-scripts.php:398
+msgid "hooks found in the theme code"
+msgstr "csatlakozási pont található a sablon kódjában"
 
 #: includes/admin/class-scripts.php:112
 msgid "How to test it?"
@@ -562,7 +579,7 @@ msgstr "Inaktív"
 msgid "Install Plugin"
 msgstr "Bővítmény telepítése"
 
-#: includes/admin/class-scripts.php:110 includes/admin/class-scripts.php:176
+#: includes/admin/class-scripts.php:110 includes/admin/class-scripts.php:178
 msgid "Installing the plugin."
 msgstr "A bővítmény telepítése."
 
@@ -621,15 +638,24 @@ msgstr "A modell sikeresen eltávolítva."
 msgid "Model: %s"
 msgstr "Modell: %s"
 
+#: includes/admin/class-scripts.php:345
+msgid "No hooks found in the plugin code. Cannot proceed with extension."
+msgstr ""
+"Nem találhatók csatlakozási pontok a bővítmény kódjában. A bővítmény "
+"kibővítése nem folytatható."
+
 #: includes/admin/class-ajax.php:471
 msgid "No hooks found in the plugin."
 msgstr "Nem találhatók csatlakozási pontok a bővítményben."
 
-#: includes/admin/class-scripts.php:392
-msgid "No hooks found in the theme code. Cannot proceed with extension."
+#: includes/admin/class-scripts.php:397
+msgid ""
+"No hooks found in the theme code. You can still create an extension, but you "
+"may need to add hooks manually."
 msgstr ""
-"Nem találhatók csatlakozási pontok a téma kódjában. A kibővítéssel nem lehet "
-"továbblépni."
+"Nem találhatók csatlakozási pontok a téma kódjában. Továbbra is "
+"létrehozhatsz bővítményt, de lehet, hogy manuálisan kell hozzáadnod a "
+"csatlakozási pontokat."
 
 #: includes/admin/class-ajax.php:651
 msgid "No hooks found in the theme."
@@ -659,9 +685,9 @@ msgstr "Nincs megadva téma slug."
 msgid "No theme specified."
 msgstr "Nincs megadva téma."
 
-#: views/page-extend-theme.php:15 views/page-fix-plugin.php:20
-#: views/page-extend-hooks.php:15 views/page-explain-plugin.php:20
-#: views/page-extend-plugin.php:20
+#: views/page-explain-plugin.php:20 views/page-extend-hooks.php:15
+#: views/page-extend-plugin.php:20 views/page-extend-theme.php:15
+#: views/page-fix-plugin.php:20
 msgid "Nonce verification failed. Please try again."
 msgstr "A nonce ellenőrzése sikertelen. Próbáld újra."
 
@@ -669,20 +695,20 @@ msgstr "A nonce ellenőrzése sikertelen. Próbáld újra."
 msgid "OpenAI API Key"
 msgstr "OpenAI API-kulcs"
 
-#: views/page-explain-plugin.php:55 includes/admin/class-scripts.php:280
+#: views/page-explain-plugin.php:55 includes/admin/class-scripts.php:282
 msgid "Performance Review"
 msgstr "Teljesítményértékelés"
 
-#: includes/admin/class-scripts.php:226 includes/admin/class-scripts.php:331
+#: includes/admin/class-scripts.php:228 includes/admin/class-scripts.php:333
 msgid "Please describe the changes you want to make to the plugin."
 msgstr ""
 "Kérjük, írd le, milyen változtatásokat szeretnél végrehajtani a bővítményen."
 
-#: includes/admin/class-scripts.php:380
+#: includes/admin/class-scripts.php:385
 msgid "Please describe the changes you want to make to the theme."
 msgstr "Kérjük, írd le a témán végrehajtani kívánt módosításokat."
 
-#: includes/admin/class-scripts.php:104 includes/admin/class-scripts.php:169
+#: includes/admin/class-scripts.php:104 includes/admin/class-scripts.php:171
 msgid "Please enter a plugin description."
 msgstr "Kérjük, adj meg egy bővítményleírást."
 
@@ -698,7 +724,7 @@ msgstr "Bővítmény"
 msgid "Plugin Explanation"
 msgstr "Bővítmény magyarázata"
 
-#: views/page-extend-theme.php:60 views/page-extend-hooks.php:56
+#: views/page-extend-hooks.php:56 views/page-extend-theme.php:60
 msgid "Plugin Name:"
 msgstr "Bővítmény neve:"
 
@@ -706,8 +732,8 @@ msgstr "Bővítmény neve:"
 msgid "Plugin reactivated successfully."
 msgstr "A bővítmény sikeresen újraaktiválva."
 
-#: includes/admin/class-scripts.php:111 includes/admin/class-scripts.php:177
-#: includes/admin/class-scripts.php:340 includes/admin/class-scripts.php:389
+#: includes/admin/class-scripts.php:111 includes/admin/class-scripts.php:179
+#: includes/admin/class-scripts.php:342 includes/admin/class-scripts.php:394
 msgid "Plugin successfully installed."
 msgstr "A bővítmény sikeresen telepítve."
 
@@ -719,12 +745,12 @@ msgstr "Kérdés/Fókusz:"
 msgid "Remove"
 msgstr "Eltávolítás"
 
-#: views/page-extend-theme.php:57 views/page-extend-hooks.php:53
+#: views/page-extend-hooks.php:53 views/page-extend-theme.php:57
 msgid "Review or edit the generated plan for the extension plugin:"
 msgstr "Tekintsd át vagy szerkeszd a bővítményhez létrehozott tervet:"
 
-#: views/page-generate-plugin.php:34 views/page-fix-plugin.php:70
-#: views/page-extend-plugin.php:60
+#: views/page-extend-plugin.php:60 views/page-fix-plugin.php:70
+#: views/page-generate-plugin.php:34
 msgid "Review or edit the generated plan:"
 msgstr "Nézd át vagy szerkeszd a generált tervet:"
 
@@ -732,21 +758,21 @@ msgstr "Nézd át vagy szerkeszd a generált tervet:"
 msgid "Save"
 msgstr "Mentés"
 
-#: views/page-fix-plugin.php:95 views/page-extend-plugin.php:85
+#: views/page-extend-plugin.php:85 views/page-fix-plugin.php:95
 msgid "Save Changes"
 msgstr "Változtatások mentése"
 
-#: views/page-extend-theme.php:83 views/page-extend-hooks.php:79
+#: views/page-extend-hooks.php:79 views/page-extend-theme.php:83
 msgid "Save Extension Plugin"
 msgstr "Bővítménykibővítés mentése"
 
-#: views/page-explain-plugin.php:51 includes/admin/class-scripts.php:279
+#: views/page-explain-plugin.php:51 includes/admin/class-scripts.php:281
 msgid "Security Analysis"
 msgstr "Biztonsági elemzés"
 
+#: includes/admin/class-admin.php:465 includes/admin/class-admin.php:501
 #: includes/admin/class-ajax.php:385 includes/admin/class-ajax.php:426
 #: includes/admin/class-ajax.php:573 includes/admin/class-bulk-actions.php:47
-#: includes/admin/class-admin.php:465 includes/admin/class-admin.php:501
 msgid "Security check failed."
 msgstr "A biztonsági ellenőrzés sikertelen volt."
 
@@ -764,11 +790,11 @@ msgstr ""
 "definiálva, ami megakadályozza, hogy a WP-Autoplugin telepítsen vagy "
 "frissítsen bővítményeket a webhelyeden."
 
-#: views/page-extend-theme.php:74 views/page-extend-hooks.php:70
+#: views/page-extend-hooks.php:70 views/page-extend-theme.php:74
 msgid "The extension plugin code has been generated. Review it before saving:"
 msgstr "A bővítménykibővítés kódja létrejött. Mentés előtt tekintsd át:"
 
-#: includes/admin/class-scripts.php:337 includes/admin/class-scripts.php:386
+#: includes/admin/class-scripts.php:339 includes/admin/class-scripts.php:391
 msgid "The extension plugin has been created."
 msgstr "A bővítménykibővítés létrejött."
 
@@ -780,7 +806,7 @@ msgstr ""
 "A bővítménykód sikeresen generálva. Aktiválás előtt áttekintheted és "
 "szerkesztheted a bővítményfájlt:"
 
-#: includes/admin/class-scripts.php:178 includes/admin/class-scripts.php:232
+#: includes/admin/class-scripts.php:180 includes/admin/class-scripts.php:234
 msgid "The plugin code has been updated."
 msgstr "A bővítménykód frissítve lett."
 
@@ -821,7 +847,7 @@ msgstr "A megadott bővítmény nem létezik."
 msgid "The specified theme does not exist."
 msgstr "A megadott téma nem létezik."
 
-#: views/page-fix-plugin.php:89 views/page-extend-plugin.php:79
+#: views/page-extend-plugin.php:79 views/page-fix-plugin.php:89
 msgid "This plugin is active, changes will take effect immediately."
 msgstr "Ez a bővítmény aktív, a változások azonnal érvénybe lépnek."
 
@@ -833,13 +859,13 @@ msgstr "Ismeretlen bővítmény"
 msgid "URL"
 msgstr "URL"
 
-#: views/page-explain-plugin.php:63 includes/admin/class-scripts.php:282
+#: views/page-explain-plugin.php:63 includes/admin/class-scripts.php:284
 msgid "Usage Instructions"
 msgstr "Használati utasítások"
 
-#: views/page-extend-theme.php:78 views/page-generate-plugin.php:54
-#: views/page-fix-plugin.php:89 views/page-extend-hooks.php:74
-#: views/page-extend-plugin.php:79
+#: views/page-extend-hooks.php:74 views/page-extend-plugin.php:79
+#: views/page-extend-theme.php:78 views/page-fix-plugin.php:89
+#: views/page-generate-plugin.php:54
 msgid "Warning:"
 msgstr "Figyelmeztetés:"
 
@@ -875,8 +901,8 @@ msgstr "Nincs megfelelő jogosultságod az oldal eléréséhez."
 msgid "You can %1$sfix the error automatically%2$s."
 msgstr "Automatikusan %1$sjavíthatod a hibát%2$s."
 
-#: includes/admin/class-bulk-actions.php:51 includes/admin/class-admin.php:460
-#: includes/admin/class-admin.php:496
+#: includes/admin/class-admin.php:460 includes/admin/class-admin.php:496
+#: includes/admin/class-bulk-actions.php:51
 msgid "You do not have sufficient permissions to access this page."
 msgstr "Nincs megfelelő jogosultságod az oldal eléréséhez."
 
@@ -884,10 +910,10 @@ msgstr "Nincs megfelelő jogosultságod az oldal eléréséhez."
 msgid "You don't have any autoplugins yet."
 msgstr "Még nincsenek autopluginod."
 
-#: views/page-extend-theme.php:64 views/page-extend-hooks.php:60
+#: views/page-extend-hooks.php:60 views/page-extend-theme.php:64
 msgid "« Edit Description"
 msgstr "« Leírás szerkesztése"
 
-#: views/page-extend-theme.php:82 views/page-extend-hooks.php:78
+#: views/page-extend-hooks.php:78 views/page-extend-theme.php:82
 msgid "« Edit Plan"
 msgstr "« Terv szerkesztése"

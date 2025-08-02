@@ -27,7 +27,7 @@ function buildAccordion(plan) {
         plan = JSON.parse(plan);
     }
     if (typeof plan !== 'object') {
-        return 'Error: Invalid plan data.';
+        return wp_autoplugin.messages.invalid_plan_data || 'Error: Invalid plan data.';
     }
 
     let accordion = '';

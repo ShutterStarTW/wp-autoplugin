@@ -112,6 +112,8 @@ class Scripts {
 						'how_to_test'           => esc_html__( 'How to test it?', 'wp-autoplugin' ),
 						'use_fixer'             => esc_html__( 'If you notice any issues, use the Fix button in the Autoplugins list.', 'wp-autoplugin' ),
 						'activate'              => esc_html__( 'Activate Plugin', 'wp-autoplugin' ),
+						'invalid_plan_data'     => esc_html__( 'Error: Invalid plan data.', 'wp-autoplugin' ),
+						'copy_error_prefix'     => esc_html__( 'Failed to copy:', 'wp-autoplugin' ),
 					],
 					'plugin_examples' => [
 						esc_html__( 'A simple contact form with honeypot spam protection.', 'wp-autoplugin' ),
@@ -339,6 +341,9 @@ class Scripts {
 						'creating_plugin'         => esc_html__( 'Creating the extension plugin.', 'wp-autoplugin' ),
 						'plugin_created'          => esc_html__( 'Plugin successfully installed.', 'wp-autoplugin' ),
 						'plugin_activation_error' => esc_html__( 'Error activating the plugin.', 'wp-autoplugin' ),
+						'extracting_hooks'        => esc_html__( 'Extracting plugin hooks, please wait...', 'wp-autoplugin' ),
+						'no_hooks_found'          => esc_html__( 'No hooks found in the plugin code. Cannot proceed with extension.', 'wp-autoplugin' ),
+						'hooks_found_plugin'      => esc_html__( 'hooks found in the plugin code', 'wp-autoplugin' ),
 					],
 				]
 			);
@@ -388,8 +393,9 @@ class Scripts {
 						'creating_plugin'         => esc_html__( 'Creating the extension plugin.', 'wp-autoplugin' ),
 						'plugin_created'          => esc_html__( 'Plugin successfully installed.', 'wp-autoplugin' ),
 						'plugin_activation_error' => esc_html__( 'Error activating the plugin.', 'wp-autoplugin' ),
-						'extracting_hooks'        => esc_html__( 'Extracting theme hooks, please wait...', 'wp-autoplugin' ),
-						'no_hooks_found'          => esc_html__( 'No hooks found in the theme code. Cannot proceed with extension.', 'wp-autoplugin' ),
+						'extracting_hooks_theme'  => esc_html__( 'Extracting theme hooks, please wait...', 'wp-autoplugin' ),
+						'no_hooks_found_theme'    => esc_html__( 'No hooks found in the theme code. You can still create an extension, but you may need to add hooks manually.', 'wp-autoplugin' ),
+						'hooks_found_theme'       => esc_html__( 'hooks found in the theme code', 'wp-autoplugin' ),
 					],
 				]
 			);
