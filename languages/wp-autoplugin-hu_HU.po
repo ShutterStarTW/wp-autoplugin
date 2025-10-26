@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: WP-Autoplugin 1.7\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/wp-autoplugin\n"
 "POT-Creation-Date: 2025-08-20T15:48:21+00:00\n"
-"PO-Revision-Date: 2025-10-25 15:45+0000\n"
+"PO-Revision-Date: 2025-10-26 09:08+0000\n"
 "Last-Translator: \n"
 "Language-Team: Magyar\n"
 "Language: hu_HU\n"
@@ -17,1041 +17,64 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
 "X-Loco-Version: 2.8.0; wp-6.8.3; php-8.3.25"
 
-#. Plugin Name of the plugin
-#: wp-autoplugin.php includes/admin/class-menu.php:41
-#: includes/admin/class-menu.php:42
-msgid "WP-Autoplugin"
-msgstr "WP-Autoplugin"
+#: views/page-settings.php:161
+msgid "\"model\" Parameter Value"
+msgstr "A \"model\" paraméter értéke"
+
+#: views/page-generate-plugin.php:40
+msgid "&laquo; Edit Description"
+msgstr "&laquo; Leírás szerkesztése"
+
+# Kontextus: Bővítmény módosítása/bővítése oldalon.
+#: views/page-extend-plugin.php:63 views/page-fix-plugin.php:65
+msgid "&laquo; Edit Issue"
+msgstr "&laquo; Leírás szerkesztése"
+
+#: views/page-extend-plugin.php:104 views/page-fix-plugin.php:106
+#: views/page-generate-plugin.php:109
+msgid "&laquo; Edit Plan"
+msgstr "« Terv szerkesztése"
+
+#: includes/admin/class-admin.php:94
+msgid "(Change)"
+msgstr "(Módosítás)"
+
+#: includes/class-hooks-extender.php:191
+msgid "(No custom hooks found in the theme code.)"
+msgstr "(Nem találhatók egyedi hookok a sablon kódjában.)"
+
+#: includes/admin/class-scripts.php:137
+msgid "A custom post type for testimonials."
+msgstr "Egyedi bejegyzéstípus értékelésekhez."
 
 #. Description of the plugin
 #: wp-autoplugin.php includes/admin/class-updater.php:47
 msgid "A plugin that generates other plugins on-demand using AI."
 msgstr "AI alapú bővítmény-generáló bővítmény."
 
-#. Author of the plugin
-#: wp-autoplugin.php
-msgid "Balázs Piller"
-msgstr "Piller Balázs"
+#: includes/admin/class-scripts.php:136
+msgid "A simple contact form with honeypot spam protection."
+msgstr "Egyszerű kapcsolatfelvételi űrlap honeypot spamszűréssel."
 
-#. Author URI of the plugin
-#: wp-autoplugin.php
-msgid "https://wp-autoplugin.com"
-msgstr "https://wp-autoplugin.com"
+#: includes/admin/class-scripts.php:139
+msgid "A simple image compression tool."
+msgstr "Egyszerű képtömörítő eszköz."
 
-#: includes/admin/class-action-links.php:42
-msgid "Modify (Patch)"
-msgstr "Módosítás (Patch)"
-
-#: includes/admin/class-action-links.php:46 includes/admin/class-menu.php:98
-#: includes/admin/class-menu.php:99
-msgid "Create Extension"
-msgstr "Kiegészítő létrehozása"
-
-#: includes/admin/class-action-links.php:63 includes/admin/class-menu.php:107
-#: includes/admin/class-menu.php:108
-msgid "Extend Theme"
-msgstr "Sablon kibővítése"
-
-#: includes/admin/class-action-links.php:86
-msgid "Extend"
-msgstr "Kibővítés"
-
-#. translators: %s: version number.
-#: includes/admin/class-admin.php:75
-msgid "WP-Autoplugin v%s"
-msgstr "WP-Autoplugin v%s"
-
-#. translators: %s: model name.
-#: includes/admin/class-admin.php:86
-msgid "Model: %s"
-msgstr "Modell: %s"
-
-#: includes/admin/class-admin.php:94
-msgid "(Change)"
-msgstr "(Módosítás)"
-
-#: includes/admin/class-admin.php:99
-msgid "Click for token usage breakdown"
-msgstr "Kattints a tokenhasználat részletezéséhez"
-
-#: includes/admin/class-bulk-actions.php:47 includes/admin/class-menu.php:189
-#: includes/admin/class-menu.php:231 includes/admin/class-menu.php:259
-#: includes/ajax/class-model.php:41 includes/ajax/class-model.php:82
-#: includes/ajax/class-model.php:120 includes/ajax/class-model.php:171
-msgid "Security check failed."
-msgstr "A biztonsági ellenőrzés sikertelen volt."
-
-#: includes/admin/class-bulk-actions.php:51 includes/admin/class-menu.php:180
-#: includes/admin/class-menu.php:223 includes/admin/class-menu.php:251
-msgid "You do not have sufficient permissions to access this page."
-msgstr "Nincs megfelelő jogosultságod az oldal eléréséhez."
-
-#: includes/admin/class-menu.php:52 includes/admin/class-menu.php:53
-#: views/page-list-plugins.php:30 views/page-list-plugins.php:39
-msgid "Generate New Plugin"
-msgstr "Új bővítmény generálása"
-
-#: includes/admin/class-menu.php:61 includes/admin/class-menu.php:62
-msgid "Settings"
-msgstr "Beállítások"
-
-#: includes/admin/class-menu.php:71 includes/admin/class-menu.php:72
-msgid "Extend Plugin"
-msgstr "Bővítmény továbbfejlesztése"
-
-#: includes/admin/class-menu.php:80 includes/admin/class-menu.php:81
-#: views/page-fix-plugin.php:53
-msgid "Fix Plugin"
-msgstr "Bővítmény javítása"
-
-#: includes/admin/class-menu.php:89 includes/admin/class-menu.php:90
-#: views/page-explain-plugin.php:67
-msgid "Explain Plugin"
-msgstr "Bővítmény magyarázata"
-
-#: includes/admin/class-menu.php:185 includes/admin/class-menu.php:227
-msgid "No plugin specified."
-msgstr "Nincs megadva bővítmény."
-
-#: includes/admin/class-menu.php:198 includes/admin/class-menu.php:239
-msgid "The specified plugin does not exist."
-msgstr "A megadott bővítmény nem létezik."
-
-#: includes/admin/class-menu.php:255
-msgid "No theme specified."
-msgstr "Nincs megadva sablon."
-
-#: includes/admin/class-menu.php:265
-msgid "The specified theme does not exist."
-msgstr "A megadott sablon nem létezik."
-
-#: includes/admin/class-notices.php:44
-msgid ""
-"The <code>DISALLOW_FILE_MODS</code> constant is defined in your wp-config."
-"php file, which prevents WP-Autoplugin from installing or updating plugins "
-"on your site."
-msgstr ""
-"A <code>DISALLOW_FILE_MODS</code> konstans definiálva van a wp-config.php "
-"fájlban, ami megakadályozza, hogy a WP-Autoplugin bővítményeket telepítsen "
-"vagy frissítsen az oldalon."
-
-#: includes/admin/class-notices.php:68
-msgid "The plugin could not be activated due to a fatal error."
-msgstr "A bővítményt nem lehetett aktiválni végzetes hiba miatt."
-
-#. translators: 1: fix link start tag, 2: fix link end tag
-#: includes/admin/class-notices.php:74
-msgid "You can %1$sfix the error automatically%2$s."
-msgstr "A hibát %1$sautomatikusan javíthatod%2$s."
-
-#: includes/admin/class-plugin-list-table.php:46
-msgid "Plugin"
-msgstr "Bővítmény"
-
-#: includes/admin/class-plugin-list-table.php:84
-msgid "Deactivate"
-msgstr "Kikapcsolás"
+#: includes/admin/class-scripts.php:138
+msgid "A widget that displays recent posts."
+msgstr "Widget, amely megjeleníti a legutóbbi bejegyzéseket."
 
 #: includes/admin/class-plugin-list-table.php:87
 msgid "Activate"
 msgstr "Bekapcsolás"
 
-#: includes/admin/class-plugin-list-table.php:90
-msgid "Fix"
-msgstr "Javítás"
-
-#: includes/admin/class-plugin-list-table.php:91
-msgid "Modify"
-msgstr "Módosítás"
-
-#: includes/admin/class-plugin-list-table.php:92
-msgid "Explain"
-msgstr "Magyarázat"
-
-#: includes/admin/class-plugin-list-table.php:93
-msgid "Delete"
-msgstr "Törlés"
-
-#: includes/admin/class-plugin-list-table.php:180
-msgid "No plugins found."
-msgstr "Nem található bővítmény."
-
-#: includes/admin/class-plugin-list-table.php:222
-msgid "All"
-msgstr "Összes"
-
-#: includes/admin/class-plugin-list-table.php:223
-msgid "Active"
-msgstr "Aktív"
-
-#: includes/admin/class-plugin-list-table.php:224
-msgid "Inactive"
-msgstr "Inaktív"
-
-#: includes/admin/class-scripts.php:34
-msgid "Please enter a plugin description."
-msgstr "Kérlek, adj meg egy leírást a bővítményhez."
-
-#: includes/admin/class-scripts.php:35
-msgid "Generating a plan for your plugin."
-msgstr "A bővítmény tervének generálása."
-
-#: includes/admin/class-scripts.php:36
-msgid "Error generating the plugin plan."
-msgstr "Hiba történt a bővítményterv generálása közben."
-
-#: includes/admin/class-scripts.php:37
-msgid "Generating code."
-msgstr "Kód generálása."
-
-#: includes/admin/class-scripts.php:38
-msgid "Error generating the plugin code."
-msgstr "Hiba történt a bővítménykód generálása közben."
-
-#: includes/admin/class-scripts.php:39
-msgid "Error creating the plugin."
-msgstr "Hiba történt a bővítmény létrehozása közben."
-
-#: includes/admin/class-scripts.php:40
-msgid "Installing the plugin."
-msgstr "A bővítmény telepítése."
-
-#: includes/admin/class-scripts.php:41
-msgid "Plugin successfully installed."
-msgstr "A bővítmény sikeresen telepítve."
-
-#: includes/admin/class-scripts.php:42
-msgid "How to test it?"
-msgstr "Hogyan tesztelheted?"
-
-#: includes/admin/class-scripts.php:43
-msgid "If you notice any issues, use the Fix button in the Autoplugins list."
-msgstr ""
-"Ha hibát észlelsz, használd a Javítás gombot az Autopluginok listájában."
-
 #: includes/admin/class-scripts.php:44
 msgid "Activate Plugin"
 msgstr "Bővítmény bekapcsolása"
 
-#: includes/admin/class-scripts.php:45
-msgid "The plugin code has been updated."
-msgstr "A bővítmény kódja frissítve."
-
-#: includes/admin/class-scripts.php:46
-msgid "Generating explanation..."
-msgstr "Magyarázat generálása..."
-
-#: includes/admin/class-scripts.php:47
-msgid "Error generating explanation."
-msgstr "Hiba történt a magyarázat generálása közben."
-
-#: includes/admin/class-scripts.php:48 views/page-explain-plugin.php:51
-msgid "Security Analysis"
-msgstr "Biztonsági elemzés"
-
-#: includes/admin/class-scripts.php:49 views/page-explain-plugin.php:55
-msgid "Performance Review"
-msgstr "Teljesítmény-ellenőrzés"
-
-#: includes/admin/class-scripts.php:50
-msgid "Code Quality Analysis"
-msgstr "Kódminőség elemzés"
-
-#: includes/admin/class-scripts.php:51 views/page-explain-plugin.php:63
-msgid "Usage Instructions"
-msgstr "Használati utasítások"
-
-#: includes/admin/class-scripts.php:52
-msgid "General Explanation"
-msgstr "Általános magyarázat"
-
-#: includes/admin/class-scripts.php:53
-msgid "Explanation copied to clipboard!"
-msgstr "Magyarázat a vágólapra másolva!"
-
-#: includes/admin/class-scripts.php:54
-msgid "Failed to copy explanation."
-msgstr "Nem sikerült a magyarázat másolása."
-
-#: includes/admin/class-scripts.php:55
-msgid "Please describe the changes you want to make to the plugin."
-msgstr ""
-"Kérlek, írd le, milyen változtatásokat szeretnél végrehajtani a bővítményen."
-
-#: includes/admin/class-scripts.php:56
-msgid "Error generating the development plan."
-msgstr "Hiba történt a fejlesztési terv generálása közben."
-
-#: includes/admin/class-scripts.php:57
-msgid "Generating the extended plugin code."
-msgstr "A kibővített bővítménykód generálása."
-
-#: includes/admin/class-scripts.php:58
-msgid "Error generating the extended code."
-msgstr "Hiba történt a kibővített kód generálása közben."
-
-#: includes/admin/class-scripts.php:59
-msgid "Error creating the extended plugin."
-msgstr "Hiba történt a kibővített bővítmény létrehozása közben."
-
-#: includes/admin/class-scripts.php:60
-msgid "Creating the extension plugin."
-msgstr "A kiegészítő bővítmény létrehozása."
-
-#: includes/admin/class-scripts.php:61
-msgid "Error activating the plugin."
-msgstr "Hiba történt a bővítmény aktiválása közben."
-
-#: includes/admin/class-scripts.php:62
-msgid "Extracting hooks, please wait..."
-msgstr "Hookok kinyerése, kérlek várj..."
-
-#: includes/admin/class-scripts.php:63
-msgid "No hooks found in the codebase. Cannot extend the plugin."
-msgstr "Nem találhatók hookok a kódbázisban. A bővítmény nem bővíthető."
-
-#: includes/admin/class-scripts.php:134
-msgid "A simple contact form with honeypot spam protection."
-msgstr "Egyszerű kapcsolatfelvételi űrlap honeypot spamszűréssel."
-
-#: includes/admin/class-scripts.php:135
-msgid "A custom post type for testimonials."
-msgstr "Egyedi bejegyzéstípus értékelésekhez."
-
-#: includes/admin/class-scripts.php:136
-msgid "A widget that displays recent posts."
-msgstr "Widget, amely megjeleníti a legutóbbi bejegyzéseket."
-
-#: includes/admin/class-scripts.php:137
-msgid "A simple image compression tool."
-msgstr "Egyszerű képtömörítő eszköz."
-
-#: includes/admin/class-scripts.php:385 views/footer-modal.php:161
-msgid "No token usage data available yet."
-msgstr "Még nem áll rendelkezésre tokenhasználati adat."
-
-#: includes/admin/class-scripts.php:386
-msgid "Total Usage"
-msgstr "Teljes használat"
-
-#: includes/admin/class-scripts.php:387
-msgid "Step Breakdown"
-msgstr "Lépésekre bontás"
-
-#: includes/admin/class-scripts.php:388
-msgid "Failed to save models."
-msgstr "A modellek mentése sikertelen."
-
-#: includes/admin/class-scripts.php:389
-msgid "An error occurred while saving models."
-msgstr "Hiba történt a modellek mentése közben."
-
-#: includes/ajax/class-ajax.php:95 includes/ajax/class-hooks-extender.php:41
-#: includes/ajax/class-hooks-extender.php:92
-#: includes/ajax/class-hooks-extender.php:154
-#: includes/ajax/class-hooks-extender.php:231 includes/ajax/class-model.php:116
-#: includes/ajax/class-model.php:167 includes/ajax/class-theme-extender.php:41
-#: includes/ajax/class-theme-extender.php:61
-#: includes/ajax/class-theme-extender.php:112
-#: includes/ajax/class-theme-extender.php:174
-msgid "You are not allowed to access this page."
-msgstr "Nincs jogosultságod az oldal eléréséhez."
-
-#: includes/ajax/class-ajax.php:108
-msgid "Invalid AJAX action."
-msgstr "Érvénytelen AJAX művelet."
-
-#: includes/ajax/class-extender.php:201 includes/ajax/class-fixer.php:252
-#: includes/ajax/class-generator.php:120 includes/ajax/class-generator.php:208
-#: includes/ajax/class-generator.php:241
-#: includes/ajax/class-hooks-extender.php:171
-#: includes/ajax/class-theme-extender.php:191
-msgid "Invalid input data."
-msgstr "Érvénytelen bemeneti adatok."
-
-#: includes/ajax/class-extender.php:206 includes/ajax/class-fixer.php:257
-#: includes/ajax/class-generator.php:125
-#: includes/ajax/class-hooks-extender.php:176
-#: includes/ajax/class-theme-extender.php:196
-msgid "File index out of range."
-msgstr "A fájl index kívül esik a tartományon."
-
-#: includes/ajax/class-fixer.php:200
-msgid "Invalid plugin path."
-msgstr "Érvénytelen bővítmény útvonal."
-
-#: includes/ajax/class-generator.php:58
-msgid "Failed to decode the generated plan: "
-msgstr "Nem sikerült dekódolni a generált tervet: "
-
-#: includes/ajax/class-generator.php:256
-msgid "Failed to decode the review result."
-msgstr "Nem sikerült dekódolni az ellenőrzés eredményét."
-
-#: includes/ajax/class-hooks-extender.php:46
-#: includes/ajax/class-hooks-extender.php:97
-#: includes/ajax/class-theme-extender.php:66
-#: includes/ajax/class-theme-extender.php:117
-msgid "Missing required parameters."
-msgstr "Hiányzó kötelező paraméterek."
-
-#: includes/ajax/class-hooks-extender.php:52
-msgid "No hooks found in the plugin."
-msgstr "Nem találhatók hookok a bővítményben."
-
-#: includes/ajax/class-hooks-extender.php:71
-#: includes/ajax/class-theme-extender.php:91
-msgid "Failed to decode the generated plan."
-msgstr "Nem sikerült dekódolni a generált tervet."
-
-#: includes/ajax/class-hooks-extender.php:237
-msgid "No plugin file specified."
-msgstr "Nincs megadva bővítményfájl."
-
-#: includes/ajax/class-model.php:46
-msgid "Invalid model data."
-msgstr "Érvénytelen modelladatok."
-
-#: includes/ajax/class-model.php:70
-msgid "Model added successfully."
-msgstr "A modell sikeresen hozzáadva."
-
-#: includes/ajax/class-model.php:92
-msgid "Invalid model index."
-msgstr "Érvénytelen modell index."
-
-#: includes/ajax/class-model.php:104
-msgid "Model removed successfully."
-msgstr "A modell sikeresen eltávolítva."
-
-#: includes/ajax/class-model.php:125
-msgid "No model specified."
-msgstr "Nincs megadva modell."
-
-#: includes/ajax/class-model.php:151
-msgid "Invalid model specified."
-msgstr "Érvénytelen modell lett megadva."
-
-#: includes/ajax/class-model.php:157
-msgid "Model changed successfully."
-msgstr "A modell sikeresen módosítva."
-
-#: includes/ajax/class-model.php:180
-msgid "Default model is required."
-msgstr "Alapértelmezett modell megadása kötelező."
-
-#. Translators: %s: model name.
-#: includes/ajax/class-model.php:209
-msgid "Invalid model specified: %s"
-msgstr "Érvénytelen modell lett megadva: %s"
-
-#: includes/ajax/class-model.php:219
-msgid "Models updated successfully."
-msgstr "A modellek sikeresen frissítve."
-
-#: includes/ajax/class-theme-extender.php:47
-msgid "No theme slug specified."
-msgstr "Nincs megadva sablon slug."
-
-#: includes/ajax/class-theme-extender.php:72
-msgid "No hooks found in the theme."
-msgstr "Nem találhatók hookok a sablonban."
-
-#: includes/api/class-custom-api.php:111
-msgid "Error communicating with the API."
-msgstr "Hiba történt az API-val való kommunikáció közben."
-
-#: includes/class-github-updater.php:409
-msgid "Plugin Information"
-msgstr "Bővítmény információk"
-
-#: includes/class-github-updater.php:410
-msgid "See the GitHub page for details."
-msgstr "Részletekért lásd a GitHub oldalt."
-
-#: includes/class-github-updater.php:411
-msgid "GitHub Repository"
-msgstr "GitHub Repository"
-
-#: includes/class-github-updater.php:634
-msgid ""
-"The plugin has been updated, but could not be reactivated. Please reactivate "
-"it manually."
-msgstr ""
-"A bővítmény frissítve lett, de nem sikerült újraaktiválni. Kérlek, aktiváld "
-"újra kézzel."
-
-#: includes/class-github-updater.php:635
-msgid "Plugin reactivated successfully."
-msgstr "A bővítmény sikeresen újraaktiválva."
-
-#: includes/class-hooks-extender.php:185
-msgid "(No custom hooks found in the theme code.)"
-msgstr "(Nem találhatók egyedi hookok a sablon kódjában.)"
-
-#: includes/class-plugin-installer.php:54
-#: includes/class-plugin-installer.php:180
-msgid "Plugin installation is disabled."
-msgstr "A bővítmény telepítése le van tiltva."
-
-#: includes/class-plugin-installer.php:69
-#: includes/class-plugin-installer.php:298
-msgid "Plugin path cannot contain \"../\"."
-msgstr "A bővítmény útvonala nem tartalmazhatja a \"../\" karaktersorozatot."
-
-#: includes/class-plugin-installer.php:73
-msgid "Error updating plugin file: file does not exist."
-msgstr "Hiba a bővítményfájl frissítésekor: a fájl nem létezik."
-
-#: includes/class-plugin-installer.php:86
-msgid "Error creating plugin file."
-msgstr "Hiba történt a bővítményfájl létrehozásakor."
-
-#: includes/class-plugin-installer.php:206
-msgid "Invalid directory path."
-msgstr "Érvénytelen könyvtár útvonal."
-
-#: includes/class-plugin-installer.php:221
-#: includes/class-plugin-installer.php:312
-msgid "Invalid file path."
-msgstr "Érvénytelen fájl útvonal."
-
-#. Translators: %s: file path.
-#: includes/class-plugin-installer.php:228
-msgid "Missing content for file: %s"
-msgstr "Hiányzó tartalom a fájlhoz: %s"
-
-#. Translators: %s: file path.
-#: includes/class-plugin-installer.php:240
-msgid "Error creating file: %s"
-msgstr "Hiba történt a fájl létrehozásakor: %s"
-
-#: includes/class-plugin-installer.php:263
-msgid "No main plugin file found."
-msgstr "Nem található fő bővítményfájl."
-
-#: includes/class-plugin-installer.php:285
-msgid "Plugin modification is disabled."
-msgstr "A bővítmény módosítása le van tiltva."
-
-#: includes/class-plugin-installer.php:304
-msgid "Target plugin directory does not exist."
-msgstr "A cél bővítmény könyvtár nem létezik."
-
-#. Translators: %s: file path.
-#: includes/class-plugin-installer.php:323
-msgid "Unsupported file type for update: %s"
-msgstr "Nem támogatott fájltípus a frissítéshez: %s"
-
-#. Translators: %s: file path.
-#: includes/class-plugin-installer.php:335
-msgid "Failed to write file: %s"
-msgstr "Nem sikerült a fájl írása: %s"
-
-#: includes/class-plugin-installer.php:352
-#: includes/class-plugin-installer.php:422
-#: includes/class-plugin-installer.php:443
-msgid "Plugin not found."
-msgstr "A bővítmény nem található."
-
-#: includes/class-plugin-installer.php:407
-msgid "Plugin activated successfully."
-msgstr "A bővítmény sikeresen aktiválva."
-
-#: includes/class-plugin-installer.php:428
-msgid "Plugin deactivated successfully."
-msgstr "A bővítmény sikeresen kikapcsolva."
-
-#. Translators: %s: error message.
-#: includes/class-plugin-installer.php:452
-msgid "Error deleting plugin: %s"
-msgstr "Hiba történt a bővítmény törlésekor: %s"
-
-#: includes/class-plugin-installer.php:456
-msgid "Plugin deleted successfully."
-msgstr "A bővítmény sikeresen törölve."
-
-#: views/footer-modal.php:5
-msgid "Select Models"
-msgstr "Modellek kiválasztása"
-
-#: views/footer-modal.php:10
-msgid "Default Model:"
-msgstr "Alapértelmezett modell:"
-
-#: views/footer-modal.php:28 views/footer-modal.php:62
-#: views/footer-modal.php:96 views/footer-modal.php:130
-#: views/page-settings.php:64 views/page-settings.php:88
-#: views/page-settings.php:151 views/page-settings.php:241
-msgid "Custom Models"
-msgstr "Egyedi modellek"
-
-#: views/footer-modal.php:44
-msgid "Planner Model:"
-msgstr "Tervező modell:"
-
-#: views/footer-modal.php:46 views/footer-modal.php:80
-#: views/footer-modal.php:114 views/page-settings.php:53
-msgid "Use Default Model"
-msgstr "Alapértelmezett modell használata"
-
-#: views/footer-modal.php:78
-msgid "Coder Model:"
-msgstr "Kódoló modell:"
-
-#: views/footer-modal.php:112
-msgid "Reviewer Model:"
-msgstr "Ellenőrző modell:"
-
-#: views/footer-modal.php:146
-msgid "Save Models"
-msgstr "Modellek mentése"
-
-#: views/footer-modal.php:147
-msgid "Cancel"
-msgstr "Mégsem"
-
-#: views/footer-modal.php:156
-msgid "Token Usage Breakdown"
-msgstr "Tokenhasználat részletezése"
-
-#: views/footer-modal.php:165
-msgid "Close"
-msgstr "Bezárás"
-
-#: views/page-explain-plugin.php:20 views/page-extend-hooks.php:15
-#: views/page-extend-plugin.php:20 views/page-extend-theme.php:15
-#: views/page-fix-plugin.php:20
-msgid "Nonce verification failed. Please try again."
-msgstr "Nonce ellenőrzés sikertelen. Kérlek próbáld újra."
-
-#. translators: %s: plugin name.
-#: views/page-explain-plugin.php:37
-msgid "Explain This Plugin: %s"
-msgstr "Bővítmény magyarázata: %s"
-
-#: views/page-explain-plugin.php:40
-msgid ""
-"Enter a specific question about this plugin or leave blank for a general "
-"explanation:"
-msgstr ""
-"Tegyél fel egy konkrét kérdést ezzel a bővítménnyel kapcsolatban, vagy hagyd "
-"üresen egy általános magyarázathoz:"
-
-#: views/page-explain-plugin.php:41
-msgid ""
-"E.g., How does this plugin store its data? | Leave empty for a complete "
-"explanation."
-msgstr ""
-"Pl.: Hogyan tárolja ez a bővítmény az adatokat? | Hagyd üresen a teljes "
-"magyarázathoz."
-
-#: views/page-explain-plugin.php:44
-msgid "Explanation Focus (Optional):"
-msgstr "Magyarázat fókusza (Opcionális):"
-
-#: views/page-explain-plugin.php:47
-msgid "General Overview"
-msgstr "Általános áttekintés"
-
-#: views/page-explain-plugin.php:59
-msgid "Code Quality"
-msgstr "Kódminőség"
-
-#: views/page-explain-plugin.php:73
-msgid "Plugin Explanation"
-msgstr "Bővítmény magyarázata"
-
-#. translators: %s: plugin name.
-#: views/page-explain-plugin.php:77
-msgid "Explanation for: %s"
-msgstr "Magyarázat ehhez: %s"
-
-#: views/page-explain-plugin.php:79
-msgid "Question/Focus:"
-msgstr "Kérdés/Fókusz:"
-
-#: views/page-explain-plugin.php:80
-msgid "General explanation"
-msgstr "Általános magyarázat"
-
-#: views/page-explain-plugin.php:86
-msgid "Ask Another Question"
-msgstr "Új kérdés feltétele"
-
-#: views/page-explain-plugin.php:87
-msgid "Copy to Clipboard"
-msgstr "Másolás vágólapra"
-
-#: views/page-explain-plugin.php:88
-msgid "Download as Text"
-msgstr "Letöltés szövegként"
-
-#. translators: %s: plugin name.
-#: views/page-extend-hooks.php:24
-msgid "Create Extension for: %s"
-msgstr "Kiegészítő létrehozása ehhez: %s"
-
-#: views/page-extend-hooks.php:27
-msgid "Extracting plugin hooks, please wait..."
-msgstr "Bővítmény hookok kinyerése, kérlek várj..."
-
-#: views/page-extend-hooks.php:36 views/page-extend-theme.php:40
-msgid "Copy Hooks"
-msgstr "Hookok másolása"
-
-#: views/page-extend-hooks.php:38 views/page-extend-theme.php:42
-msgid ""
-"Copy all hooks to clipboard, along with relevant context, to use with your "
-"LLM of choice."
-msgstr ""
-"Másold az összes hookot a vágólapra a releváns kontextussal együtt, hogy "
-"használhasd a választott LLM-eddel."
-
-#: views/page-extend-hooks.php:42
-msgid "Describe the extension you would like to create:"
-msgstr "Írd le a létrehozni kívánt kiegészítőt:"
-
-#: views/page-extend-hooks.php:44 views/page-extend-theme.php:48
-msgid "Generate Extension Plan"
-msgstr "Kiegészítő terv generálása"
-
-#: views/page-extend-hooks.php:51 views/page-extend-theme.php:55
-msgid "Generated Extension Plan"
-msgstr "Generált kiegészítő terv"
-
-#: views/page-extend-hooks.php:53 views/page-extend-theme.php:57
-msgid "Review or edit the generated plan for the extension plugin:"
-msgstr "Nézd át vagy szerkeszd a kiegészítő bővítmény generált tervét:"
-
-#: views/page-extend-hooks.php:56 views/page-extend-theme.php:60
-msgid "« Edit Description"
-msgstr "&laquo; Leírás szerkesztése"
-
-#: views/page-extend-hooks.php:57 views/page-extend-theme.php:61
-msgid "Generate Extension Code"
-msgstr "Kiegészítő kód generálása"
-
-#. translators: %s: theme/plugin name.
-#: views/page-extend-hooks.php:64 views/page-extend-theme.php:68
-msgid "Extension Plugin for: %s"
-msgstr "Kiegészítő bővítmény ehhez: %s"
-
-#: views/page-extend-hooks.php:66 views/page-extend-theme.php:70
-msgid "Review the generated code before saving:"
-msgstr "Nézd át a generált kódot mentés előtt:"
-
-#: views/page-extend-hooks.php:79 views/page-extend-plugin.php:81
-#: views/page-extend-theme.php:83 views/page-fix-plugin.php:83
-#: views/page-generate-plugin.php:65
-msgid "Generating files..."
-msgstr "Fájlok generálása..."
-
-#: views/page-extend-hooks.php:89 views/page-extend-plugin.php:99
-#: views/page-extend-theme.php:93 views/page-fix-plugin.php:101
-#: views/page-generate-plugin.php:105
-msgid "Warning:"
-msgstr "Figyelmeztetés:"
-
-#: views/page-extend-hooks.php:89 views/page-extend-theme.php:93
-#: views/page-generate-plugin.php:105
-msgid ""
-"AI-generated code may be unstable or insecure; use only after careful review "
-"and testing."
-msgstr ""
-"Az AI által generált kód instabil lehet és biztonsági hibákat tartalmazhat. "
-"Csak alapos kódellenőrzés és tesztelés után használd."
-
-#: views/page-extend-hooks.php:93 views/page-extend-theme.php:97
-#: views/page-extend-plugin.php:104 views/page-fix-plugin.php:106
-#: views/page-generate-plugin.php:109
-msgid "« Edit Plan"
-msgstr "&laquo; Terv szerkesztése"
-
-#: views/page-extend-hooks.php:94 views/page-extend-theme.php:98
-msgid "Save Extension Plugin"
-msgstr "Kiegészítő bővítmény mentése"
-
-#. translators: %s: error message.
-#: views/page-extend-plugin.php:37 views/page-fix-plugin.php:39
-msgid "Error while activating the plugin: %s"
-msgstr "Hiba történt a bővítmény aktiválása közben: %s"
-
-#. translators: %s: plugin name.
-#: views/page-extend-plugin.php:46
-msgid "Modify This Plugin: %s"
-msgstr "Bővítmény módosítása: %s"
-
-#: views/page-extend-plugin.php:49
-msgid ""
-"Describe the changes you would like to make to the plugin. Include as much "
-"detail as possible:"
-msgstr ""
-"Írd le a bővítményen végrehajtani kívánt módosításokat. Minél részletesebb "
-"leírást adj meg:"
-
-#: views/page-extend-plugin.php:51 views/page-generate-plugin.php:26
-msgid "Generate Plan"
-msgstr "Terv generálása"
-
-#: views/page-extend-plugin.php:57 views/page-fix-plugin.php:59
-#: views/page-generate-plugin.php:31
-msgid "Generated Plan"
-msgstr "Generált terv"
-
-#: views/page-extend-plugin.php:60 views/page-fix-plugin.php:62
-#: views/page-generate-plugin.php:34
-msgid "Review or edit the generated plan:"
-msgstr "Nézd át vagy szerkeszd a generált tervet:"
-
-# Kontextus: Bővítmény módosítása/bővítése oldalon.
-#: views/page-extend-plugin.php:63
-msgid "&laquo; Edit Issue"
-msgstr "&laquo; Leírás szerkesztése"
-
-#: views/page-extend-plugin.php:64 views/page-fix-plugin.php:66
-#: views/page-generate-plugin.php:41
-msgid "Generate Plugin Code"
-msgstr "Bővítménykód generálása"
-
-#. translators: %s: plugin name.
-#: views/page-extend-plugin.php:71
-msgid "Extended Plugin: %s"
-msgstr "Kibővített bővítmény: %s"
-
-#: views/page-extend-plugin.php:74
-msgid ""
-"The plugin has been modified successfully. You can review the changes before "
-"activating it:"
-msgstr ""
-"A bővítmény sikeresen módosítva. Aktiválás előtt áttekintheted a "
-"változtatásokat:"
-
-#: views/page-extend-plugin.php:99 views/page-fix-plugin.php:101
-msgid "This plugin is active, changes will take effect immediately."
-msgstr "Ez a bővítmény aktív, a változások azonnal érvénybe lépnek."
-
-#: views/page-extend-plugin.php:105 views/page-fix-plugin.php:107
-msgid "Save Changes"
-msgstr "Változtatások mentése"
-
-#. translators: %s: theme name.
-#: views/page-extend-theme.php:28
-msgid "Extend This Theme: %s"
-msgstr "Sablon kibővítése: %s"
-
-#: views/page-extend-theme.php:31
-msgid "Extracting theme hooks, please wait..."
-msgstr "Sablon hookok kinyerése, kérlek várj..."
-
-#: views/page-extend-theme.php:46
-msgid "Describe the extension you would like to make to the theme:"
-msgstr "Írd le a sablonon végrehajtani kívánt bővítést:"
-
-#: views/page-fix-plugin.php:32
-msgid "Unknown Plugin"
-msgstr "Ismeretlen bővítmény"
-
-#. translators: %s: plugin name.
-#: views/page-fix-plugin.php:48
-msgid "Fix This Plugin: %s"
-msgstr "Bővítmény javítása: %s"
-
-#: views/page-fix-plugin.php:51
-msgid ""
-"Describe the issue you are experiencing with the plugin. Include as much "
-"detail as possible and any error messages you are seeing:"
-msgstr ""
-"Írd le a bővítmény használata közben tapasztalt problémát. Minél "
-"részletesebb leírást adj meg, és tüntesd fel a hibaüzeneteket is:"
-
-#. translators: %s: plugin name.
-#: views/page-fix-plugin.php:73
-msgid "Fixed Plugin: %s"
-msgstr "Javított bővítmény: %s"
-
-#: views/page-fix-plugin.php:76
-msgid ""
-"The plugin has been fixed successfully. You can review the changes before "
-"activating it:"
-msgstr ""
-"A bővítmény sikeresen javítva. Aktiválás előtt áttekintheted a "
-"változtatásokat:"
-
-#: views/page-generate-plugin.php:21
-msgid "Generate Plugin"
-msgstr "Bővítmény generálása"
-
-#: views/page-generate-plugin.php:24
-msgid "Enter a description of the plugin you want to generate:"
-msgstr "Add meg a létrehozni kívánt bővítmény leírását:"
-
-#: views/page-generate-plugin.php:40
-msgid "&laquo; Edit Description"
-msgstr "&laquo; Leírás szerkesztése"
-
-#: views/page-generate-plugin.php:47
-msgid "Generated Plugin Code"
-msgstr "Generált bővítménykód"
-
-#: views/page-generate-plugin.php:53
-msgid ""
-"The plugin code has been generated successfully. You can review and edit the "
-"plugin file before activating it:"
-msgstr ""
-"A bővítménykód sikeresen generálva. Aktiválás előtt áttekintheted és "
-"szerkesztheted a bővítményfájlt:"
-
-#: views/page-generate-plugin.php:59
-msgid "You can review and edit the generated code before installing:"
-msgstr "Telepítés előtt áttekintheted és szerkesztheted a generált kódot:"
-
-#: views/page-generate-plugin.php:70
-msgid "AI is reviewing the complete codebase..."
-msgstr "Az MI ellenőrzi a teljes kódbázist..."
-
-#: views/page-generate-plugin.php:74
-msgid "Code Review Results"
-msgstr "Kódellenőrzés eredményei"
-
-#: views/page-generate-plugin.php:78
-msgid "Suggested Improvements"
-msgstr "Javasolt fejlesztések"
-
-#: views/page-generate-plugin.php:83
-msgid "Apply Suggestions"
-msgstr "Javaslatok alkalmazása"
-
-#: views/page-generate-plugin.php:86
-msgid "Skip Review"
-msgstr "Ellenőrzés kihagyása"
-
-#: views/page-generate-plugin.php:110
-msgid "Install Plugin"
-msgstr "Bővítmény telepítése"
-
-#: views/page-list-plugins.php:29
-msgid "Autoplugins"
-msgstr "Autopluginok"
-
-#: views/page-list-plugins.php:37
-msgid "You don't have any autoplugins yet."
-msgstr "Még nincsenek autopluginjaid."
-
-#: views/page-list-plugins.php:38
-msgid ""
-"Autoplugins are regular plugins, but they are generated by AI. You can "
-"manage them just like any other plugin. They will be listed here for your "
-"convenience."
-msgstr ""
-"Az autopluginok hagyományos bővítmények, amelyeket mesterséges intelligencia "
-"hozott létre. Ugyanúgy kezelheted őket, mint bármely más bővítményt. A "
-"könnyebb áttekinthetőség érdekében itt listázzuk őket."
-
-#: views/page-settings.php:23
-msgid "WP-Autoplugin Settings"
-msgstr "WP-Autoplugin beállítások"
-
-#: views/page-settings.php:32
-msgid "OpenAI API Key"
-msgstr "OpenAI API-kulcs"
-
-#: views/page-settings.php:36
-msgid "Anthropic API Key"
-msgstr "Anthropic API-kulcs"
-
-#: views/page-settings.php:40
-msgid "Google Gemini API Key"
-msgstr "Google Gemini API-kulcs"
-
-#: views/page-settings.php:44
-msgid "xAI API Key"
-msgstr "xAI API-kulcs"
-
-#: views/page-settings.php:75
-msgid "Default Model"
-msgstr "Alapértelmezett modell"
-
-#: views/page-settings.php:98 views/page-settings.php:190
-msgid "Show specialized model settings"
-msgstr "Speciális modellbeállítások megjelenítése"
-
-#: views/page-settings.php:114
-msgid "Planner Model"
-msgstr "Tervező modell"
-
-#: views/page-settings.php:117
-msgid ""
-"Used for planning plugin extensions and analyzing hooks. Falls back to "
-"Default Model if not set."
-msgstr ""
-"Bővítmény-kiegészítők tervezésére és hookok elemzésére használatos. Ha nincs "
-"beállítva, az Alapértelmezett modellt használja."
-
-#: views/page-settings.php:121
-msgid "Coder Model"
-msgstr "Kódoló modell"
-
-#: views/page-settings.php:124
-msgid ""
-"Used for generating and fixing code. Falls back to Default Model if not set."
-msgstr ""
-"Kód generálására és javítására használatos. Ha nincs beállítva, az "
-"Alapértelmezett modellt használja."
-
-#: views/page-settings.php:128
-msgid "Reviewer Model"
-msgstr "Ellenőrző modell"
-
-#: views/page-settings.php:131
-msgid ""
-"Used for explaining code and reviewing generated plugins. Falls back to "
-"Default Model if not set."
-msgstr ""
-"Kód magyarázatára és a generált bővítmények ellenőrzésére használatos. Ha "
-"nincs beállítva, az Alapértelmezett modellt használja."
-
-#: views/page-settings.php:138
-msgid "Generate Plugins"
-msgstr "Bővítmények generálása"
-
-#: views/page-settings.php:142
-msgid "Simple plugin mode (single-file plugins)"
-msgstr "Egyszerű bővítmény mód (egyfájlos bővítmények)"
-
-#: views/page-settings.php:143
-msgid "Complex plugin mode (multi-file plugins)"
-msgstr "Összetett bővítmény mód (többfájlos bővítmények)"
-
-#: views/page-settings.php:146
-msgid "Complex mode uses more tokens. For best results, use capable models."
-msgstr ""
-"Az összetett mód több tokent használ. A legjobb eredmény érdekében használj "
-"nagy kapacitású modelleket."
-
-#: views/page-settings.php:159
-msgid "Model Name (User-defined Label)"
-msgstr "Modell neve (Felhasználó által definiált címke)"
-
-#: views/page-settings.php:160
-msgid "API Endpoint URL"
-msgstr "API végpont URL"
-
-#: views/page-settings.php:161
-msgid "\"model\" Parameter Value"
-msgstr "A \"model\" paraméter értéke"
-
-#: views/page-settings.php:162 views/page-settings.php:207
-msgid "API Key"
-msgstr "API-kulcs"
-
-#: views/page-settings.php:163
-msgid "Additional Headers (one per line, name=value)"
-msgstr "További fejlécadatok (soronként egy, név=érték)"
-
-#: views/page-settings.php:164
-msgid "Add Custom Model"
-msgstr "Egyedi modell hozzáadása"
+#: includes/admin/class-plugin-list-table.php:223
+msgid "Active"
+msgstr "Aktív"
 
 #: views/page-settings.php:170
 msgid ""
@@ -1063,38 +86,1023 @@ msgstr ""
 "használni. Ezek a modellek elérhetőek lesznek a modellválasztó legördülő "
 "menüben. Az API-nak kompatibilisnek kell lennie az OpenAI API-val."
 
-#: views/page-settings.php:193 views/page-settings.php:199
-msgid "Hide specialized model settings"
-msgstr "Speciális modellbeállítások elrejtése"
+#: views/page-settings.php:164
+msgid "Add Custom Model"
+msgstr "Egyedi modell hozzáadása"
 
-#: views/page-settings.php:204
-msgid "Details"
-msgstr "Részletek"
+#: views/page-settings.php:163
+msgid "Additional Headers (one per line, name=value)"
+msgstr "További fejlécadatok (soronként egy, név=érték)"
 
-#: views/page-settings.php:205
-msgid "URL"
-msgstr "URL"
+#: views/page-generate-plugin.php:70
+msgid "AI is reviewing the complete codebase..."
+msgstr "Az MI ellenőrzi a teljes kódbázist..."
 
-#: views/page-settings.php:206
-msgid "Model Parameter"
-msgstr "Modell paraméter"
+#: views/page-extend-hooks.php:89 views/page-extend-theme.php:93
+#: views/page-generate-plugin.php:105
+msgid ""
+"AI-generated code may be unstable or insecure; use only after careful review "
+"and testing."
+msgstr ""
+"Az AI által generált kód instabil lehet és biztonsági hibákat tartalmazhat. "
+"Csak alapos kódellenőrzés és tesztelés után használd."
 
-#: views/page-settings.php:208
-msgid "Headers"
-msgstr "Fejlécek"
+#: includes/admin/class-plugin-list-table.php:222
+msgid "All"
+msgstr "Összes"
 
-#: views/page-settings.php:209
-msgid "Remove"
-msgstr "Eltávolítás"
+#: includes/admin/class-scripts.php:391
+msgid "An error occurred while saving models."
+msgstr "Hiba történt a modellek mentése közben."
 
-#: views/page-settings.php:210
-msgid "Please fill out all required fields."
-msgstr "Kérlek, töltsd ki az összes kötelező mezőt."
+#: views/page-settings.php:36
+msgid "Anthropic API Key"
+msgstr "Anthropic API-kulcs"
+
+#: views/page-settings.php:160
+msgid "API Endpoint URL"
+msgstr "API végpont URL"
+
+#: views/page-settings.php:162 views/page-settings.php:207
+msgid "API Key"
+msgstr "API-kulcs"
+
+#: views/page-generate-plugin.php:83
+msgid "Apply Suggestions"
+msgstr "Javaslatok alkalmazása"
 
 #: views/page-settings.php:211
 msgid "Are you sure you want to remove this model?"
 msgstr "Biztosan el akarod távolítani ezt a modellt?"
 
+#: views/page-explain-plugin.php:86
+msgid "Ask Another Question"
+msgstr "Új kérdés feltétele"
+
+#: views/page-list-plugins.php:29
+msgid "Autoplugins"
+msgstr "Autopluginok"
+
+#: views/page-list-plugins.php:38
+msgid ""
+"Autoplugins are regular plugins, but they are generated by AI. You can "
+"manage them just like any other plugin. They will be listed here for your "
+"convenience."
+msgstr ""
+"Az autopluginok hagyományos bővítmények, amelyeket mesterséges intelligencia "
+"hozott létre. Ugyanúgy kezelheted őket, mint bármely más bővítményt. A "
+"könnyebb áttekinthetőség érdekében itt listázzuk őket."
+
+#. Author of the plugin
+#: wp-autoplugin.php
+msgid "Balázs Piller"
+msgstr "Piller Balázs"
+
+#: views/footer-modal.php:147
+msgid "Cancel"
+msgstr "Mégsem"
+
+#: includes/admin/class-admin.php:99
+msgid "Click for token usage breakdown"
+msgstr "Kattints a tokenhasználat részletezéséhez"
+
+#: views/footer-modal.php:165
+msgid "Close"
+msgstr "Bezárás"
+
+#: views/page-explain-plugin.php:59
+msgid "Code Quality"
+msgstr "Kódminőség"
+
+#: includes/admin/class-scripts.php:50
+msgid "Code Quality Analysis"
+msgstr "Kódminőség elemzés"
+
+#: views/page-generate-plugin.php:74
+msgid "Code Review Results"
+msgstr "Kódellenőrzés eredményei"
+
+#: views/page-settings.php:121
+msgid "Coder Model"
+msgstr "Kódoló modell"
+
+#: views/footer-modal.php:78
+msgid "Coder Model:"
+msgstr "Kódoló modell:"
+
+#: views/page-settings.php:146
+msgid "Complex mode uses more tokens. For best results, use capable models."
+msgstr ""
+"Az összetett mód több tokent használ. A legjobb eredmény érdekében használj "
+"nagy kapacitású modelleket."
+
+#: views/page-settings.php:143
+msgid "Complex plugin mode (multi-file plugins)"
+msgstr "Összetett bővítmény mód (többfájlos bővítmények)"
+
+#: views/page-extend-hooks.php:38 views/page-extend-theme.php:42
+msgid ""
+"Copy all hooks to clipboard, along with relevant context, to use with your "
+"LLM of choice."
+msgstr ""
+"Másold az összes hookot a vágólapra a releváns kontextussal együtt, hogy "
+"használhasd a választott LLM-eddel."
+
+#: views/page-extend-hooks.php:36 views/page-extend-theme.php:40
+msgid "Copy Hooks"
+msgstr "Hookok másolása"
+
+#: views/page-explain-plugin.php:87
+msgid "Copy to Clipboard"
+msgstr "Másolás vágólapra"
+
+#: includes/admin/class-action-links.php:46 includes/admin/class-menu.php:98
+#: includes/admin/class-menu.php:99
+msgid "Create Extension"
+msgstr "Kiegészítő létrehozása"
+
+#. translators: %s: plugin name.
+#: views/page-extend-hooks.php:24
+msgid "Create Extension for: %s"
+msgstr "Kiegészítő létrehozása ehhez: %s"
+
+#: includes/admin/class-scripts.php:60
+msgid "Creating the extension plugin."
+msgstr "A kiegészítő bővítmény létrehozása."
+
+#: views/footer-modal.php:28 views/footer-modal.php:62
+#: views/footer-modal.php:96 views/footer-modal.php:130
+#: views/page-settings.php:64 views/page-settings.php:88
+#: views/page-settings.php:151 views/page-settings.php:241
+msgid "Custom Models"
+msgstr "Egyedi modellek"
+
+#: includes/admin/class-plugin-list-table.php:84
+msgid "Deactivate"
+msgstr "Kikapcsolás"
+
+#: views/page-settings.php:75
+msgid "Default Model"
+msgstr "Alapértelmezett modell"
+
+#: includes/ajax/class-model.php:180
+msgid "Default model is required."
+msgstr "Alapértelmezett modell megadása kötelező."
+
+#: views/footer-modal.php:10
+msgid "Default Model:"
+msgstr "Alapértelmezett modell:"
+
+#: includes/admin/class-plugin-list-table.php:93
+msgid "Delete"
+msgstr "Törlés"
+
+#: views/page-extend-plugin.php:49
+msgid ""
+"Describe the changes you would like to make to the plugin. Include as much "
+"detail as possible:"
+msgstr ""
+"Írd le a bővítményen végrehajtani kívánt módosításokat. Minél részletesebb "
+"leírást adj meg:"
+
+#: views/page-extend-hooks.php:42
+msgid "Describe the extension you would like to create:"
+msgstr "Írd le a létrehozni kívánt kiegészítőt:"
+
+#: views/page-extend-theme.php:46
+msgid "Describe the extension you would like to make to the theme:"
+msgstr "Írd le a sablonon végrehajtani kívánt bővítést:"
+
+#: views/page-fix-plugin.php:51
+msgid ""
+"Describe the issue you are experiencing with the plugin. Include as much "
+"detail as possible and any error messages you are seeing:"
+msgstr ""
+"Írd le a bővítmény használata közben tapasztalt problémát. Minél "
+"részletesebb leírást adj meg, és tüntesd fel a hibaüzeneteket is:"
+
+#: views/page-settings.php:204
+msgid "Details"
+msgstr "Részletek"
+
+#: views/page-explain-plugin.php:88
+msgid "Download as Text"
+msgstr "Letöltés szövegként"
+
+#: includes/admin/class-scripts.php:64
+msgid "Drop files to attach"
+msgstr "Csatolandó fájlok eldobása"
+
+#: views/page-explain-plugin.php:41
+msgid ""
+"E.g., How does this plugin store its data? | Leave empty for a complete "
+"explanation."
+msgstr ""
+"Pl.: Hogyan tárolja ez a bővítmény az adatokat? | Hagyd üresen a teljes "
+"magyarázathoz."
+
+#: views/page-generate-plugin.php:24
+msgid "Enter a description of the plugin you want to generate:"
+msgstr "Add meg a létrehozni kívánt bővítmény leírását:"
+
+#: views/page-explain-plugin.php:40
+msgid ""
+"Enter a specific question about this plugin or leave blank for a general "
+"explanation:"
+msgstr ""
+"Tegyél fel egy konkrét kérdést ezzel a bővítménnyel kapcsolatban, vagy hagyd "
+"üresen egy általános magyarázathoz:"
+
+#: includes/admin/class-scripts.php:61
+msgid "Error activating the plugin."
+msgstr "Hiba történt a bővítmény aktiválása közben."
+
+#: includes/api/class-custom-api.php:111
+#: includes/api/class-openai-responses-api.php:94
+msgid "Error communicating with the API."
+msgstr "Hiba történt az API-val való kommunikáció közben."
+
+#. Translators: %s: file path.
+#: includes/class-plugin-installer.php:240
+msgid "Error creating file: %s"
+msgstr "Hiba történt a fájl létrehozásakor: %s"
+
+#: includes/class-plugin-installer.php:86
+msgid "Error creating plugin file."
+msgstr "Hiba történt a bővítményfájl létrehozásakor."
+
+#: includes/admin/class-scripts.php:59
+msgid "Error creating the extended plugin."
+msgstr "Hiba történt a kibővített bővítmény létrehozása közben."
+
+#: includes/admin/class-scripts.php:39
+msgid "Error creating the plugin."
+msgstr "Hiba történt a bővítmény létrehozása közben."
+
+#. Translators: %s: error message.
+#: includes/class-plugin-installer.php:452
+msgid "Error deleting plugin: %s"
+msgstr "Hiba történt a bővítmény törlésekor: %s"
+
+#: includes/admin/class-scripts.php:47
+msgid "Error generating explanation."
+msgstr "Hiba történt a magyarázat generálása közben."
+
+#: includes/admin/class-scripts.php:56
+msgid "Error generating the development plan."
+msgstr "Hiba történt a fejlesztési terv generálása közben."
+
+#: includes/admin/class-scripts.php:58
+msgid "Error generating the extended code."
+msgstr "Hiba történt a kibővített kód generálása közben."
+
+#: includes/admin/class-scripts.php:38
+msgid "Error generating the plugin code."
+msgstr "Hiba történt a bővítménykód generálása közben."
+
+#: includes/admin/class-scripts.php:36
+msgid "Error generating the plugin plan."
+msgstr "Hiba történt a bővítményterv generálása közben."
+
 #: views/page-settings.php:212
 msgid "Error saving model"
 msgstr "Hiba történt a modell mentése közben."
+
+#: includes/class-plugin-installer.php:73
+msgid "Error updating plugin file: file does not exist."
+msgstr "Hiba a bővítményfájl frissítésekor: a fájl nem létezik."
+
+#. translators: %s: error message.
+#: views/page-extend-plugin.php:37 views/page-fix-plugin.php:39
+msgid "Error while activating the plugin: %s"
+msgstr "Hiba történt a bővítmény aktiválása közben: %s"
+
+#: includes/admin/class-plugin-list-table.php:92
+msgid "Explain"
+msgstr "Magyarázat"
+
+#: includes/admin/class-menu.php:89 includes/admin/class-menu.php:90
+#: views/page-explain-plugin.php:67
+msgid "Explain Plugin"
+msgstr "Bővítmény magyarázata"
+
+#. translators: %s: plugin name.
+#: views/page-explain-plugin.php:37
+msgid "Explain This Plugin: %s"
+msgstr "Bővítmény magyarázata: %s"
+
+#: includes/admin/class-scripts.php:53
+msgid "Explanation copied to clipboard!"
+msgstr "Magyarázat a vágólapra másolva!"
+
+#: views/page-explain-plugin.php:44
+msgid "Explanation Focus (Optional):"
+msgstr "Magyarázat fókusza (Opcionális):"
+
+#. translators: %s: plugin name.
+#: views/page-explain-plugin.php:77
+msgid "Explanation for: %s"
+msgstr "Magyarázat ehhez: %s"
+
+#: includes/admin/class-action-links.php:88
+msgid "Extend"
+msgstr "Kibővítés"
+
+#: includes/admin/class-menu.php:71 includes/admin/class-menu.php:72
+msgid "Extend Plugin"
+msgstr "Bővítmény továbbfejlesztése"
+
+#: includes/admin/class-action-links.php:63 includes/admin/class-menu.php:107
+#: includes/admin/class-menu.php:108
+msgid "Extend Theme"
+msgstr "Sablon kibővítése"
+
+#. translators: %s: theme name.
+#: views/page-extend-theme.php:28
+msgid "Extend This Theme: %s"
+msgstr "Sablon kibővítése: %s"
+
+#. translators: %s: plugin name.
+#: views/page-extend-plugin.php:71
+msgid "Extended Plugin: %s"
+msgstr "Kibővített bővítmény: %s"
+
+#. translators: %s: theme/plugin name.
+#: views/page-extend-hooks.php:64 views/page-extend-theme.php:68
+msgid "Extension Plugin for: %s"
+msgstr "Kiegészítő bővítmény ehhez: %s"
+
+#: includes/admin/class-scripts.php:62
+msgid "Extracting hooks, please wait..."
+msgstr "Hookok kinyerése, kérlek várj..."
+
+#: views/page-extend-hooks.php:27
+msgid "Extracting plugin hooks, please wait..."
+msgstr "Bővítmény hookok kinyerése, kérlek várj..."
+
+#: views/page-extend-theme.php:31
+msgid "Extracting theme hooks, please wait..."
+msgstr "Sablon hookok kinyerése, kérlek várj..."
+
+#: includes/admin/class-scripts.php:54
+msgid "Failed to copy explanation."
+msgstr "Nem sikerült a magyarázat másolása."
+
+#: includes/ajax/class-hooks-extender.php:72
+#: includes/ajax/class-theme-extender.php:92
+msgid "Failed to decode the generated plan."
+msgstr "Nem sikerült dekódolni a generált tervet."
+
+#: includes/ajax/class-generator.php:60
+msgid "Failed to decode the generated plan: "
+msgstr "Nem sikerült dekódolni a generált tervet: "
+
+#: includes/ajax/class-generator.php:258
+msgid "Failed to decode the review result."
+msgstr "Nem sikerült dekódolni az ellenőrzés eredményét."
+
+#: includes/admin/class-scripts.php:390
+msgid "Failed to save models."
+msgstr "A modellek mentése sikertelen."
+
+#. Translators: %s: file path.
+#: includes/class-plugin-installer.php:335
+msgid "Failed to write file: %s"
+msgstr "Nem sikerült a fájl írása: %s"
+
+#: includes/ajax/class-extender.php:208 includes/ajax/class-fixer.php:259
+#: includes/ajax/class-generator.php:127
+#: includes/ajax/class-hooks-extender.php:177
+#: includes/ajax/class-theme-extender.php:197
+msgid "File index out of range."
+msgstr "A fájl index kívül esik a tartományon."
+
+#: includes/admin/class-plugin-list-table.php:90
+msgid "Fix"
+msgstr "Javítás"
+
+#: includes/admin/class-menu.php:80 includes/admin/class-menu.php:81
+#: views/page-fix-plugin.php:53
+msgid "Fix Plugin"
+msgstr "Bővítmény javítása"
+
+#. translators: %s: plugin name.
+#: views/page-fix-plugin.php:48
+msgid "Fix This Plugin: %s"
+msgstr "Bővítmény javítása: %s"
+
+#. translators: %s: plugin name.
+#: views/page-fix-plugin.php:73
+msgid "Fixed Plugin: %s"
+msgstr "Javított bővítmény: %s"
+
+#: includes/admin/class-scripts.php:52
+msgid "General Explanation"
+msgstr "Általános magyarázat"
+
+#: views/page-explain-plugin.php:80
+msgid "General explanation"
+msgstr "Általános magyarázat"
+
+#: views/page-explain-plugin.php:47
+msgid "General Overview"
+msgstr "Általános áttekintés"
+
+#: views/page-extend-hooks.php:57 views/page-extend-theme.php:61
+msgid "Generate Extension Code"
+msgstr "Kiegészítő kód generálása"
+
+#: views/page-extend-hooks.php:44 views/page-extend-theme.php:48
+msgid "Generate Extension Plan"
+msgstr "Kiegészítő terv generálása"
+
+#: includes/admin/class-menu.php:52 includes/admin/class-menu.php:53
+#: views/page-list-plugins.php:30 views/page-list-plugins.php:39
+msgid "Generate New Plugin"
+msgstr "Új bővítmény generálása"
+
+#: views/page-extend-plugin.php:51 views/page-generate-plugin.php:26
+msgid "Generate Plan"
+msgstr "Terv generálása"
+
+#: views/page-generate-plugin.php:21
+msgid "Generate Plugin"
+msgstr "Bővítmény generálása"
+
+#: views/page-extend-plugin.php:64 views/page-fix-plugin.php:66
+#: views/page-generate-plugin.php:41
+msgid "Generate Plugin Code"
+msgstr "Bővítménykód generálása"
+
+#: views/page-settings.php:138
+msgid "Generate Plugins"
+msgstr "Bővítmények generálása"
+
+#: views/page-extend-hooks.php:51 views/page-extend-theme.php:55
+msgid "Generated Extension Plan"
+msgstr "Generált kiegészítő terv"
+
+#: views/page-extend-plugin.php:57 views/page-fix-plugin.php:59
+#: views/page-generate-plugin.php:31
+msgid "Generated Plan"
+msgstr "Generált terv"
+
+#: views/page-generate-plugin.php:47
+msgid "Generated Plugin Code"
+msgstr "Generált bővítménykód"
+
+#: includes/admin/class-scripts.php:35
+msgid "Generating a plan for your plugin."
+msgstr "A bővítmény tervének generálása."
+
+#: includes/admin/class-scripts.php:37
+msgid "Generating code."
+msgstr "Kód generálása."
+
+#: includes/admin/class-scripts.php:46
+msgid "Generating explanation..."
+msgstr "Magyarázat generálása..."
+
+#: views/page-extend-hooks.php:79 views/page-extend-plugin.php:81
+#: views/page-extend-theme.php:83 views/page-fix-plugin.php:83
+#: views/page-generate-plugin.php:65
+msgid "Generating files..."
+msgstr "Fájlok generálása..."
+
+#: includes/admin/class-scripts.php:57
+msgid "Generating the extended plugin code."
+msgstr "A kibővített bővítménykód generálása."
+
+#: includes/class-github-updater.php:409
+msgid "GitHub Repository"
+msgstr "GitHub Repository"
+
+#: views/page-settings.php:40
+msgid "Google Gemini API Key"
+msgstr "Google Gemini API-kulcs"
+
+#: views/page-settings.php:208
+msgid "Headers"
+msgstr "Fejlécek"
+
+#: views/page-settings.php:193 views/page-settings.php:199
+msgid "Hide specialized model settings"
+msgstr "Speciális modellbeállítások elrejtése"
+
+#: includes/admin/class-scripts.php:42
+msgid "How to test it?"
+msgstr "Hogyan tesztelheted?"
+
+#. Author URI of the plugin
+#: wp-autoplugin.php
+msgid "https://wp-autoplugin.com"
+msgstr "https://wp-autoplugin.com"
+
+#: includes/admin/class-scripts.php:43
+msgid "If you notice any issues, use the Fix button in the Autoplugins list."
+msgstr ""
+"Ha hibát észlelsz, használd a Javítás gombot az Autopluginok listájában."
+
+#: includes/admin/class-plugin-list-table.php:224
+msgid "Inactive"
+msgstr "Inaktív"
+
+#: views/page-generate-plugin.php:110
+msgid "Install Plugin"
+msgstr "Bővítmény telepítése"
+
+#: includes/admin/class-scripts.php:40
+msgid "Installing the plugin."
+msgstr "A bővítmény telepítése."
+
+#: includes/ajax/class-ajax.php:108
+msgid "Invalid AJAX action."
+msgstr "Érvénytelen AJAX művelet."
+
+#: includes/class-plugin-installer.php:206
+msgid "Invalid directory path."
+msgstr "Érvénytelen könyvtár útvonal."
+
+#: includes/class-plugin-installer.php:221
+#: includes/class-plugin-installer.php:312
+msgid "Invalid file path."
+msgstr "Érvénytelen fájl útvonal."
+
+#: includes/ajax/class-extender.php:203 includes/ajax/class-fixer.php:254
+#: includes/ajax/class-generator.php:122 includes/ajax/class-generator.php:210
+#: includes/ajax/class-generator.php:243
+#: includes/ajax/class-hooks-extender.php:172
+#: includes/ajax/class-theme-extender.php:192
+msgid "Invalid input data."
+msgstr "Érvénytelen bemeneti adatok."
+
+#: includes/ajax/class-model.php:46
+msgid "Invalid model data."
+msgstr "Érvénytelen modelladatok."
+
+#: includes/ajax/class-model.php:92
+msgid "Invalid model index."
+msgstr "Érvénytelen modell index."
+
+#: includes/ajax/class-model.php:151
+msgid "Invalid model specified."
+msgstr "Érvénytelen modell lett megadva."
+
+#. Translators: %s: model name.
+#: includes/ajax/class-model.php:209
+msgid "Invalid model specified: %s"
+msgstr "Érvénytelen modell lett megadva: %s"
+
+#: includes/ajax/class-fixer.php:202
+msgid "Invalid plugin path."
+msgstr "Érvénytelen bővítmény útvonal."
+
+#. Translators: %s: file path.
+#: includes/class-plugin-installer.php:228
+msgid "Missing content for file: %s"
+msgstr "Hiányzó tartalom a fájlhoz: %s"
+
+#: includes/ajax/class-hooks-extender.php:46
+#: includes/ajax/class-hooks-extender.php:98
+#: includes/ajax/class-theme-extender.php:66
+#: includes/ajax/class-theme-extender.php:118
+msgid "Missing required parameters."
+msgstr "Hiányzó kötelező paraméterek."
+
+#: includes/ajax/class-model.php:70
+msgid "Model added successfully."
+msgstr "A modell sikeresen hozzáadva."
+
+#: includes/ajax/class-model.php:157
+msgid "Model changed successfully."
+msgstr "A modell sikeresen módosítva."
+
+#: views/page-settings.php:159
+msgid "Model Name (User-defined Label)"
+msgstr "Modell neve (Felhasználó által definiált címke)"
+
+#: views/page-settings.php:206
+msgid "Model Parameter"
+msgstr "Modell paraméter"
+
+#: includes/ajax/class-model.php:104
+msgid "Model removed successfully."
+msgstr "A modell sikeresen eltávolítva."
+
+#. translators: %s: model name.
+#: includes/admin/class-admin.php:86
+msgid "Model: %s"
+msgstr "Modell: %s"
+
+#: includes/ajax/class-model.php:219
+msgid "Models updated successfully."
+msgstr "A modellek sikeresen frissítve."
+
+#: includes/admin/class-plugin-list-table.php:91
+msgid "Modify"
+msgstr "Módosítás"
+
+#: includes/admin/class-action-links.php:42
+msgid "Modify (Patch)"
+msgstr "Módosítás (Patch)"
+
+#. translators: %s: plugin name.
+#: views/page-extend-plugin.php:46
+msgid "Modify This Plugin: %s"
+msgstr "Bővítmény módosítása: %s"
+
+#: includes/admin/class-scripts.php:63
+msgid "No hooks found in the codebase. Cannot extend the plugin."
+msgstr "Nem találhatók hookok a kódbázisban. A bővítmény nem bővíthető."
+
+#: includes/ajax/class-hooks-extender.php:52
+msgid "No hooks found in the plugin."
+msgstr "Nem találhatók hookok a bővítményben."
+
+#: includes/ajax/class-theme-extender.php:72
+msgid "No hooks found in the theme."
+msgstr "Nem találhatók hookok a sablonban."
+
+#: includes/class-plugin-installer.php:263
+msgid "No main plugin file found."
+msgstr "Nem található fő bővítményfájl."
+
+#: includes/ajax/class-model.php:125
+msgid "No model specified."
+msgstr "Nincs megadva modell."
+
+#: includes/ajax/class-hooks-extender.php:238
+msgid "No plugin file specified."
+msgstr "Nincs megadva bővítményfájl."
+
+#: includes/admin/class-menu.php:185 includes/admin/class-menu.php:227
+msgid "No plugin specified."
+msgstr "Nincs megadva bővítmény."
+
+#: includes/admin/class-plugin-list-table.php:180
+msgid "No plugins found."
+msgstr "Nem található bővítmény."
+
+#: includes/ajax/class-theme-extender.php:47
+msgid "No theme slug specified."
+msgstr "Nincs megadva sablon slug."
+
+#: includes/admin/class-menu.php:255
+msgid "No theme specified."
+msgstr "Nincs megadva sablon."
+
+#: includes/admin/class-scripts.php:387 views/footer-modal.php:161
+msgid "No token usage data available yet."
+msgstr "Még nem áll rendelkezésre tokenhasználati adat."
+
+#: views/page-explain-plugin.php:20 views/page-extend-hooks.php:15
+#: views/page-extend-plugin.php:20 views/page-extend-theme.php:15
+#: views/page-fix-plugin.php:20
+msgid "Nonce verification failed. Please try again."
+msgstr "Nonce ellenőrzés sikertelen. Kérlek próbáld újra."
+
+#: views/page-settings.php:32
+msgid "OpenAI API Key"
+msgstr "OpenAI API-kulcs"
+
+#: includes/admin/class-scripts.php:49 views/page-explain-plugin.php:55
+msgid "Performance Review"
+msgstr "Teljesítmény-ellenőrzés"
+
+#: views/page-settings.php:114
+msgid "Planner Model"
+msgstr "Tervező modell"
+
+#: views/footer-modal.php:44
+msgid "Planner Model:"
+msgstr "Tervező modell:"
+
+#: includes/admin/class-scripts.php:55
+msgid "Please describe the changes you want to make to the plugin."
+msgstr ""
+"Kérlek, írd le, milyen változtatásokat szeretnél végrehajtani a bővítményen."
+
+#: includes/admin/class-scripts.php:34
+msgid "Please enter a plugin description."
+msgstr "Kérlek, adj meg egy leírást a bővítményhez."
+
+#: views/page-settings.php:210
+msgid "Please fill out all required fields."
+msgstr "Kérlek, töltsd ki az összes kötelező mezőt."
+
+#: includes/admin/class-plugin-list-table.php:46
+msgid "Plugin"
+msgstr "Bővítmény"
+
+#: includes/class-plugin-installer.php:407
+msgid "Plugin activated successfully."
+msgstr "A bővítmény sikeresen aktiválva."
+
+#: includes/class-plugin-installer.php:428
+msgid "Plugin deactivated successfully."
+msgstr "A bővítmény sikeresen kikapcsolva."
+
+#: includes/class-plugin-installer.php:456
+msgid "Plugin deleted successfully."
+msgstr "A bővítmény sikeresen törölve."
+
+#: views/page-explain-plugin.php:73
+msgid "Plugin Explanation"
+msgstr "Bővítmény magyarázata"
+
+#: includes/class-github-updater.php:407
+msgid "Plugin Information"
+msgstr "Bővítmény információk"
+
+#: includes/class-plugin-installer.php:54
+#: includes/class-plugin-installer.php:180
+msgid "Plugin installation is disabled."
+msgstr "A bővítmény telepítése le van tiltva."
+
+#: includes/class-plugin-installer.php:285
+msgid "Plugin modification is disabled."
+msgstr "A bővítmény módosítása le van tiltva."
+
+#: includes/class-plugin-installer.php:352
+#: includes/class-plugin-installer.php:422
+#: includes/class-plugin-installer.php:443
+msgid "Plugin not found."
+msgstr "A bővítmény nem található."
+
+#: includes/class-plugin-installer.php:69
+#: includes/class-plugin-installer.php:298
+msgid "Plugin path cannot contain \"../\"."
+msgstr "A bővítmény útvonala nem tartalmazhatja a \"../\" karaktersorozatot."
+
+#: includes/class-github-updater.php:638
+msgid "Plugin reactivated successfully."
+msgstr "A bővítmény sikeresen újraaktiválva."
+
+#: includes/admin/class-scripts.php:41
+msgid "Plugin successfully installed."
+msgstr "A bővítmény sikeresen telepítve."
+
+#: views/page-explain-plugin.php:79
+msgid "Question/Focus:"
+msgstr "Kérdés/Fókusz:"
+
+#: views/page-settings.php:209
+msgid "Remove"
+msgstr "Eltávolítás"
+
+#: views/page-extend-hooks.php:53 views/page-extend-theme.php:57
+msgid "Review or edit the generated plan for the extension plugin:"
+msgstr "Nézd át vagy szerkeszd a kiegészítő bővítmény generált tervét:"
+
+#: views/page-extend-plugin.php:60 views/page-fix-plugin.php:62
+#: views/page-generate-plugin.php:34
+msgid "Review or edit the generated plan:"
+msgstr "Nézd át vagy szerkeszd a generált tervet:"
+
+#: views/page-extend-hooks.php:66 views/page-extend-theme.php:70
+msgid "Review the generated code before saving:"
+msgstr "Nézd át a generált kódot mentés előtt:"
+
+#: views/page-settings.php:128
+msgid "Reviewer Model"
+msgstr "Ellenőrző modell"
+
+#: views/footer-modal.php:112
+msgid "Reviewer Model:"
+msgstr "Ellenőrző modell:"
+
+#: views/page-extend-plugin.php:105 views/page-fix-plugin.php:107
+msgid "Save Changes"
+msgstr "Változtatások mentése"
+
+#: views/page-extend-hooks.php:94 views/page-extend-theme.php:98
+msgid "Save Extension Plugin"
+msgstr "Kiegészítő bővítmény mentése"
+
+#: views/footer-modal.php:146
+msgid "Save Models"
+msgstr "Modellek mentése"
+
+#: includes/admin/class-scripts.php:48 views/page-explain-plugin.php:51
+msgid "Security Analysis"
+msgstr "Biztonsági elemzés"
+
+#: includes/admin/class-bulk-actions.php:47 includes/admin/class-menu.php:189
+#: includes/admin/class-menu.php:231 includes/admin/class-menu.php:259
+#: includes/ajax/class-model.php:41 includes/ajax/class-model.php:82
+#: includes/ajax/class-model.php:120 includes/ajax/class-model.php:171
+msgid "Security check failed."
+msgstr "A biztonsági ellenőrzés sikertelen volt."
+
+#: includes/class-github-updater.php:408
+msgid "See the GitHub page for details."
+msgstr "Részletekért lásd a GitHub oldalt."
+
+#: views/footer-modal.php:5
+msgid "Select Models"
+msgstr "Modellek kiválasztása"
+
+#: includes/admin/class-menu.php:61 includes/admin/class-menu.php:62
+msgid "Settings"
+msgstr "Beállítások"
+
+#: views/page-settings.php:98 views/page-settings.php:190
+msgid "Show specialized model settings"
+msgstr "Speciális modellbeállítások megjelenítése"
+
+#: views/page-settings.php:142
+msgid "Simple plugin mode (single-file plugins)"
+msgstr "Egyszerű bővítmény mód (egyfájlos bővítmények)"
+
+#: views/page-generate-plugin.php:86
+msgid "Skip Review"
+msgstr "Ellenőrzés kihagyása"
+
+#: includes/admin/class-scripts.php:389
+msgid "Step Breakdown"
+msgstr "Lépésekre bontás"
+
+#: views/page-generate-plugin.php:78
+msgid "Suggested Improvements"
+msgstr "Javasolt fejlesztések"
+
+#: includes/class-plugin-installer.php:304
+msgid "Target plugin directory does not exist."
+msgstr "A cél bővítmény könyvtár nem létezik."
+
+#: includes/admin/class-notices.php:44
+msgid ""
+"The <code>DISALLOW_FILE_MODS</code> constant is defined in your wp-config."
+"php file, which prevents WP-Autoplugin from installing or updating plugins "
+"on your site."
+msgstr ""
+"A <code>DISALLOW_FILE_MODS</code> konstans definiálva van a wp-config.php "
+"fájlban, ami megakadályozza, hogy a WP-Autoplugin bővítményeket telepítsen "
+"vagy frissítsen az oldalon."
+
+#: views/page-generate-plugin.php:53
+msgid ""
+"The plugin code has been generated successfully. You can review and edit the "
+"plugin file before activating it:"
+msgstr ""
+"A bővítménykód sikeresen generálva. Aktiválás előtt áttekintheted és "
+"szerkesztheted a bővítményfájlt:"
+
+#: includes/admin/class-scripts.php:45
+msgid "The plugin code has been updated."
+msgstr "A bővítmény kódja frissítve."
+
+#: includes/admin/class-notices.php:68
+msgid "The plugin could not be activated due to a fatal error."
+msgstr "A bővítményt nem lehetett aktiválni végzetes hiba miatt."
+
+#: views/page-fix-plugin.php:76
+msgid ""
+"The plugin has been fixed successfully. You can review the changes before "
+"activating it:"
+msgstr ""
+"A bővítmény sikeresen javítva. Aktiválás előtt áttekintheted a "
+"változtatásokat:"
+
+#: views/page-extend-plugin.php:74
+msgid ""
+"The plugin has been modified successfully. You can review the changes before "
+"activating it:"
+msgstr ""
+"A bővítmény sikeresen módosítva. Aktiválás előtt áttekintheted a "
+"változtatásokat:"
+
+#: includes/class-github-updater.php:637
+msgid ""
+"The plugin has been updated, but could not be reactivated. Please reactivate "
+"it manually."
+msgstr ""
+"A bővítmény frissítve lett, de nem sikerült újraaktiválni. Kérlek, aktiváld "
+"újra kézzel."
+
+#: includes/admin/class-menu.php:198 includes/admin/class-menu.php:239
+msgid "The specified plugin does not exist."
+msgstr "A megadott bővítmény nem létezik."
+
+#: includes/admin/class-menu.php:265
+msgid "The specified theme does not exist."
+msgstr "A megadott sablon nem létezik."
+
+#: views/page-extend-plugin.php:99 views/page-fix-plugin.php:101
+msgid "This plugin is active, changes will take effect immediately."
+msgstr "Ez a bővítmény aktív, a változások azonnal érvénybe lépnek."
+
+#: views/footer-modal.php:156
+msgid "Token Usage Breakdown"
+msgstr "Tokenhasználat részletezése"
+
+#: includes/admin/class-scripts.php:388
+msgid "Total Usage"
+msgstr "Teljes használat"
+
+#: views/page-fix-plugin.php:32
+msgid "Unknown Plugin"
+msgstr "Ismeretlen bővítmény"
+
+#. Translators: %s: file path.
+#: includes/class-plugin-installer.php:323
+msgid "Unsupported file type for update: %s"
+msgstr "Nem támogatott fájltípus a frissítéshez: %s"
+
+#: views/page-settings.php:205
+msgid "URL"
+msgstr "URL"
+
+#: includes/admin/class-scripts.php:51 views/page-explain-plugin.php:63
+msgid "Usage Instructions"
+msgstr "Használati utasítások"
+
+#: views/footer-modal.php:46 views/footer-modal.php:80
+#: views/footer-modal.php:114 views/page-settings.php:53
+msgid "Use Default Model"
+msgstr "Alapértelmezett modell használata"
+
+#: views/page-settings.php:131
+msgid ""
+"Used for explaining code and reviewing generated plugins. Falls back to "
+"Default Model if not set."
+msgstr ""
+"Kód magyarázatára és a generált bővítmények ellenőrzésére használatos. Ha "
+"nincs beállítva, az Alapértelmezett modellt használja."
+
+#: views/page-settings.php:124
+msgid ""
+"Used for generating and fixing code. Falls back to Default Model if not set."
+msgstr ""
+"Kód generálására és javítására használatos. Ha nincs beállítva, az "
+"Alapértelmezett modellt használja."
+
+#: views/page-settings.php:117
+msgid ""
+"Used for planning plugin extensions and analyzing hooks. Falls back to "
+"Default Model if not set."
+msgstr ""
+"Bővítmény-kiegészítők tervezésére és hookok elemzésére használatos. Ha nincs "
+"beállítva, az Alapértelmezett modellt használja."
+
+#: views/page-extend-hooks.php:89 views/page-extend-plugin.php:99
+#: views/page-extend-theme.php:93 views/page-fix-plugin.php:101
+#: views/page-generate-plugin.php:105
+msgid "Warning:"
+msgstr "Figyelmeztetés:"
+
+#. Plugin Name of the plugin
+#: wp-autoplugin.php includes/admin/class-menu.php:41
+#: includes/admin/class-menu.php:42
+msgid "WP-Autoplugin"
+msgstr "WP-Autoplugin"
+
+#: views/page-settings.php:23
+msgid "WP-Autoplugin Settings"
+msgstr "WP-Autoplugin beállítások"
+
+#. translators: %s: version number.
+#: includes/admin/class-admin.php:75
+msgid "WP-Autoplugin v%s"
+msgstr "WP-Autoplugin v%s"
+
+#: views/page-settings.php:44
+msgid "xAI API Key"
+msgstr "xAI API-kulcs"
+
+#: includes/ajax/class-ajax.php:95 includes/ajax/class-hooks-extender.php:41
+#: includes/ajax/class-hooks-extender.php:93
+#: includes/ajax/class-hooks-extender.php:155
+#: includes/ajax/class-hooks-extender.php:232 includes/ajax/class-model.php:116
+#: includes/ajax/class-model.php:167 includes/ajax/class-theme-extender.php:41
+#: includes/ajax/class-theme-extender.php:61
+#: includes/ajax/class-theme-extender.php:113
+#: includes/ajax/class-theme-extender.php:175
+msgid "You are not allowed to access this page."
+msgstr "Nincs jogosultságod az oldal eléréséhez."
+
+#. translators: 1: fix link start tag, 2: fix link end tag
+#: includes/admin/class-notices.php:74
+msgid "You can %1$sfix the error automatically%2$s."
+msgstr "A hibát %1$sautomatikusan javíthatod%2$s."
+
+#: views/page-generate-plugin.php:59
+msgid "You can review and edit the generated code before installing:"
+msgstr "Telepítés előtt áttekintheted és szerkesztheted a generált kódot:"
+
+#: includes/admin/class-bulk-actions.php:51 includes/admin/class-menu.php:180
+#: includes/admin/class-menu.php:223 includes/admin/class-menu.php:251
+msgid "You do not have sufficient permissions to access this page."
+msgstr "Nincs megfelelő jogosultságod az oldal eléréséhez."
+
+#: views/page-list-plugins.php:37
+msgid "You don't have any autoplugins yet."
+msgstr "Még nincsenek autopluginjaid."
+
+#: views/page-extend-hooks.php:56 views/page-extend-theme.php:60
+msgid "« Edit Description"
+msgstr "&laquo; Leírás szerkesztése"
+
+#: views/page-extend-hooks.php:93 views/page-extend-theme.php:97
+msgid "« Edit Plan"
+msgstr "&laquo; Terv szerkesztése"
