@@ -68,7 +68,6 @@ class ComposerStaticInit62b8c0a821dc44c3b86fc9def1bcbee9
         'WP_Autoplugin\\V2\\Infrastructure\\Database\\Workspace_Repository' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Database/Workspace_Repository.php',
         'WP_Autoplugin\\V2\\Infrastructure\\Queue\\Job_Runner' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Queue/Job_Runner.php',
         'WP_Autoplugin\\V2\\Infrastructure\\Queue\\Queue' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Queue/Queue.php',
-        'WP_Autoplugin\\V2\\Migration\\Legacy_Migration' => __DIR__ . '/../..' . '/src/V2/Migration/Legacy_Migration.php',
         'WP_Autoplugin\\V2\\Orchestration\\Legacy_Orchestrator' => __DIR__ . '/../..' . '/src/V2/Orchestration/Legacy_Orchestrator.php',
         'WP_Autoplugin\\V2\\Rest\\Routes' => __DIR__ . '/../..' . '/src/V2/Rest/Routes.php',
         'WP_Autoplugin\\XAI_API' => __DIR__ . '/../..' . '/includes/api/class-xai-api.php',

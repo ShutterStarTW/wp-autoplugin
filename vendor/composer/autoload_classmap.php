@@ -53,7 +53,6 @@ return array(
     'WP_Autoplugin\\V2\\Infrastructure\\Database\\Workspace_Repository' => $baseDir . '/src/V2/Infrastructure/Database/Workspace_Repository.php',
     'WP_Autoplugin\\V2\\Infrastructure\\Queue\\Job_Runner' => $baseDir . '/src/V2/Infrastructure/Queue/Job_Runner.php',
     'WP_Autoplugin\\V2\\Infrastructure\\Queue\\Queue' => $baseDir . '/src/V2/Infrastructure/Queue/Queue.php',
-    'WP_Autoplugin\\V2\\Migration\\Legacy_Migration' => $baseDir . '/src/V2/Migration/Legacy_Migration.php',
     'WP_Autoplugin\\V2\\Orchestration\\Legacy_Orchestrator' => $baseDir . '/src/V2/Orchestration/Legacy_Orchestrator.php',
     'WP_Autoplugin\\V2\\Rest\\Routes' => $baseDir . '/src/V2/Rest/Routes.php',
     'WP_Autoplugin\\XAI_API' => $baseDir . '/includes/api/class-xai-api.php',

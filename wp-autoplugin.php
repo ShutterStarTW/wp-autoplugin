@@ -33,6 +33,9 @@ define( 'WP_AUTOPLUGIN_URL', plugin_dir_url( __FILE__ ) );
 // Include the autoloader.
 require_once WP_AUTOPLUGIN_DIR . 'vendor/autoload.php';
 
+// Register the bundled Action Scheduler before plugins_loaded version arbitration runs.
+require_once WP_AUTOPLUGIN_DIR . 'vendor/woocommerce/action-scheduler/action-scheduler.php';
+
 register_activation_hook( __FILE__, [ \WP_Autoplugin\V2\Infrastructure\Database\Installer::class, 'activate' ] );
 
 /**

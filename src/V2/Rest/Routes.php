@@ -187,14 +187,26 @@ final class Routes {
 			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 
+		$jobs = new Job_Repository();
+		$job  = null;
 		try {
-			$jobs   = new Job_Repository();
 			$job    = $jobs->create( $workspace_id, (string) $request['task'], (array) $request['payload'], get_current_user_id() );
 			$runner = ( new Queue() )->dispatch( $job['id'] );
 			$jobs->update( $job['id'], [ 'runner' => $runner ] );
 
 			return new \WP_REST_Response( $jobs->find( $job['id'] ), 202 );
 		} catch ( \Throwable $error ) {
+			if ( $job ) {
+				$jobs->update(
+					$job['id'],
+					[
+						'status'        => 'failed',
+						'error_message' => $error->getMessage(),
+						'finished_at'   => current_time( 'mysql', true ),
+					]
+				);
+				$jobs->event( $job['id'], 'failed', $error->getMessage(), [], 'error' );
+			}
 			return new \WP_Error( 'wp_autoplugin_job_error', $error->getMessage(), [ 'status' => 500 ] );
 		}
 	}
