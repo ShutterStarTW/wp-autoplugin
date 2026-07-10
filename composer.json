@@ -2,15 +2,20 @@
     "name": "wp-autoplugin/wp-autoplugin",
     "description": "A WordPress plugin that generates other plugins on-demand using AI.",
     "type": "wordpress-plugin",
-    "license": "GPLv2",
+    "license": "GPL-2.0-or-later",
     "authors": [
         {
             "name": "Balazs Piller",
             "email": "hello@wp-autoplugin.com"
         }
     ],
-    "require": {},
+    "require": {
+        "php": ">=8.2"
+    },
     "autoload": {
+        "psr-4": {
+            "WP_Autoplugin\\V2\\": "src/V2/"
+        },
         "classmap": [
             "includes/"
         ]

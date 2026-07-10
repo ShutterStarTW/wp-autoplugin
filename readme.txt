@@ -2,10 +2,10 @@
 Contributors: balazspiller
 Donate link: https://wp-autoplugin.com
 Tags: ai, plugin generator, development, wordpress, automation
-Requires at least: 6.0
+Requires at least: 6.6
 Tested up to: 6.9
-Stable tag: 1.8.0
-Requires PHP: 7.4
+Stable tag: 2.0.0-dev
+Requires PHP: 8.2
 License: GPLv3 or later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -90,6 +90,14 @@ WP-Autoplugin relies on third-party AI APIs. No data is transmitted until you co
 - [Privacy Policy](https://www.anthropic.com/privacy-policy)
 
 == Changelog ==
+
+= 2.0.0-dev =
+* Added the v2 universal React/TypeScript workspace foundation.
+* Added versioned projects, workspaces, revisions, jobs, events, usage, diagnostics, and prompt-template tables.
+* Added durable background planning and explanation jobs with polling and cancellation.
+* Added explicit, non-destructive legacy tracking migration.
+* Added bounded target discovery with file, line, token, and hook estimates.
+* Kept source promotion disabled while staged revision validation and rollback are completed.
 
 = 1.8.0 =
 * Updated translations (thanks ShutterStarTW)

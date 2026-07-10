@@ -1,0 +1,30 @@
+.wp-autoplugin-v2-wrap { margin: 0 0 0 -20px; }
+.wp-autoplugin-v2 { color: #172026; min-height: calc(100vh - 32px); padding: 32px; background: #f3f5f7; box-sizing: border-box; }
+.wp-autoplugin-v2__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.wp-autoplugin-v2__header h1 { margin: 2px 0 0; font-size: 30px; line-height: 1.2; }
+.wp-autoplugin-v2__header .eyebrow { color: #3858e9; font-weight: 600; margin: 0; text-transform: uppercase; letter-spacing: .08em; }
+.wp-autoplugin-v2__layout { display: grid; grid-template-columns: minmax(300px, 420px) minmax(460px, 1fr); gap: 24px; margin-top: 18px; }
+.wp-autoplugin-v2 .components-card { border: 1px solid #d9dfe4; box-shadow: 0 1px 2px rgba(0, 0, 0, .04); }
+.wp-autoplugin-v2 .components-card__body { padding: 24px; }
+.target-summary { background: #f7f8fa; border-radius: 6px; margin: 18px 0; padding: 16px; }
+.target-summary h3 { margin: 0 0 4px; }
+.target-summary p { color: #5f6b73; margin: 0 0 16px; }
+.target-summary dl { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 0; }
+.target-summary dt { color: #5f6b73; font-size: 12px; }
+.target-summary dd { font-weight: 600; margin: 2px 0 0; }
+.workspace-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+.workspace-stage .components-card { min-height: 440px; }
+.empty-stage { display: grid; place-content: center; min-height: 350px; text-align: center; color: #5f6b73; }
+.job-status .status { border-radius: 999px; display: inline-block; font-size: 11px; font-weight: 700; margin-right: 10px; padding: 4px 9px; text-transform: uppercase; background: #e8edf1; }
+.job-status .status--completed { background: #d7f0df; color: #14612c; }
+.job-status .status--failed,
+.job-status .status--cancelled { background: #f7d9dc; color: #8b1a24; }
+.job-status progress { display: block; height: 10px; margin-top: 22px; width: 100%; accent-color: #3858e9; }
+.job-result { border-top: 1px solid #d9dfe4; margin-top: 24px; padding-top: 18px; }
+.job-result h3 { text-transform: capitalize; }
+.job-result pre { background: #f6f7f7; max-height: 360px; overflow: auto; padding: 12px; white-space: pre-wrap; }
+.job-result small { color: #5f6b73; display: block; margin-top: 18px; }
+.wp-autoplugin-v2-loading { padding: 40px; }
+@media (max-width: 960px) {
+	.wp-autoplugin-v2__layout { grid-template-columns: 1fr; }
+}

@@ -44,18 +44,9 @@ class Menu {
 			esc_html__( 'WP-Autoplugin', 'wp-autoplugin' ),
 			'manage_options',
 			'wp-autoplugin',
-			[ $this, 'render_list_plugins_page' ],
+			[ $this, 'render_workspace_page' ],
 			'dashicons-admin-plugins',
 			100
-		);
-
-		add_submenu_page(
-			'wp-autoplugin',
-			esc_html__( 'Generate New Plugin', 'wp-autoplugin' ),
-			esc_html__( 'Generate New Plugin', 'wp-autoplugin' ),
-			'manage_options',
-			'wp-autoplugin-generate',
-			[ $this, 'render_generate_plugin_page' ]
 		);
 
 		add_submenu_page(
@@ -112,6 +103,19 @@ class Menu {
 			'wp-autoplugin-extend-theme',
 			[ $this, 'render_extend_theme_page' ]
 		);
+	}
+
+	/**
+	 * Display the v2 universal workspace.
+	 *
+	 * @return void
+	 */
+	public function render_workspace_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'wp-autoplugin' ) );
+		}
+
+		include WP_AUTOPLUGIN_DIR . 'views/page-workspace.php';
 	}
 
 	/**

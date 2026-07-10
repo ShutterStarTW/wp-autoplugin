@@ -6,6 +6,20 @@ namespace Composer\Autoload;
 
 class ComposerStaticInit62b8c0a821dc44c3b86fc9def1bcbee9
 {
+    public static $prefixLengthsPsr4 = array (
+        'W' =>
+        array (
+            'WP_Autoplugin\\V2\\' => 17,
+        ),
+    );
+
+    public static $prefixDirsPsr4 = array (
+        'WP_Autoplugin\\V2\\' =>
+        array (
+            0 => __DIR__ . '/../..' . '/src/V2',
+        ),
+    );
+
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
         'WP_Autoplugin\\AI_Utils' => __DIR__ . '/../..' . '/includes/class-ai-utils.php',
@@ -40,12 +54,31 @@ class ComposerStaticInit62b8c0a821dc44c3b86fc9def1bcbee9
         'WP_Autoplugin\\Plugin_Fixer' => __DIR__ . '/../..' . '/includes/class-plugin-fixer.php',
         'WP_Autoplugin\\Plugin_Generator' => __DIR__ . '/../..' . '/includes/class-plugin-generator.php',
         'WP_Autoplugin\\Plugin_Installer' => __DIR__ . '/../..' . '/includes/class-plugin-installer.php',
+        'WP_Autoplugin\\V2\\Admin\\Assets' => __DIR__ . '/../..' . '/src/V2/Admin/Assets.php',
+        'WP_Autoplugin\\V2\\Application' => __DIR__ . '/../..' . '/src/V2/Application.php',
+        'WP_Autoplugin\\V2\\Domain\\AI\\Capability_Matrix' => __DIR__ . '/../..' . '/src/V2/Domain/AI/Capability_Matrix.php',
+        'WP_Autoplugin\\V2\\Domain\\Revision\\Version_Bumper' => __DIR__ . '/../..' . '/src/V2/Domain/Revision/Version_Bumper.php',
+        'WP_Autoplugin\\V2\\Domain\\Target\\Source_Reader' => __DIR__ . '/../..' . '/src/V2/Domain/Target/Source_Reader.php',
+        'WP_Autoplugin\\V2\\Domain\\Target\\Target_Scanner' => __DIR__ . '/../..' . '/src/V2/Domain/Target/Target_Scanner.php',
+        'WP_Autoplugin\\V2\\Infrastructure\\Database\\Installer' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Database/Installer.php',
+        'WP_Autoplugin\\V2\\Infrastructure\\Database\\Job_Repository' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Database/Job_Repository.php',
+        'WP_Autoplugin\\V2\\Infrastructure\\Database\\Repository' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Database/Repository.php',
+        'WP_Autoplugin\\V2\\Infrastructure\\Database\\Revision_Repository' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Database/Revision_Repository.php',
+        'WP_Autoplugin\\V2\\Infrastructure\\Database\\Usage_Repository' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Database/Usage_Repository.php',
+        'WP_Autoplugin\\V2\\Infrastructure\\Database\\Workspace_Repository' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Database/Workspace_Repository.php',
+        'WP_Autoplugin\\V2\\Infrastructure\\Queue\\Job_Runner' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Queue/Job_Runner.php',
+        'WP_Autoplugin\\V2\\Infrastructure\\Queue\\Queue' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Queue/Queue.php',
+        'WP_Autoplugin\\V2\\Migration\\Legacy_Migration' => __DIR__ . '/../..' . '/src/V2/Migration/Legacy_Migration.php',
+        'WP_Autoplugin\\V2\\Orchestration\\Legacy_Orchestrator' => __DIR__ . '/../..' . '/src/V2/Orchestration/Legacy_Orchestrator.php',
+        'WP_Autoplugin\\V2\\Rest\\Routes' => __DIR__ . '/../..' . '/src/V2/Rest/Routes.php',
         'WP_Autoplugin\\XAI_API' => __DIR__ . '/../..' . '/includes/api/class-xai-api.php',
     );
 
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
+            $loader->prefixLengthsPsr4 = ComposerStaticInit62b8c0a821dc44c3b86fc9def1bcbee9::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInit62b8c0a821dc44c3b86fc9def1bcbee9::$prefixDirsPsr4;
             $loader->classMap = ComposerStaticInit62b8c0a821dc44c3b86fc9def1bcbee9::$classMap;
 
         }, null, ClassLoader::class);

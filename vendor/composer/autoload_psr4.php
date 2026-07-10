@@ -6,4 +6,5 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname($vendorDir);
 
 return array(
+    'WP_Autoplugin\\V2\\' => array($baseDir . '/src/V2'),
 );

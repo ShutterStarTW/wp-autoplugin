@@ -2,7 +2,9 @@
 /**
  * Plugin Name: WP-Autoplugin
  * Description: A plugin that generates other plugins on-demand using AI.
- * Version: 1.8.0
+ * Version: 2.0.0-dev
+ * Requires at least: 6.6
+ * Requires PHP: 8.2
  * Author: Balázs Piller
  * Author URI: https://wp-autoplugin.com
  * Text Domain: wp-autoplugin
@@ -10,7 +12,7 @@
  *
  * @package WP-Autoplugin
  * @since 1.0.0
- * @version 1.8.0
+ * @version 2.0.0-dev
  * @link https://wp-autoplugin.com
  * @license GPL-2.0+
  * @license https://www.gnu.org/licenses/gpl-2.0.html
@@ -24,12 +26,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define constants.
-define( 'WP_AUTOPLUGIN_VERSION', '1.8.0' );
+define( 'WP_AUTOPLUGIN_VERSION', '2.0.0-dev' );
 define( 'WP_AUTOPLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WP_AUTOPLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 // Include the autoloader.
 require_once WP_AUTOPLUGIN_DIR . 'vendor/autoload.php';
+
+register_activation_hook( __FILE__, [ \WP_Autoplugin\V2\Infrastructure\Database\Installer::class, 'activate' ] );
 
 /**
  * Initialize the plugin.
@@ -39,5 +43,7 @@ require_once WP_AUTOPLUGIN_DIR . 'vendor/autoload.php';
 function wp_autoplugin_init() {
 	load_plugin_textdomain( 'wp-autoplugin', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 	$admin_pages = new \WP_Autoplugin\Admin\Admin();
+	$application = new \WP_Autoplugin\V2\Application();
+	$application->boot();
 }
 add_action( 'plugins_loaded', 'wp_autoplugin_init' );

@@ -102,6 +102,9 @@ class Scripts {
 	 */
 	public function enqueue_scripts() {
 		$screen = get_current_screen();
+		if ( $screen && 'toplevel_page_wp-autoplugin' === $screen->id ) {
+			return;
+		}
 
 		// A small utility script, used on multiple pages.
 		wp_register_script(

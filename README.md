@@ -6,6 +6,14 @@
 
 WP-Autoplugin is a free WordPress plugin that uses AI to assist in generating, fixing, and extending plugins on-demand. It enables users to quickly create functional plugins from simple descriptions, addressing specific needs without unnecessary bloat.
 
+## v2 development architecture
+
+The v2 codebase targets WordPress 6.6+ and PHP 8.2+. Its primary admin screen is a local-first React/TypeScript workspace backed by capability-checked REST resources and versioned custom tables. Planning and explanation requests run as durable jobs, results and normalized usage are persisted, and legacy tracked-plugin data is imported only after an explicit, non-destructive preview.
+
+Generated changes are represented as staged revisions. The current development build intentionally does not expose a promotion endpoint: target files remain unchanged until revision validation, diff approval, copy/in-place safeguards, and rollback are complete.
+
+Frontend sources live in `assets/v2/src`; distributable assets live in `assets/v2/build`. Run `npm run build` after installing the declared development packages when changing the TypeScript or SCSS sources.
+
 - Generate plugins using AI
 - Fix and extend existing plugins
 - Full control over the generation process
