@@ -43,14 +43,16 @@ class Plugin_Fixer {
 	 * @param string|array $plugin_code_or_files The plugin code string OR array of [ path => contents ].
 	 * @param string       $problem              The problem encountered.
 	 * @param array        $prompt_images        Prompt images.
+	 * @param string       $target_type          Target type being fixed.
 	 *
 	 * @return string|WP_Error
 	 */
-	public function identify_issue( $plugin_code_or_files, $problem, $prompt_images = [] ) {
+	public function identify_issue( $plugin_code_or_files, $problem, $prompt_images = [], $target_type = 'plugin' ) {
 		$code_context = $this->build_code_context( $plugin_code_or_files );
+		$target_type  = 'theme' === $target_type ? 'theme' : 'plugin';
 
 		$prompt = <<<PROMPT
-I have a WordPress plugin that needs fixing. Here is the current codebase:
+I have a WordPress $target_type that needs fixing. Here is the current codebase:
 
 $code_context
 
@@ -59,7 +61,7 @@ The problem I am encountering:
 $problem
 """
 
-Your task is to analyze the plugin code and the reported problem, and provide a detailed plan in JSON format for how to fix the issue. The plan should include:
+Your task is to analyze the $target_type code and the reported problem, and provide a detailed plan in JSON format for how to fix the issue. The plan should include:
 1. A detailed description of the fix to be applied.
 2. A list of files that will be modified or added to implement the fix, with a brief description of each. Do not write the code yet.
 

@@ -56,6 +56,7 @@ final class Legacy_Orchestrator {
 		$target  = (array) $workspace['target_metadata'];
 		$files   = ( new Source_Reader() )->read( $target );
 		$request = (string) $workspace['request'];
+		$type    = 'theme' === ( $target['kind'] ?? '' ) ? 'theme' : 'plugin';
 
 		if ( 'explain' === $job['task'] ) {
 			if ( empty( $files ) ) {
@@ -65,9 +66,9 @@ final class Legacy_Orchestrator {
 		} elseif ( 'new_plugin' === ( $target['kind'] ?? '' ) ) {
 			$content = ( new Plugin_Generator( $api ) )->generate_plugin_plan( $request );
 		} elseif ( 'fix' === $workspace['operation'] ) {
-			$content = ( new Plugin_Fixer( $api ) )->identify_issue( $files, $request );
+			$content = ( new Plugin_Fixer( $api ) )->identify_issue( $files, $request, [], $type );
 		} else {
-			$content = ( new Plugin_Extender( $api ) )->plan_plugin_extension( $files, $request );
+			$content = ( new Plugin_Extender( $api ) )->plan_plugin_extension( $files, $request, [], $type );
 		}
 
 		if ( is_wp_error( $content ) ) {

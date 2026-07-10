@@ -16,7 +16,7 @@ final class Workspace_Repository extends Repository {
 
 		try {
 			$table = Installer::table( 'targets' );
-			$this->wpdb->query(
+			$target_result = $this->wpdb->query(
 				$this->wpdb->prepare(
 					"INSERT INTO $table (kind, ref, name, metadata, created_at, updated_at)
 					VALUES (%s, %s, %s, %s, %s, %s)
@@ -29,12 +29,18 @@ final class Workspace_Repository extends Repository {
 					$now
 				)
 			); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table is an allow-listed internal name.
+			if ( false === $target_result ) {
+				throw new \RuntimeException( $this->persistence_error( 'target' ) );
+			}
 
 			$target_id = (int) $this->wpdb->get_var(
 				$this->wpdb->prepare( "SELECT id FROM $table WHERE kind = %s AND ref = %s", $target['kind'], $target['ref'] ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table is an allow-listed internal name.
 			);
+			if ( ! $target_id ) {
+				throw new \RuntimeException( $this->persistence_error( 'target' ) );
+			}
 
-			$this->wpdb->insert(
+			$project_result = $this->wpdb->insert(
 				Installer::table( 'projects' ),
 				[
 					'target_id'  => $target_id,
@@ -47,8 +53,11 @@ final class Workspace_Repository extends Repository {
 				[ '%d', '%s', '%s', '%d', '%s', '%s' ]
 			);
 			$project_id = (int) $this->wpdb->insert_id;
+			if ( false === $project_result || ! $project_id ) {
+				throw new \RuntimeException( $this->persistence_error( 'project' ) );
+			}
 
-			$this->wpdb->insert(
+			$workspace_result = $this->wpdb->insert(
 				Installer::table( 'workspaces' ),
 				[
 					'project_id' => $project_id,
@@ -63,11 +72,13 @@ final class Workspace_Repository extends Repository {
 			);
 			$workspace_id = (int) $this->wpdb->insert_id;
 
-			if ( ! $project_id || ! $workspace_id ) {
-				throw new \RuntimeException( 'Could not persist workspace.' );
+			if ( false === $workspace_result || ! $workspace_id ) {
+				throw new \RuntimeException( $this->persistence_error( 'workspace' ) );
 			}
 
-			$this->wpdb->query( 'COMMIT' );
+			if ( false === $this->wpdb->query( 'COMMIT' ) ) {
+				throw new \RuntimeException( $this->persistence_error( 'transaction' ) );
+			}
 
 			return [
 				'project_id'   => $project_id,
@@ -80,6 +91,15 @@ final class Workspace_Repository extends Repository {
 		}
 	}
 
+	private function persistence_error( string $resource ): string {
+		$message = sprintf( 'Could not persist %s.', $resource );
+		if ( $this->wpdb->last_error ) {
+			$message .= ' ' . $this->wpdb->last_error;
+		}
+
+		return $message;
+	}
+
 	/**
 	 * @return array<string, mixed>|null
 	 */
@@ -87,9 +107,12 @@ final class Workspace_Repository extends Repository {
 		$workspaces = Installer::table( 'workspaces' );
 		$projects   = Installer::table( 'projects' );
 		$targets    = Installer::table( 'targets' );
+		$jobs       = Installer::table( 'jobs' );
 		$row        = $this->wpdb->get_row(
 			$this->wpdb->prepare(
-				"SELECT w.*, p.name AS project_name, t.kind AS target_kind, t.ref AS target_ref, t.metadata AS target_metadata
+				"SELECT w.*, p.name AS project_name, t.kind AS target_kind, t.ref AS target_ref, t.metadata AS target_metadata,
+				(SELECT j.id FROM $jobs j WHERE j.workspace_id = w.id ORDER BY j.id DESC LIMIT 1) AS latest_job_id,
+				(SELECT j.status FROM $jobs j WHERE j.workspace_id = w.id ORDER BY j.id DESC LIMIT 1) AS latest_job_status
 				FROM $workspaces w INNER JOIN $projects p ON p.id = w.project_id
 				LEFT JOIN $targets t ON t.id = p.target_id WHERE w.id = %d",
 				$id
@@ -101,8 +124,63 @@ final class Workspace_Repository extends Repository {
 			return null;
 		}
 
-		$row['id']              = (int) $row['id'];
-		$row['project_id']      = (int) $row['project_id'];
+		return $this->hydrate( $row );
+	}
+
+	/**
+	 * List workspace tabs that the current user has not closed.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function list_open( int $user_id ): array {
+		$workspaces = Installer::table( 'workspaces' );
+		$projects   = Installer::table( 'projects' );
+		$targets    = Installer::table( 'targets' );
+		$jobs       = Installer::table( 'jobs' );
+		$rows       = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT w.*, p.name AS project_name, t.kind AS target_kind, t.ref AS target_ref, t.metadata AS target_metadata,
+				(SELECT j.id FROM $jobs j WHERE j.workspace_id = w.id ORDER BY j.id DESC LIMIT 1) AS latest_job_id,
+				(SELECT j.status FROM $jobs j WHERE j.workspace_id = w.id ORDER BY j.id DESC LIMIT 1) AS latest_job_status
+				FROM $workspaces w INNER JOIN $projects p ON p.id = w.project_id
+				LEFT JOIN $targets t ON t.id = p.target_id
+				WHERE w.created_by = %d AND w.is_closed = 0 ORDER BY w.updated_at DESC, w.id DESC",
+				$user_id
+			), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tables are allow-listed internal names.
+			ARRAY_A
+		);
+
+		return array_map( [ $this, 'hydrate' ], $rows );
+	}
+
+	/**
+	 * Hide a workspace tab without deleting its project, revisions, or jobs.
+	 */
+	public function close( int $id, int $user_id ): bool {
+		$updated = $this->wpdb->update(
+			Installer::table( 'workspaces' ),
+			[
+				'is_closed' => 1,
+				'closed_at' => $this->now(),
+				'updated_at' => $this->now(),
+			],
+			[ 'id' => $id, 'created_by' => $user_id ],
+			[ '%d', '%s', '%s' ],
+			[ '%d', '%d' ]
+		);
+
+		return false !== $updated && $updated > 0;
+	}
+
+	/**
+	 * @param array<string, mixed> $row Raw database row.
+	 * @return array<string, mixed>
+	 */
+	private function hydrate( array $row ): array {
+		foreach ( [ 'id', 'project_id', 'created_by', 'is_closed' ] as $field ) {
+			$row[ $field ] = (int) $row[ $field ];
+		}
+		$row['latest_job_id']   = $row['latest_job_id'] ? (int) $row['latest_job_id'] : null;
 		$row['target_metadata'] = $this->decode( $row['target_metadata'] );
 
 		return $row;

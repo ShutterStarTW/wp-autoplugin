@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
  * Creates and upgrades v2 operational tables.
  */
 final class Installer {
-	public const SCHEMA_VERSION = '1';
+	public const SCHEMA_VERSION = '2';
 	private const OPTION_NAME   = 'wp_autoplugin_v2_schema_version';
 
 	/**
@@ -95,14 +95,17 @@ final class Installer {
 			project_id bigint(20) unsigned NOT NULL,
 			operation varchar(30) NOT NULL,
 			status varchar(20) NOT NULL DEFAULT 'draft',
+			is_closed tinyint(1) unsigned NOT NULL DEFAULT 0,
 			request longtext NULL,
 			base_revision_id bigint(20) unsigned NULL,
 			created_by bigint(20) unsigned NOT NULL,
 			created_at datetime NOT NULL,
 			updated_at datetime NOT NULL,
+			closed_at datetime NULL,
 			PRIMARY KEY  (id),
 			KEY project_id (project_id),
-			KEY status (status)
+			KEY status (status),
+			KEY user_open (created_by,is_closed)
 		) $charset;";
 
 		$sql[] = 'CREATE TABLE ' . self::table( 'revisions' ) . " (

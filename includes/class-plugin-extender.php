@@ -43,22 +43,24 @@ class Plugin_Extender {
 	 * @param string|array $plugin_code_or_files The plugin code string OR array of [ path => contents ].
 	 * @param string       $plugin_changes       The plugin changes to be made.
 	 * @param array        $prompt_images        Prompt images.
+	 * @param string       $target_type          Target type being modified.
 	 *
 	 * @return string|WP_Error
 	 */
-	public function plan_plugin_extension( $plugin_code_or_files, $plugin_changes, $prompt_images = [] ) {
+	public function plan_plugin_extension( $plugin_code_or_files, $plugin_changes, $prompt_images = [], $target_type = 'plugin' ) {
 		$code_context = $this->build_code_context( $plugin_code_or_files );
+		$target_type  = 'theme' === $target_type ? 'theme' : 'plugin';
 		$prompt       = <<<PROMPT
-I have a WordPress plugin I would like to modify. Here is the plugin codebase:
+I have a WordPress $target_type I would like to modify. Here is the $target_type codebase:
 
 $code_context
 
-I want the following changes to be made to the plugin:
+I want the following changes to be made to the $target_type:
 """
 $plugin_changes
 """
 
-Your task is to analyze the plugin code and the requested changes, and provide a detailed plan in JSON format for how to implement these changes. The plan should include:
+Your task is to analyze the $target_type code and the requested changes, and provide a detailed plan in JSON format for how to implement these changes. The plan should include:
 1. A detailed description of the changes to be made, including any new features or modifications.
 2. A list of files that will be modified or added, with a brief description of each. Do not write the code yet.
 

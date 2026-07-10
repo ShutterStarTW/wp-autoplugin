@@ -95,7 +95,7 @@ WP-Autoplugin relies on third-party AI APIs. No data is transmitted until you co
 * Added the v2 universal React/TypeScript workspace foundation.
 * Added versioned projects, workspaces, revisions, jobs, events, usage, diagnostics, and prompt-template tables.
 * Added durable background planning and explanation jobs with polling and cancellation.
-* Added explicit, non-destructive legacy tracking migration.
+* Added persistent IDE-style workspace tabs with non-destructive closing.
 * Added bounded target discovery with file, line, token, and hook estimates.
 * Kept source promotion disabled while staged revision validation and rollback are completed.
 

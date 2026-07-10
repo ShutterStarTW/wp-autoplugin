@@ -31,6 +31,13 @@ final class Job_Repository extends Repository {
 		if ( ! $id ) {
 			throw new \RuntimeException( 'Could not create job.' );
 		}
+		$this->wpdb->update(
+			Installer::table( 'workspaces' ),
+			[ 'updated_at' => $now ],
+			[ 'id' => $workspace_id ],
+			[ '%s' ],
+			[ '%d' ]
+		);
 
 		$this->event( $id, 'queued', __( 'Job queued.', 'wp-autoplugin' ) );
 

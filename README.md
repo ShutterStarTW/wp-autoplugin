@@ -8,7 +8,9 @@ WP-Autoplugin is a free WordPress plugin that uses AI to assist in generating, f
 
 ## v2 development architecture
 
-The v2 codebase targets WordPress 6.6+ and PHP 8.2+. Its primary admin screen is a local-first React/TypeScript workspace backed by capability-checked REST resources and versioned custom tables. Planning and explanation requests run as durable jobs, results and normalized usage are persisted, and legacy tracked-plugin data is imported only after an explicit, non-destructive preview.
+The v2 codebase targets WordPress 6.6+ and PHP 8.2+. Its primary admin screen is a local-first React/TypeScript workspace backed by capability-checked REST resources and versioned custom tables. Planning and explanation requests run as durable jobs, and results and normalized usage are persisted.
+
+Open workspaces are restored as IDE-style tabs when an administrator returns to the page. Closing a tab hides the workspace from the active tab set without deleting its project, revisions, jobs, or usage history.
 
 Generated changes are represented as staged revisions. The current development build intentionally does not expose a promotion endpoint: target files remain unchanged until revision validation, diff approval, copy/in-place safeguards, and rollback are complete.
 

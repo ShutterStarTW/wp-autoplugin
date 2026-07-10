@@ -7,7 +7,6 @@ use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
-use WP_Autoplugin\V2\Migration\Legacy_Migration;
 
 /**
  * Capability-checked REST interface for the v2 admin application.
@@ -35,19 +34,32 @@ final class Routes {
 			'permission_callback' => $permission,
 		] );
 		register_rest_route( self::NAMESPACE, '/workspaces', [
-			'methods'             => \WP_REST_Server::CREATABLE,
-			'callback'            => [ $this, 'create_workspace' ],
-			'permission_callback' => $permission,
-			'args'                => [
-				'target_kind' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_key' ],
-				'target_ref'  => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
-				'operation'   => [ 'required' => true, 'type' => 'string', 'enum' => self::OPERATIONS ],
-				'request'     => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_textarea_field' ],
+			[
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => [ $this, 'workspaces' ],
+				'permission_callback' => $permission,
+			],
+			[
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => [ $this, 'create_workspace' ],
+				'permission_callback' => $permission,
+				'args'                => [
+					'target_kind' => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_key' ],
+					'target_ref'  => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+					'operation'   => [ 'required' => true, 'type' => 'string', 'enum' => self::OPERATIONS ],
+					'request'     => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_textarea_field' ],
+				],
 			],
 		] );
 		register_rest_route( self::NAMESPACE, '/workspaces/(?P<id>\d+)', [
 			'methods'             => \WP_REST_Server::READABLE,
 			'callback'            => [ $this, 'workspace' ],
+			'permission_callback' => $permission,
+			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
+		] );
+		register_rest_route( self::NAMESPACE, '/workspaces/(?P<id>\d+)/close', [
+			'methods'             => \WP_REST_Server::CREATABLE,
+			'callback'            => [ $this, 'close_workspace' ],
 			'permission_callback' => $permission,
 			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
 		] );
@@ -82,11 +94,6 @@ final class Routes {
 			'permission_callback' => $permission,
 			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
 		] );
-		register_rest_route( self::NAMESPACE, '/migration/import', [
-			'methods'             => \WP_REST_Server::CREATABLE,
-			'callback'            => [ $this, 'import_legacy' ],
-			'permission_callback' => $permission,
-		] );
 	}
 
 	public function can_manage(): bool {
@@ -99,12 +106,15 @@ final class Routes {
 			'schema'    => Installer::SCHEMA_VERSION,
 			'queue'     => ( new Queue() )->status(),
 			'log_mode'  => get_option( 'wp_autoplugin_v2_log_mode', 'metadata' ),
-			'migration' => ( new Legacy_Migration() )->preview(),
 		] );
 	}
 
 	public function targets(): \WP_REST_Response {
 		return rest_ensure_response( [ 'items' => ( new Target_Scanner() )->all() ] );
+	}
+
+	public function workspaces(): \WP_REST_Response {
+		return rest_ensure_response( [ 'items' => ( new Workspace_Repository() )->list_open( get_current_user_id() ) ] );
 	}
 
 	/**
@@ -122,17 +132,23 @@ final class Routes {
 		if ( 'new_plugin' === $kind && 'create' !== $operation ) {
 			return new \WP_Error( 'wp_autoplugin_invalid_operation', __( 'A new plugin target only supports the create operation.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
-		if ( 'theme' === $kind && ! in_array( $operation, [ 'hook_extension', 'explain', 'fork' ], true ) ) {
-			return new \WP_Error( 'wp_autoplugin_invalid_operation', __( 'Themes can be inspected, forked, or extended through hooks.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		if ( 'theme' === $kind && ! in_array( $operation, [ 'modify', 'fix', 'hook_extension', 'explain', 'fork' ], true ) ) {
+			return new \WP_Error( 'wp_autoplugin_invalid_operation', __( 'Themes can be modified, fixed, inspected, forked, or extended through hooks.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
 
 		try {
-			$workspace = ( new Workspace_Repository() )->create(
+			$repository = new Workspace_Repository();
+			$created    = $repository->create(
 				$target,
 				$operation,
 				(string) $request['request'],
 				get_current_user_id()
 			);
+			$workspace                 = $repository->find( (int) $created['workspace_id'] );
+			if ( ! $workspace ) {
+				throw new \RuntimeException( __( 'The workspace was created but could not be loaded.', 'wp-autoplugin' ) );
+			}
+			$workspace['workspace_id'] = (int) $created['workspace_id'];
 
 			return new \WP_REST_Response( $workspace, 201 );
 		} catch ( \Throwable $error ) {
@@ -148,6 +164,18 @@ final class Routes {
 		return $workspace
 			? rest_ensure_response( $workspace )
 			: new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+	}
+
+	/**
+	 * Close a tab without deleting its durable workspace data.
+	 *
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function close_workspace( \WP_REST_Request $request ) {
+		$closed = ( new Workspace_Repository() )->close( (int) $request['id'], get_current_user_id() );
+		return $closed
+			? rest_ensure_response( [ 'id' => (int) $request['id'], 'closed' => true ] )
+			: new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found or already closed.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 	}
 
 	/**
@@ -211,7 +239,4 @@ final class Routes {
 		return rest_ensure_response( $jobs->find( $job['id'] ) );
 	}
 
-	public function import_legacy(): \WP_REST_Response {
-		return rest_ensure_response( ( new Legacy_Migration() )->import( get_current_user_id() ) );
-	}
 }
