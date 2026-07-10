@@ -55,31 +55,40 @@ const operations = [
 	{
 		label: __( 'Create', 'wp-autoplugin' ),
 		description: __( 'Start from a blank plugin.', 'wp-autoplugin' ),
+		requestLabel: __( 'What should the plugin do?', 'wp-autoplugin' ),
 		value: 'create',
 	},
 	{
 		label: __( 'Modify', 'wp-autoplugin' ),
 		description: __( 'Add or change functionality.', 'wp-autoplugin' ),
+		requestLabel: __( 'What would you like to change?', 'wp-autoplugin' ),
 		value: 'modify',
 	},
 	{
 		label: __( 'Fix a bug', 'wp-autoplugin' ),
 		description: __( 'Diagnose and repair a problem.', 'wp-autoplugin' ),
+		requestLabel: __( 'What problem should the AI fix?', 'wp-autoplugin' ),
 		value: 'fix',
 	},
 	{
 		label: __( 'Hook extension', 'wp-autoplugin' ),
 		description: __( 'Build against discovered hooks.', 'wp-autoplugin' ),
+		requestLabel: __( 'What should the extension do?', 'wp-autoplugin' ),
 		value: 'hook_extension',
 	},
 	{
 		label: __( 'Fork or copy', 'wp-autoplugin' ),
 		description: __( 'Work in a separate copy.', 'wp-autoplugin' ),
+		requestLabel: __(
+			'What would you like to change in the copy?',
+			'wp-autoplugin'
+		),
 		value: 'fork',
 	},
 	{
 		label: __( 'Explain', 'wp-autoplugin' ),
 		description: __( 'Ask questions about the source.', 'wp-autoplugin' ),
+		requestLabel: __( 'What would you like to know?', 'wp-autoplugin' ),
 		value: 'explain',
 	},
 ];
@@ -604,10 +613,12 @@ function WorkspaceLauncher( {
 					/>
 					<div className="workspace-request">
 						<TextareaControl
-							label={ __(
-								'What should the AI do?',
-								'wp-autoplugin'
-							) }
+							label={
+								operations.find(
+									( item ) => item.value === operation
+								)?.requestLabel ??
+								__( 'What should the AI do?', 'wp-autoplugin' )
+							}
 							value={ request }
 							rows={ 2 }
 							onChange={ onRequestChange }
@@ -979,7 +990,7 @@ function TargetSummary( { target }: { target: Target } ) {
 				</div>
 				<div>
 					<dt>{ __( 'Tokens', 'wp-autoplugin' ) }</dt>
-					<dd>~{ target.tokens.toLocaleString() }</dd>
+					<dd>{ formatCompactNumber( target.tokens ) }</dd>
 				</div>
 				<div>
 					<dt>{ __( 'Hooks', 'wp-autoplugin' ) }</dt>
@@ -988,6 +999,13 @@ function TargetSummary( { target }: { target: Target } ) {
 			</dl>
 		</div>
 	);
+}
+
+function formatCompactNumber( value: number ) {
+	return new Intl.NumberFormat( undefined, {
+		notation: 'compact',
+		maximumFractionDigits: 0,
+	} ).format( value );
 }
 
 function OperationPicker( {
