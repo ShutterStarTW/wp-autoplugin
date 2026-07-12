@@ -63,6 +63,12 @@ final class Routes {
 			'permission_callback' => $permission,
 			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
 		] );
+		register_rest_route( self::NAMESPACE, '/workspaces/(?P<id>\d+)/jobs', [
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => [ $this, 'workspace_jobs' ],
+			'permission_callback' => $permission,
+			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
+		] );
 		register_rest_route( self::NAMESPACE, '/jobs', [
 			'methods'             => \WP_REST_Server::CREATABLE,
 			'callback'            => [ $this, 'create_job' ],
@@ -93,6 +99,15 @@ final class Routes {
 			'callback'            => [ $this, 'cancel_job' ],
 			'permission_callback' => $permission,
 			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
+		] );
+		register_rest_route( self::NAMESPACE, '/jobs/(?P<id>\d+)/plan', [
+			'methods'             => \WP_REST_Server::CREATABLE,
+			'callback'            => [ $this, 'update_plan' ],
+			'permission_callback' => $permission,
+			'args'                => [
+				'id'      => [ 'type' => 'integer', 'minimum' => 1 ],
+				'content' => [ 'required' => true, 'type' => 'string' ],
+			],
 		] );
 	}
 
@@ -160,7 +175,7 @@ final class Routes {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function workspace( \WP_REST_Request $request ) {
-		$workspace = ( new Workspace_Repository() )->find( (int) $request['id'] );
+		$workspace = $this->workspace_for_current_user( (int) $request['id'] );
 		return $workspace
 			? rest_ensure_response( $workspace )
 			: new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
@@ -183,7 +198,7 @@ final class Routes {
 	 */
 	public function create_job( \WP_REST_Request $request ) {
 		$workspace_id = (int) $request['workspace_id'];
-		if ( ! ( new Workspace_Repository() )->find( $workspace_id ) ) {
+		if ( ! $this->workspace_for_current_user( $workspace_id ) ) {
 			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 
@@ -214,9 +229,21 @@ final class Routes {
 	/**
 	 * @return \WP_REST_Response|\WP_Error
 	 */
+	public function workspace_jobs( \WP_REST_Request $request ) {
+		$workspace_id = (int) $request['id'];
+		if ( ! $this->workspace_for_current_user( $workspace_id ) ) {
+			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+
+		return rest_ensure_response( [ 'items' => ( new Job_Repository() )->list_for_workspace( $workspace_id ) ] );
+	}
+
+	/**
+	 * @return \WP_REST_Response|\WP_Error
+	 */
 	public function job( \WP_REST_Request $request ) {
 		$job = ( new Job_Repository() )->find( (int) $request['id'] );
-		return $job
+		return $job && $this->workspace_for_current_user( (int) $job['workspace_id'] )
 			? rest_ensure_response( $job )
 			: new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 	}
@@ -226,7 +253,8 @@ final class Routes {
 	 */
 	public function job_events( \WP_REST_Request $request ) {
 		$jobs = new Job_Repository();
-		if ( ! $jobs->find( (int) $request['id'] ) ) {
+		$job  = $jobs->find( (int) $request['id'] );
+		if ( ! $job || ! $this->workspace_for_current_user( (int) $job['workspace_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 
@@ -239,7 +267,7 @@ final class Routes {
 	public function cancel_job( \WP_REST_Request $request ) {
 		$jobs = new Job_Repository();
 		$job  = $jobs->find( (int) $request['id'] );
-		if ( ! $job ) {
+		if ( ! $job || ! $this->workspace_for_current_user( (int) $job['workspace_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		if ( in_array( $job['status'], [ 'completed', 'failed', 'cancelled' ], true ) ) {
@@ -249,6 +277,37 @@ final class Routes {
 		$jobs->request_cancel( $job['id'] );
 
 		return rest_ensure_response( $jobs->find( $job['id'] ) );
+	}
+
+	/**
+	 * Save a human-edited plan; staged revisions remain immutable and separate.
+	 *
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function update_plan( \WP_REST_Request $request ) {
+		$jobs = new Job_Repository();
+		$job  = $jobs->find( (int) $request['id'] );
+		if ( ! $job || ! $this->workspace_for_current_user( (int) $job['workspace_id'] ) ) {
+			return new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+
+		if ( ! $jobs->update_plan_content( $job['id'], (string) $request['content'] ) ) {
+			return new \WP_Error( 'wp_autoplugin_plan_not_editable', __( 'Only completed plan jobs can be edited.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+
+		$jobs->event( $job['id'], 'plan_edited', __( 'Plan edited by an administrator.', 'wp-autoplugin' ) );
+		return rest_ensure_response( $jobs->find( $job['id'] ) );
+	}
+
+	/**
+	 * @return array<string, mixed>|null
+	 */
+	private function workspace_for_current_user( int $workspace_id ): ?array {
+		$workspace = ( new Workspace_Repository() )->find( $workspace_id );
+
+		return $workspace && (int) $workspace['created_by'] === get_current_user_id()
+			? $workspace
+			: null;
 	}
 
 }

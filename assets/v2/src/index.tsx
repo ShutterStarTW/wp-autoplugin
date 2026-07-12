@@ -28,9 +28,12 @@ type Target = {
 
 type Job = {
 	id: number;
+	workspace_id: number;
+	task: string;
 	status: string;
 	progress: number;
 	error_message?: string;
+	payload: { message?: string };
 	result?: {
 		content?: string;
 		structured?: Record< string, unknown >;
@@ -122,8 +125,8 @@ function App() {
 	const [ targetSearch, setTargetSearch ] = useState( '' );
 	const [ operation, setOperation ] = useState( 'create' );
 	const [ request, setRequest ] = useState( '' );
-	const [ job, setJob ] = useState< Job | null >( null );
-	const [ jobLoading, setJobLoading ] = useState( false );
+	const [ jobs, setJobs ] = useState< Job[] >( [] );
+	const [ jobsLoading, setJobsLoading ] = useState( false );
 	const [ activeTab, setActiveTab ] = useState( 'plan' );
 	const [ error, setError ] = useState( '' );
 	const [ busy, setBusy ] = useState( true );
@@ -170,8 +173,8 @@ function App() {
 	useEffect( () => {
 		if ( 'new' === activeWorkspaceId ) {
 			window.localStorage.removeItem( ACTIVE_WORKSPACE_KEY );
-			setJob( null );
-			setJobLoading( false );
+			setJobs( [] );
+			setJobsLoading( false );
 			return;
 		}
 
@@ -180,33 +183,17 @@ function App() {
 			String( activeWorkspaceId )
 		);
 		setActiveTab(
-			'explain' === activeWorkspace?.operation ? 'review' : 'plan'
+			'explain' === activeWorkspace?.operation ? 'explain' : 'plan'
 		);
 
-		if ( ! activeWorkspace?.latest_job_id ) {
-			setJob( null );
-			setJobLoading( false );
-			return;
-		}
-
 		let current = true;
-		setJobLoading( true );
-		apiFetch< Job >( {
-			path: `${ rest }/jobs/${ activeWorkspace.latest_job_id }`,
+		setJobsLoading( true );
+		apiFetch< { items: Job[] } >( {
+			path: `${ rest }/workspaces/${ activeWorkspaceId }/jobs`,
 		} )
-			.then( ( latestJob ) => {
+			.then( ( response ) => {
 				if ( current ) {
-					setJob( latestJob );
-					setWorkspaces( ( items ) =>
-						items.map( ( item ) =>
-							item.id === latestJob.workspace_id
-								? {
-										...item,
-										latest_job_status: latestJob.status,
-								  }
-								: item
-						)
-					);
+					setJobs( response.items );
 				}
 			} )
 			.catch( ( reason ) => {
@@ -216,45 +203,55 @@ function App() {
 			} )
 			.finally( () => {
 				if ( current ) {
-					setJobLoading( false );
+					setJobsLoading( false );
 				}
 			} );
 
 		return () => {
 			current = false;
 		};
-	}, [
-		activeWorkspaceId,
-		activeWorkspace?.latest_job_id,
-		activeWorkspace?.operation,
-	] );
+	}, [ activeWorkspaceId, activeWorkspace?.operation ] );
 
 	useEffect( () => {
-		if (
-			! job ||
-			[ 'completed', 'failed', 'cancelled' ].includes( job.status )
-		) {
+		const activeJobs = jobs.filter( ( item ) =>
+			[ 'queued', 'running', 'retrying' ].includes( item.status )
+		);
+		if ( ! activeJobs.length ) {
 			return;
 		}
 		const timer = window.setInterval( () => {
-			apiFetch< Job >( { path: `${ rest }/jobs/${ job.id }` } )
-				.then( ( updatedJob ) => {
-					setJob( updatedJob );
-					setWorkspaces( ( items ) =>
-						items.map( ( item ) =>
-							item.id === updatedJob.workspace_id
-								? {
-										...item,
-										latest_job_status: updatedJob.status,
-								  }
-								: item
+			Promise.all(
+				activeJobs.map( ( item ) =>
+					apiFetch< Job >( { path: `${ rest }/jobs/${ item.id }` } )
+				)
+			)
+				.then( ( updatedJobs ) => {
+					setJobs( ( items ) =>
+						items.map(
+							( item ) =>
+								updatedJobs.find(
+									( updated ) => updated.id === item.id
+								) ?? item
 						)
 					);
+					const latestJob = updatedJobs[ updatedJobs.length - 1 ];
+					if ( latestJob ) {
+						setWorkspaces( ( items ) =>
+							items.map( ( item ) =>
+								item.id === latestJob.workspace_id
+									? {
+											...item,
+											latest_job_status: latestJob.status,
+									  }
+									: item
+							)
+						);
+					}
 				} )
 				.catch( ( reason ) => setError( reason.message ) );
 		}, 2000 );
 		return () => window.clearInterval( timer );
-	}, [ job ] );
+	}, [ jobs ] );
 
 	const target = useMemo(
 		() =>
@@ -321,7 +318,8 @@ function App() {
 				data: {
 					workspace_id: workspaceId,
 					task: operation === 'explain' ? 'explain' : 'plan',
-					payload: {},
+					payload:
+						operation === 'explain' ? { message: request } : {},
 				},
 			} );
 			const openedWorkspace: Workspace = {
@@ -335,9 +333,9 @@ function App() {
 				...current.filter( ( item ) => item.id !== openedWorkspace.id ),
 			] );
 			setActiveWorkspaceId( openedWorkspace.id );
-			setJob( created );
+			setJobs( [ created ] );
 			setRequest( '' );
-			setActiveTab( operation === 'explain' ? 'review' : 'plan' );
+			setActiveTab( operation === 'explain' ? 'explain' : 'plan' );
 		} catch ( reason: any ) {
 			setError( reason.message );
 		} finally {
@@ -363,15 +361,14 @@ function App() {
 		}
 	}
 
-	async function cancel() {
-		if ( ! job ) {
-			return;
-		}
+	async function cancel( job: Job ) {
 		const updated = await apiFetch< Job >( {
 			path: `${ rest }/jobs/${ job.id }/cancel`,
 			method: 'POST',
 		} );
-		setJob( updated );
+		setJobs( ( items ) =>
+			items.map( ( item ) => ( item.id === updated.id ? updated : item ) )
+		);
 		setWorkspaces( ( items ) =>
 			items.map( ( item ) =>
 				item.id === updated.workspace_id
@@ -379,6 +376,51 @@ function App() {
 					: item
 			)
 		);
+	}
+
+	async function createJob( task: 'plan' | 'explain', payload = {} ) {
+		if ( ! activeWorkspace ) {
+			return;
+		}
+		setError( '' );
+		try {
+			const created = await apiFetch< Job >( {
+				path: `${ rest }/jobs`,
+				method: 'POST',
+				data: { workspace_id: activeWorkspace.id, task, payload },
+			} );
+			setJobs( ( items ) => [ ...items, created ] );
+			setWorkspaces( ( items ) =>
+				items.map( ( item ) =>
+					item.id === activeWorkspace.id
+						? {
+								...item,
+								latest_job_id: created.id,
+								latest_job_status: created.status,
+						  }
+						: item
+				)
+			);
+		} catch ( reason: any ) {
+			setError( reason.message );
+		}
+	}
+
+	async function savePlan( job: Job, content: string ) {
+		try {
+			const updated = await apiFetch< Job >( {
+				path: `${ rest }/jobs/${ job.id }/plan`,
+				method: 'POST',
+				data: { content },
+			} );
+			setJobs( ( items ) =>
+				items.map( ( item ) =>
+					item.id === updated.id ? updated : item
+				)
+			);
+		} catch ( reason: any ) {
+			setError( reason.message );
+		}
 	}
 
 	if ( busy && ! bootstrap ) {
@@ -413,11 +455,13 @@ function App() {
 		workspaceContent = (
 			<WorkspaceView
 				workspace={ activeWorkspace }
-				job={ job }
-				jobLoading={ jobLoading }
+				jobs={ jobs }
+				jobsLoading={ jobsLoading }
 				activeTab={ activeTab }
 				onTabSelect={ setActiveTab }
 				onCancel={ cancel }
+				onCreateJob={ createJob }
+				onSavePlan={ savePlan }
 			/>
 		);
 	}
@@ -646,20 +690,29 @@ function WorkspaceLauncher( {
 
 function WorkspaceView( {
 	workspace,
-	job,
-	jobLoading,
+	jobs,
+	jobsLoading,
 	activeTab,
 	onTabSelect,
 	onCancel,
+	onCreateJob,
+	onSavePlan,
 }: {
 	workspace: Workspace;
-	job: Job | null;
-	jobLoading: boolean;
+	jobs: Job[];
+	jobsLoading: boolean;
 	activeTab: string;
 	onTabSelect: ( tab: string ) => void;
-	onCancel: () => void;
+	onCancel: ( job: Job ) => void;
+	onCreateJob: ( task: 'plan' | 'explain', payload?: object ) => void;
+	onSavePlan: ( job: Job, content: string ) => void;
 } ) {
 	const target = workspace.target_metadata;
+	const tabs =
+		workspace.operation === 'explain'
+			? [ 'explain' ]
+			: [ 'plan', 'code', 'review' ];
+	const latestPlan = latestJobFor( jobs, 'plan' );
 	return (
 		<section className="workspace-editor">
 			<header className="workspace-editor__header">
@@ -692,7 +745,7 @@ function WorkspaceView( {
 				className="workspace-stage-tabs"
 				aria-label={ __( 'Workspace stages', 'wp-autoplugin' ) }
 			>
-				{ [ 'plan', 'code', 'review' ].map( ( tab ) => (
+				{ tabs.map( ( tab ) => (
 					<button
 						type="button"
 						key={ tab }
@@ -705,25 +758,36 @@ function WorkspaceView( {
 			</nav>
 			<Card className="workspace-editor__panel">
 				<CardBody>
-					{ jobLoading && (
+					{ jobsLoading && (
 						<div className="workspace-job-loading">
 							<Spinner />{ ' ' }
 							{ __( 'Loading job…', 'wp-autoplugin' ) }
 						</div>
 					) }
-					{ ! jobLoading && ! job && (
-						<div className="empty-stage">
-							<h2>{ getTabLabel( activeTab ) }</h2>
-							<p>
-								{ __(
-									'No job has been started for this stage yet.',
-									'wp-autoplugin'
-								) }
-							</p>
-						</div>
+					{ ! jobsLoading && activeTab === 'plan' && (
+						<PlanStage
+							job={ latestPlan }
+							onCancel={ onCancel }
+							onCreate={ () => onCreateJob( 'plan' ) }
+							onSave={ onSavePlan }
+						/>
 					) }
-					{ ! jobLoading && job && (
-						<JobStatus job={ job } onCancel={ onCancel } />
+					{ ! jobsLoading && activeTab === 'code' && (
+						<CodeStage plan={ latestPlan } />
+					) }
+					{ ! jobsLoading && activeTab === 'review' && (
+						<ReviewStage plan={ latestPlan } />
+					) }
+					{ ! jobsLoading && activeTab === 'explain' && (
+						<ExplainStage
+							jobs={ jobs.filter(
+								( job ) => job.task === 'explain'
+							) }
+							onCancel={ onCancel }
+							onFollowUp={ ( message ) =>
+								onCreateJob( 'explain', { message } )
+							}
+						/>
 					) }
 				</CardBody>
 			</Card>
@@ -731,7 +795,17 @@ function WorkspaceView( {
 	);
 }
 
-function JobStatus( { job, onCancel }: { job: Job; onCancel: () => void } ) {
+function latestJobFor( jobs: Job[], task: string ): Job | null {
+	return [ ...jobs ].reverse().find( ( job ) => job.task === task ) ?? null;
+}
+
+function JobStatus( {
+	job,
+	onCancel,
+}: {
+	job: Job;
+	onCancel: ( job: Job ) => void;
+} ) {
 	const terminal = [ 'completed', 'failed', 'cancelled' ].includes(
 		job.status
 	);
@@ -766,9 +840,341 @@ function JobStatus( { job, onCancel }: { job: Job; onCancel: () => void } ) {
 				<Result result={ job.result } />
 			) }
 			{ ! terminal && (
-				<Button variant="secondary" isDestructive onClick={ onCancel }>
+				<Button
+					variant="secondary"
+					isDestructive
+					onClick={ () => onCancel( job ) }
+				>
 					{ __( 'Cancel job', 'wp-autoplugin' ) }
 				</Button>
+			) }
+		</div>
+	);
+}
+
+function PlanStage( {
+	job,
+	onCancel,
+	onCreate,
+	onSave,
+}: {
+	job: Job | null;
+	onCancel: ( job: Job ) => void;
+	onCreate: () => void;
+	onSave: ( job: Job, content: string ) => void;
+} ) {
+	if ( ! job ) {
+		return (
+			<EmptyStage
+				action={ __( 'Create plan', 'wp-autoplugin' ) }
+				onAction={ onCreate }
+				title={ __( 'Plan', 'wp-autoplugin' ) }
+			/>
+		);
+	}
+	if ( job.status !== 'completed' ) {
+		return (
+			<>
+				<JobStatus job={ job } onCancel={ onCancel } />
+				{ [ 'failed', 'cancelled' ].includes( job.status ) && (
+					<Button variant="secondary" onClick={ onCreate }>
+						{ __( 'Retry plan', 'wp-autoplugin' ) }
+					</Button>
+				) }
+			</>
+		);
+	}
+	return <PlanEditor job={ job } onSave={ onSave } onRetry={ onCreate } />;
+}
+
+function PlanEditor( {
+	job,
+	onSave,
+	onRetry,
+}: {
+	job: Job;
+	onSave: ( job: Job, content: string ) => void;
+	onRetry: () => void;
+} ) {
+	const [ editing, setEditing ] = useState( false );
+	const [ content, setContent ] = useState( job.result?.content || '' );
+	return (
+		<div className="plan-stage">
+			<div className="stage-toolbar">
+				<div>
+					<strong>
+						{ __( 'Implementation plan', 'wp-autoplugin' ) }
+					</strong>
+					<small>
+						{ __( 'Saved with this plan job', 'wp-autoplugin' ) }
+					</small>
+				</div>
+				<div>
+					<Button variant="secondary" onClick={ onRetry }>
+						{ __( 'Retry plan', 'wp-autoplugin' ) }
+					</Button>
+					<Button
+						variant="primary"
+						onClick={ () => {
+							if ( editing ) {
+								onSave( job, content );
+							}
+							setEditing( ! editing );
+						} }
+					>
+						{ editing
+							? __( 'Save plan', 'wp-autoplugin' )
+							: __( 'Edit plan', 'wp-autoplugin' ) }
+					</Button>
+				</div>
+			</div>
+			{ editing ? (
+				<TextareaControl
+					hideLabelFromVision
+					label={ __( 'Plan Markdown', 'wp-autoplugin' ) }
+					value={ content }
+					onChange={ setContent }
+					rows={ 20 }
+				/>
+			) : (
+				<Markdown content={ content } />
+			) }
+			<div className="stage-next">
+				<span>
+					{ __(
+						'Code generation will be available once the staged-revision worker is connected.',
+						'wp-autoplugin'
+					) }
+				</span>
+				<Button variant="primary" disabled>
+					{ __( 'Continue to Code', 'wp-autoplugin' ) }
+				</Button>
+			</div>
+		</div>
+	);
+}
+
+function CodeStage( { plan }: { plan: Job | null } ) {
+	return (
+		<div className="code-stage">
+			<div className="code-stage__tree">
+				<strong>{ __( 'STAGED FILES', 'wp-autoplugin' ) }</strong>
+				<p>{ __( 'No staged revision yet.', 'wp-autoplugin' ) }</p>
+			</div>
+			<div className="code-stage__editor">
+				<div className="stage-toolbar">
+					<div>
+						<strong>
+							{ __( 'Code editor', 'wp-autoplugin' ) }
+						</strong>
+						<small>
+							{ __(
+								'Files and change markers will appear here.',
+								'wp-autoplugin'
+							) }
+						</small>
+					</div>
+				</div>
+				<Notice status="info" isDismissible={ false }>
+					{ plan?.status === 'completed'
+						? __(
+								'The plan is ready. Code generation needs the v2 staged-revision worker, which is not available yet.',
+								'wp-autoplugin'
+						  )
+						: __(
+								'Complete the plan before generating a staged revision.',
+								'wp-autoplugin'
+						  ) }
+				</Notice>
+				<pre className="code-stage__placeholder">
+					{ __(
+						'// Generated files will be editable here with add, modify, and delete markers.',
+						'wp-autoplugin'
+					) }
+				</pre>
+				<div className="stage-next">
+					<span>
+						{ __(
+							'Code remains read-only until a staged revision exists.',
+							'wp-autoplugin'
+						) }
+					</span>
+					<Button variant="primary" disabled>
+						{ __( 'Continue to Review', 'wp-autoplugin' ) }
+					</Button>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function ReviewStage( { plan }: { plan: Job | null } ) {
+	return (
+		<div className="review-stage">
+			<div className="review-stage__summary">
+				<span>✓</span>
+				<div>
+					<strong>{ __( 'Review queue', 'wp-autoplugin' ) }</strong>
+					<p>
+						{ __(
+							'A GitHub-style review will show an all-clear verdict or priority comments pinned to staged code.',
+							'wp-autoplugin'
+						) }
+					</p>
+				</div>
+			</div>
+			<Notice status="info" isDismissible={ false }>
+				{ plan?.status === 'completed'
+					? __(
+							'Review generation needs a staged code revision, which is not available yet.',
+							'wp-autoplugin'
+					  )
+					: __(
+							'Complete Plan and Code before starting Review.',
+							'wp-autoplugin'
+					  ) }
+			</Notice>
+		</div>
+	);
+}
+
+function ExplainStage( {
+	jobs,
+	onCancel,
+	onFollowUp,
+}: {
+	jobs: Job[];
+	onCancel: ( job: Job ) => void;
+	onFollowUp: ( message: string ) => void;
+} ) {
+	const [ message, setMessage ] = useState( '' );
+	return (
+		<div className="explain-stage">
+			<div className="explain-stage__messages">
+				{ jobs.map( ( job ) => (
+					<div className="explain-message" key={ job.id }>
+						<div className="explain-message__question">
+							<strong>{ __( 'You', 'wp-autoplugin' ) }</strong>
+							<p>
+								{ job.payload.message ||
+									__( 'Initial question', 'wp-autoplugin' ) }
+							</p>
+						</div>
+						<div className="explain-message__answer">
+							<strong>
+								{ __( 'Explain', 'wp-autoplugin' ) }
+							</strong>
+							{ job.status === 'completed' && job.result ? (
+								<>
+									<Markdown
+										content={ job.result.content || '' }
+									/>
+									<Button
+										variant="secondary"
+										onClick={ () =>
+											onFollowUp(
+												job.payload.message || ''
+											)
+										}
+									>
+										{ __(
+											'Retry answer',
+											'wp-autoplugin'
+										) }
+									</Button>
+								</>
+							) : (
+								<>
+									<JobStatus
+										job={ job }
+										onCancel={ onCancel }
+									/>
+									{ [ 'failed', 'cancelled' ].includes(
+										job.status
+									) && (
+										<Button
+											variant="secondary"
+											onClick={ () =>
+												onFollowUp(
+													job.payload.message || ''
+												)
+											}
+										>
+											{ __(
+												'Retry answer',
+												'wp-autoplugin'
+											) }
+										</Button>
+									) }
+								</>
+							) }
+						</div>
+					</div>
+				) ) }
+			</div>
+			<div className="explain-stage__composer">
+				<TextareaControl
+					hideLabelFromVision
+					label={ __( 'Ask a follow-up question', 'wp-autoplugin' ) }
+					placeholder={ __(
+						'Ask a follow-up question…',
+						'wp-autoplugin'
+					) }
+					value={ message }
+					onChange={ setMessage }
+					rows={ 3 }
+				/>
+				<Button
+					variant="primary"
+					disabled={ ! message.trim() }
+					onClick={ () => {
+						onFollowUp( message );
+						setMessage( '' );
+					} }
+				>
+					{ __( 'Ask', 'wp-autoplugin' ) }
+				</Button>
+			</div>
+		</div>
+	);
+}
+
+function EmptyStage( {
+	action,
+	onAction,
+	title,
+}: {
+	action: string;
+	onAction: () => void;
+	title: string;
+} ) {
+	return (
+		<div className="empty-stage">
+			<h2>{ title }</h2>
+			<p>
+				{ __(
+					'No job has been started for this stage yet.',
+					'wp-autoplugin'
+				) }
+			</p>
+			<Button variant="primary" onClick={ onAction }>
+				{ action }
+			</Button>
+		</div>
+	);
+}
+
+function Markdown( { content }: { content: string } ) {
+	const marked = ( window as any ).marked;
+	const purify = ( window as any ).DOMPurify;
+	const html =
+		marked && purify ? purify.sanitize( marked.parse( content ) ) : '';
+	return (
+		<div className="job-result">
+			{ html ? (
+				<div dangerouslySetInnerHTML={ { __html: html } } />
+			) : (
+				<pre>{ content }</pre>
 			) }
 		</div>
 	);

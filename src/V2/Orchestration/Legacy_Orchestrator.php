@@ -55,7 +55,10 @@ final class Legacy_Orchestrator {
 
 		$target  = (array) $workspace['target_metadata'];
 		$files   = ( new Source_Reader() )->read( $target );
-		$request = (string) $workspace['request'];
+		$message = trim( (string) ( $job['payload']['message'] ?? '' ) );
+		$request = 'explain' === $job['task'] && '' !== $message
+			? $message
+			: (string) $workspace['request'];
 		$type    = 'theme' === ( $target['kind'] ?? '' ) ? 'theme' : 'plugin';
 
 		if ( 'explain' === $job['task'] ) {

@@ -57,13 +57,24 @@ final class Job_Repository extends Repository {
 			return null;
 		}
 
-		foreach ( [ 'id', 'workspace_id', 'progress', 'cancel_requested', 'created_by' ] as $field ) {
-			$row[ $field ] = (int) $row[ $field ];
-		}
-		$row['payload'] = $this->decode( $row['payload'] );
-		$row['result']  = $this->decode( $row['result'] );
+		return $this->hydrate( $row );
+	}
 
-		return $row;
+	/**
+	 * Return the durable history for one workspace, oldest first.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function list_for_workspace( int $workspace_id ): array {
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE workspace_id = %d ORDER BY id ASC',
+				$workspace_id
+			),
+			ARRAY_A
+		);
+
+		return array_map( [ $this, 'hydrate' ], $rows );
 	}
 
 	/**
@@ -134,6 +145,22 @@ final class Job_Repository extends Repository {
 	}
 
 	/**
+	 * Save an operator-edited plan without altering the immutable revision layer.
+	 */
+	public function update_plan_content( int $id, string $content ): bool {
+		$job = $this->find( $id );
+		if ( ! $job || 'plan' !== $job['task'] || 'completed' !== $job['status'] ) {
+			return false;
+		}
+
+		$result            = is_array( $job['result'] ) ? $job['result'] : [];
+		$result['content'] = $content;
+		$result['structured'] = null;
+
+		return $this->update( $id, [ 'result' => $result ] );
+	}
+
+	/**
 	 * Append a progress event.
 	 *
 	 * @param array<string, mixed> $context Redacted event metadata.
@@ -154,5 +181,19 @@ final class Job_Repository extends Repository {
 				'created_at'=> $this->now(),
 			]
 		);
+	}
+
+	/**
+	 * @param array<string, mixed> $row Raw database row.
+	 * @return array<string, mixed>
+	 */
+	private function hydrate( array $row ): array {
+		foreach ( [ 'id', 'workspace_id', 'progress', 'cancel_requested', 'created_by' ] as $field ) {
+			$row[ $field ] = (int) $row[ $field ];
+		}
+		$row['payload'] = $this->decode( $row['payload'] );
+		$row['result']  = $this->decode( $row['result'] );
+
+		return $row;
 	}
 }
