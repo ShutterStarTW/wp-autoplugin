@@ -14,7 +14,8 @@ use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 final class Routes {
 	private const NAMESPACE = 'wp-autoplugin/v2';
 	private const OPERATIONS = [ 'create', 'modify', 'fix', 'hook_extension', 'fork', 'explain' ];
-	private const TASKS      = [ 'plan', 'code', 'review', 'explain' ];
+	private const TASKS      = [ 'plan', 'code', 'review', 'explain', 'conversation' ];
+	private const CONVERSATION_STAGES = [ 'plan', 'explain' ];
 
 	public function register(): void {
 		add_action( 'rest_api_init', [ $this, 'register_routes' ] );
@@ -202,10 +203,18 @@ final class Routes {
 			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 
-		$jobs = new Job_Repository();
-		$job  = null;
+		$jobs    = new Job_Repository();
+		$task    = (string) $request['task'];
+		$payload = (array) $request['payload'];
+		if ( 'conversation' === $task ) {
+			$payload = $this->conversation_payload( $payload, $workspace_id, $jobs );
+			if ( is_wp_error( $payload ) ) {
+				return $payload;
+			}
+		}
+		$job = null;
 		try {
-			$job    = $jobs->create( $workspace_id, (string) $request['task'], (array) $request['payload'], get_current_user_id() );
+			$job    = $jobs->create( $workspace_id, $task, $payload, get_current_user_id() );
 			$runner = ( new Queue() )->dispatch( $job['id'] );
 			$jobs->update( $job['id'], [ 'runner' => $runner ] );
 
@@ -280,7 +289,7 @@ final class Routes {
 	}
 
 	/**
-	 * Save a human-edited plan; staged revisions remain immutable and separate.
+	 * Save a human-edited Plan and queue an immutable successor file map.
 	 *
 	 * @return \WP_REST_Response|\WP_Error
 	 */
@@ -291,12 +300,78 @@ final class Routes {
 			return new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 
-		if ( ! $jobs->update_plan_content( $job['id'], (string) $request['content'] ) ) {
-			return new \WP_Error( 'wp_autoplugin_plan_not_editable', __( 'Only completed plan jobs can be edited.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		$successor = $jobs->create_plan_successor( $job, (string) $request['content'], get_current_user_id() );
+		if ( ! $successor ) {
+			return new \WP_Error( 'wp_autoplugin_plan_not_editable', __( 'Only completed plan artifacts can be edited.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+		$regeneration = null;
+		try {
+			$regeneration = $jobs->create(
+				(int) $successor['workspace_id'],
+				'plan_structure',
+				[ 'artifact_job_id' => (int) $successor['id'] ],
+				get_current_user_id()
+			);
+			$runner = ( new Queue() )->dispatch( (int) $regeneration['id'] );
+			$jobs->update( (int) $regeneration['id'], [ 'runner' => $runner ] );
+			$regeneration = $jobs->find( (int) $regeneration['id'] );
+		} catch ( \Throwable $error ) {
+			if ( $regeneration ) {
+				$jobs->update(
+					(int) $regeneration['id'],
+					[
+						'status'        => 'failed',
+						'error_message' => $error->getMessage(),
+						'finished_at'   => current_time( 'mysql', true ),
+					]
+				);
+				$jobs->event( (int) $regeneration['id'], 'failed', $error->getMessage(), [], 'error' );
+				$regeneration = $jobs->find( (int) $regeneration['id'] );
+			}
 		}
 
-		$jobs->event( $job['id'], 'plan_edited', __( 'Plan edited by an administrator.', 'wp-autoplugin' ) );
-		return rest_ensure_response( $jobs->find( $job['id'] ) );
+		return new \WP_REST_Response(
+			[
+				'artifact'         => $successor,
+				'regeneration_job' => $regeneration,
+			],
+			$regeneration && 'queued' === $regeneration['status'] ? 202 : 200
+		);
+	}
+
+	/**
+	 * Validate and normalize a shared stage-conversation payload.
+	 *
+	 * @param array<string, mixed> $payload Raw REST payload.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function conversation_payload( array $payload, int $workspace_id, Job_Repository $jobs ) {
+		$stage   = sanitize_key( (string) ( $payload['stage'] ?? '' ) );
+		$message = sanitize_textarea_field( (string) ( $payload['message'] ?? '' ) );
+		$parent  = absint( $payload['artifact_job_id'] ?? 0 );
+
+		if ( ! in_array( $stage, self::CONVERSATION_STAGES, true ) ) {
+			return new \WP_Error( 'wp_autoplugin_conversation_stage_unavailable', __( 'Follow-up messages are currently available for Plan and Explain.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+		if ( '' === $message ) {
+			return new \WP_Error( 'wp_autoplugin_conversation_message_required', __( 'A follow-up message is required.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		}
+
+		if ( $parent ) {
+			$artifact = $jobs->find( $parent );
+			if ( ! $artifact || $workspace_id !== (int) $artifact['workspace_id'] ) {
+				return new \WP_Error( 'wp_autoplugin_conversation_artifact_not_found', __( 'The selected conversation artifact is not available in this workspace.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+			}
+			if ( 'plan' === $stage && ! $jobs->is_plan_artifact( $artifact ) ) {
+				return new \WP_Error( 'wp_autoplugin_conversation_artifact_invalid', __( 'Plan follow-ups must reply to a completed Plan artifact.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+			}
+		}
+
+		return [
+			'stage'           => $stage,
+			'message'         => $message,
+			'artifact_job_id' => $parent,
+		];
 	}
 
 	/**

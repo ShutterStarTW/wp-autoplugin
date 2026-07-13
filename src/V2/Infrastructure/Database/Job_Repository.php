@@ -2,6 +2,8 @@
 
 namespace WP_Autoplugin\V2\Infrastructure\Database;
 
+use WP_Autoplugin\AI_Utils;
+
 /**
  * Durable job state and append-only event persistence.
  */
@@ -145,19 +147,98 @@ final class Job_Repository extends Repository {
 	}
 
 	/**
-	 * Save an operator-edited plan without altering the immutable revision layer.
+	 * Whether a completed job represents a staged Plan artifact.
+	 *
+	 * Older Plan jobs predate explicit artifact metadata, so they remain valid
+	 * Plan artifacts for compatibility.
+	 *
+	 * @param array<string, mixed> $job Hydrated job record.
 	 */
-	public function update_plan_content( int $id, string $content ): bool {
-		$job = $this->find( $id );
-		if ( ! $job || 'plan' !== $job['task'] || 'completed' !== $job['status'] ) {
+	public function is_plan_artifact( array $job ): bool {
+		if ( 'completed' !== ( $job['status'] ?? '' ) || ! is_array( $job['result'] ?? null ) ) {
 			return false;
 		}
 
-		$result            = is_array( $job['result'] ) ? $job['result'] : [];
-		$result['content'] = $content;
-		$result['structured'] = null;
+		if ( 'plan' === ( $job['task'] ?? '' ) ) {
+			return isset( $job['result']['content'] );
+		}
+		if ( 'plan_structure' === ( $job['task'] ?? '' ) ) {
+			return 'plan' === ( $job['result']['artifact']['type'] ?? '' )
+				&& isset( $job['result']['artifact']['content'] );
+		}
 
-		return $this->update( $id, [ 'result' => $result ] );
+		return 'conversation' === ( $job['task'] ?? '' )
+			&& 'plan' === ( $job['payload']['stage'] ?? '' )
+			&& 'artifact' === ( $job['result']['outcome'] ?? '' )
+			&& 'plan' === ( $job['result']['artifact']['type'] ?? '' )
+			&& isset( $job['result']['artifact']['content'] );
+	}
+
+	/**
+	 * Store a human-edited Plan as a new immutable successor job.
+	 *
+	 * @param array<string, mixed> $source Completed Plan artifact being edited.
+	 * @return array<string, mixed>|null
+	 */
+	public function create_plan_successor( array $source, string $content, int $user_id ): ?array {
+		if ( ! $this->is_plan_artifact( $source ) ) {
+			return null;
+		}
+
+		$now        = $this->now();
+		$structured = json_decode( AI_Utils::strip_code_fences( trim( $content ), 'json' ), true );
+		if ( ! is_array( $structured ) && is_array( $source['result']['structured'] ?? null ) ) {
+			// Markdown edits change the narrative Plan, not its static file map.
+			$structured = $source['result']['structured'];
+		}
+		$this->wpdb->insert(
+			Installer::table( 'jobs' ),
+			[
+				'workspace_id' => $source['workspace_id'],
+				'task'         => 'plan',
+				'status'       => 'completed',
+				'progress'     => 100,
+				'payload'      => $this->json(
+					[
+						'stage'                  => 'plan',
+						'source'                 => 'manual_edit',
+						'artifact_parent_job_id' => $source['id'],
+					]
+				),
+				'result'       => $this->json(
+					[
+						'content'    => $content,
+						'structured' => is_array( $structured ) ? $structured : null,
+						'artifact'   => [
+							'type'          => 'plan',
+							'parent_job_id' => $source['id'],
+						],
+					]
+				),
+				'created_by'   => $user_id,
+				'created_at'   => $now,
+				'started_at'   => $now,
+				'finished_at'  => $now,
+				'updated_at'   => $now,
+			],
+			[ '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s' ]
+		);
+
+		$id = (int) $this->wpdb->insert_id;
+		if ( ! $id ) {
+			throw new \RuntimeException( 'Could not create Plan successor.' );
+		}
+
+		$this->wpdb->update(
+			Installer::table( 'workspaces' ),
+			[ 'updated_at' => $now ],
+			[ 'id' => $source['workspace_id'] ],
+			[ '%s' ],
+			[ '%d' ]
+		);
+		$this->event( $id, 'plan_successor', __( 'Plan edited by an administrator.', 'wp-autoplugin' ), [ 'parent_job_id' => $source['id'] ] );
+
+		return $this->find( $id );
 	}
 
 	/**

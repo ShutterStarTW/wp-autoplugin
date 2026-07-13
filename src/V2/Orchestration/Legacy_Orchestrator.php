@@ -16,7 +16,8 @@ use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 /**
  * Compatibility adapter that runs existing BYOK transports in durable jobs.
  *
- * It performs plan/explain requests only and never writes target files.
+ * It performs plan/explain and read-only conversation requests only. Generated
+ * changes remain durable staged artifacts and never write target files.
  */
 final class Legacy_Orchestrator {
 	public function register(): void {
@@ -38,13 +39,18 @@ final class Legacy_Orchestrator {
 			return new \WP_Error( 'workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ) );
 		}
 
-		if ( ! in_array( $job['task'], [ 'plan', 'explain' ], true ) ) {
+		if ( ! in_array( $job['task'], [ 'plan', 'plan_structure', 'explain', 'conversation' ], true ) ) {
 			return new \WP_Error( 'task_not_implemented', __( 'This task requires the v2 staged-revision generator, which is not registered.', 'wp-autoplugin' ) );
 		}
 
+		$stage   = 'conversation' === $job['task'] ? (string) ( $job['payload']['stage'] ?? '' ) : ( 'plan_structure' === $job['task'] ? 'plan' : $job['task'] );
+		if ( ! in_array( $stage, [ 'plan', 'explain' ], true ) ) {
+			return new \WP_Error( 'conversation_stage_unavailable', __( 'This workspace stage does not support follow-up messages yet.', 'wp-autoplugin' ) );
+		}
+
 		$handler = new Api_Handler();
-		$api     = 'explain' === $job['task'] ? $handler->get_reviewer_api() : $handler->get_planner_api();
-		$model   = 'explain' === $job['task'] ? $handler->get_reviewer_model() : $handler->get_planner_model();
+		$api     = 'explain' === $stage ? $handler->get_reviewer_api() : $handler->get_planner_api();
+		$model   = 'explain' === $stage ? $handler->get_reviewer_model() : $handler->get_planner_model();
 		if ( ! $api ) {
 			return new \WP_Error( 'provider_not_configured', __( 'Configure an API key and model for this task before starting the job.', 'wp-autoplugin' ) );
 		}
@@ -60,8 +66,22 @@ final class Legacy_Orchestrator {
 			? $message
 			: (string) $workspace['request'];
 		$type    = 'theme' === ( $target['kind'] ?? '' ) ? 'theme' : 'plugin';
+		$conversation = [];
+		$regeneration = [];
 
-		if ( 'explain' === $job['task'] ) {
+		if ( 'plan_structure' === $job['task'] ) {
+			$regeneration = $this->regenerate_plan_structure( $api, $workspace, $job, $files, $jobs );
+			if ( is_wp_error( $regeneration ) ) {
+				return $regeneration;
+			}
+			$content = $regeneration['content'];
+		} elseif ( 'conversation' === $job['task'] ) {
+			$conversation = $this->follow_up( $api, $workspace, $job, $files, $jobs );
+			if ( is_wp_error( $conversation ) ) {
+				return $conversation;
+			}
+			$content = $conversation['content'];
+		} elseif ( 'explain' === $job['task'] ) {
 			if ( empty( $files ) ) {
 				return new \WP_Error( 'empty_target', __( 'There is no source to explain for this target.', 'wp-autoplugin' ) );
 			}
@@ -84,8 +104,28 @@ final class Legacy_Orchestrator {
 
 		$clean      = AI_Utils::strip_code_fences( trim( (string) $content ), 'json' );
 		$structured = json_decode( $clean, true );
+		$content_was_json = is_array( $structured );
+		if ( isset( $regeneration['structured'] ) && is_array( $regeneration['structured'] ) ) {
+			$structured = $regeneration['structured'];
+		}
 
-		return [
+		/*
+		 * Legacy planners use JSON so their project structure remains
+		 * deterministic. Persist that metadata separately, while making the
+		 * visible v2 Plan artifact editable Markdown.
+		 */
+		if ( 'plan' === $stage && isset( $conversation['structured'] ) && is_array( $conversation['structured'] ) ) {
+			$structured = $conversation['structured'];
+		}
+		if ( 'plan' === $stage && is_array( $structured ) && ( 'plan' === $job['task'] || ( 'artifact' === ( $conversation['outcome'] ?? '' ) && $content_was_json ) ) ) {
+			$content = $this->plan_markdown( $structured );
+			if ( 'artifact' === ( $conversation['outcome'] ?? '' ) ) {
+				$conversation['content']              = $content;
+				$conversation['artifact']['content'] = $content;
+			}
+		}
+
+		$result = [
 			'content'    => (string) $content,
 			'structured' => is_array( $structured ) ? $structured : null,
 			'model'      => $model,
@@ -95,5 +135,241 @@ final class Legacy_Orchestrator {
 				'output_tokens' => (int) ( $usage['output_tokens'] ?? 0 ),
 			],
 		];
+		if ( 'plan_structure' === $job['task'] ) {
+			$result['artifact'] = [
+				'type'          => 'plan',
+				'content'       => (string) $content,
+				'parent_job_id' => (int) $regeneration['artifact_job_id'],
+			];
+		}
+
+		return array_merge( $result, $conversation );
+	}
+
+	/**
+	 * Regenerate a static file map from an administrator-edited Markdown Plan.
+	 *
+	 * @param array<string, mixed>  $workspace Workspace record.
+	 * @param array<string, mixed>  $job       Structure-regeneration job.
+	 * @param array<string, string> $files     Bounded target source.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function regenerate_plan_structure( $api, array $workspace, array $job, array $files, Job_Repository $jobs ) {
+		$artifact_id = (int) ( $job['payload']['artifact_job_id'] ?? 0 );
+		$artifact    = $artifact_id ? $jobs->find( $artifact_id ) : null;
+		if ( ! $artifact || (int) $workspace['id'] !== (int) $artifact['workspace_id'] || ! $jobs->is_plan_artifact( $artifact ) ) {
+			return new \WP_Error( 'plan_structure_artifact_missing', __( 'A completed Plan artifact is required to regenerate its file structure.', 'wp-autoplugin' ) );
+		}
+
+		$plan           = $this->artifact_content( $artifact );
+		$source_context = empty( $files ) ? __( 'No target source is available for this workspace.', 'wp-autoplugin' ) : AI_Utils::build_code_context( $files );
+		$prompt         = <<<PROMPT
+You are preparing the file map for a WordPress development Plan. This is read-only planning work: do not write code or claim to modify files.
+
+Original workspace request:
+"""
+{$workspace['request']}
+"""
+
+Administrator-edited Plan in Markdown:
+"""
+$plan
+"""
+
+Bounded read-only target source context:
+"""
+$source_context
+"""
+
+Return only a valid JSON object in this exact shape:
+{"project_structure":{"directories":["relative/directory/"],"files":[{"path":"relative/file.php","type":"php","description":"brief purpose","action":"update"}]}}
+
+List only files that must be added, updated, or deleted to implement the Plan. `type` must be `php`, `js`, or `css`; `action` must be `add`, `update`, or `delete`. Keep the structure minimal. Paths must be relative to the target root. Do not include code or Markdown.
+PROMPT;
+		$response       = $api->send_prompt( $prompt, '', [ 'response_format' => [ 'type' => 'json_object' ] ] );
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$decoded = json_decode( AI_Utils::strip_code_fences( trim( (string) $response ), 'json' ), true );
+		if ( ! is_array( $decoded ) || ! is_array( $decoded['project_structure'] ?? null ) || ! is_array( $decoded['project_structure']['files'] ?? null ) ) {
+			return new \WP_Error( 'plan_structure_response_invalid', __( 'The provider returned an invalid project structure. The Plan was not changed.', 'wp-autoplugin' ) );
+		}
+
+		$structured                      = is_array( $artifact['result']['structured'] ?? null ) ? $artifact['result']['structured'] : [];
+		$structured['project_structure'] = $decoded['project_structure'];
+
+		return [
+			'content'         => $plan,
+			'structured'      => $structured,
+			'artifact_job_id' => $artifact_id,
+		];
+	}
+
+	/**
+	 * Convert a legacy JSON plan to a durable Markdown artifact.
+	 *
+	 * Project structure remains separately structured data. This preserves a
+	 * static file overview for future code generation rather than mixing it
+	 * into editable plan prose.
+	 *
+	 * @param array<string, mixed> $plan Legacy planner response.
+	 */
+	private function plan_markdown( array $plan ): string {
+		$sections = [];
+		$title    = isset( $plan['plugin_name'] ) && is_scalar( $plan['plugin_name'] )
+			? trim( (string) $plan['plugin_name'] )
+			: __( 'Implementation plan', 'wp-autoplugin' );
+
+		$sections[] = '# ' . $title;
+		foreach ( $plan as $key => $value ) {
+			if ( 'plugin_name' === $key || 'project_structure' === $key || ! is_scalar( $value ) || '' === trim( (string) $value ) ) {
+				continue;
+			}
+
+			$sections[] = '## ' . ucwords( str_replace( '_', ' ', (string) $key ) ) . "\n\n" . trim( (string) $value );
+		}
+
+		return implode( "\n\n", $sections );
+	}
+
+	/**
+	 * Run one persisted, stage-aware follow-up turn.
+	 *
+	 * @param array<string, mixed>  $workspace Workspace record.
+	 * @param array<string, mixed>  $job       Conversation job.
+	 * @param array<string, string> $files     Bounded target files.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function follow_up( $api, array $workspace, array $job, array $files, Job_Repository $jobs ) {
+		$stage       = (string) $job['payload']['stage'];
+		$message     = trim( (string) $job['payload']['message'] );
+		$artifact_id = (int) ( $job['payload']['artifact_job_id'] ?? 0 );
+		$artifact    = $artifact_id ? $jobs->find( $artifact_id ) : null;
+
+		if ( 'plan' === $stage && ( ! $artifact || ! $jobs->is_plan_artifact( $artifact ) ) ) {
+			return new \WP_Error( 'conversation_artifact_missing', __( 'A completed Plan artifact is required for this follow-up.', 'wp-autoplugin' ) );
+		}
+		if ( 'explain' === $stage && empty( $files ) ) {
+			return new \WP_Error( 'empty_target', __( 'There is no source to explain for this target.', 'wp-autoplugin' ) );
+		}
+
+		$current_artifact = $this->artifact_content( $artifact );
+		$history          = $this->conversation_history( $jobs->list_for_workspace( (int) $workspace['id'] ), $stage, (int) $job['id'] );
+		$source_context   = empty( $files ) ? __( 'No target source is available for this workspace.', 'wp-autoplugin' ) : AI_Utils::build_code_context( $files );
+		$artifact_label   = 'plan' === $stage ? __( 'current Plan artifact', 'wp-autoplugin' ) : __( 'current Explain context', 'wp-autoplugin' );
+		$prompt           = <<<PROMPT
+You are continuing a WordPress development workspace at the $stage stage.
+
+Original workspace request:
+"""
+{$workspace['request']}
+"""
+
+The $artifact_label is:
+"""
+$current_artifact
+"""
+
+Recent conversation messages (oldest first):
+"""
+$history
+"""
+
+Bounded read-only target source context:
+"""
+$source_context
+"""
+
+The administrator's new message is:
+"""
+$message
+"""
+
+Respond with only a valid JSON object. Use exactly one of these forms:
+{"outcome":"answer","content":"A concise Markdown answer that does not alter any artifact."}
+{"outcome":"artifact","content":"The complete replacement Plan artifact in Markdown or the existing Plan's JSON format."}
+
+Choose "answer" for questions, requests for explanation, or ambiguity. Choose "artifact" only when the administrator clearly asks to change the Plan or its implementation requirements. Never claim to write, install, activate, execute, promote, or modify target files.
+PROMPT;
+
+		$response = $api->send_prompt( $prompt );
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$decoded = json_decode( AI_Utils::strip_code_fences( trim( (string) $response ), 'json' ), true );
+		if ( ! is_array( $decoded ) || ! in_array( $decoded['outcome'] ?? '', [ 'answer', 'artifact' ], true ) || ! is_string( $decoded['content'] ?? null ) || '' === trim( $decoded['content'] ) ) {
+			return new \WP_Error( 'conversation_response_invalid', __( 'The provider returned an invalid follow-up response. No artifact was changed.', 'wp-autoplugin' ) );
+		}
+
+		$outcome = (string) $decoded['outcome'];
+		if ( 'artifact' === $outcome && 'plan' !== $stage ) {
+			return new \WP_Error( 'conversation_artifact_unavailable', __( 'This stage cannot create a replacement artifact yet.', 'wp-autoplugin' ) );
+		}
+
+		$result = [
+			'content' => trim( $decoded['content'] ),
+			'outcome' => $outcome,
+		];
+		if ( 'artifact' === $outcome ) {
+			$artifact_structured = json_decode( AI_Utils::strip_code_fences( trim( (string) $decoded['content'] ), 'json' ), true );
+			if ( ! is_array( $artifact_structured ) && is_array( $artifact['result']['structured'] ?? null ) ) {
+				// Narrative Plan changes keep the existing static file map.
+				$artifact_structured = $artifact['result']['structured'];
+			}
+			if ( is_array( $artifact_structured ) ) {
+				$result['structured'] = $artifact_structured;
+			}
+			$result['artifact'] = [
+				'type'          => 'plan',
+				'content'       => trim( $decoded['content'] ),
+				'parent_job_id' => $artifact_id,
+			];
+		}
+
+		return $result;
+	}
+
+	/**
+	 * @param array<string, mixed>|null $artifact Job used as the current artifact.
+	 */
+	private function artifact_content( ?array $artifact ): string {
+		if ( ! $artifact || ! is_array( $artifact['result'] ?? null ) ) {
+			return __( 'No prior artifact is available.', 'wp-autoplugin' );
+		}
+
+		return (string) ( $artifact['result']['artifact']['content'] ?? $artifact['result']['content'] ?? '' );
+	}
+
+	/**
+	 * Return the eight most recent persisted user/assistant messages for a stage.
+	 *
+	 * @param array<int, array<string, mixed>> $jobs Workspace jobs.
+	 */
+	private function conversation_history( array $jobs, string $stage, int $current_job_id ): string {
+		$messages = [];
+		foreach ( $jobs as $history_job ) {
+			if ( (int) $history_job['id'] === $current_job_id ) {
+				continue;
+			}
+
+			$is_conversation = 'conversation' === $history_job['task'] && $stage === ( $history_job['payload']['stage'] ?? '' );
+			$is_legacy_explain = 'explain' === $stage && 'explain' === $history_job['task'];
+			if ( ! $is_conversation && ! $is_legacy_explain ) {
+				continue;
+			}
+
+			$question = (string) ( $history_job['payload']['message'] ?? '' );
+			if ( '' !== $question ) {
+				$messages[] = 'Administrator: ' . $question;
+			}
+			if ( 'completed' === $history_job['status'] && ! empty( $history_job['result']['content'] ) ) {
+				$messages[] = 'Assistant: ' . $history_job['result']['content'];
+			}
+		}
+
+		$messages = array_slice( $messages, -8 );
+		return empty( $messages ) ? __( 'No earlier messages.', 'wp-autoplugin' ) : implode( "\n\n", $messages );
 	}
 }

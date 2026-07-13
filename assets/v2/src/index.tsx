@@ -8,7 +8,13 @@ import {
 	TextControl,
 	TextareaControl,
 } from '@wordpress/components';
-import { render, useEffect, useMemo, useState } from '@wordpress/element';
+import {
+	render,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from '@wordpress/element';
 import { __, _n, sprintf } from '@wordpress/i18n';
 import './style.scss';
 
@@ -33,14 +39,29 @@ type Job = {
 	status: string;
 	progress: number;
 	error_message?: string;
-	payload: { message?: string };
+	payload: {
+		message?: string;
+		stage?: string;
+		artifact_job_id?: number;
+	};
 	result?: {
 		content?: string;
 		structured?: Record< string, unknown >;
+		outcome?: 'answer' | 'artifact';
+		artifact?: {
+			type?: string;
+			content?: string;
+			parent_job_id?: number;
+		};
 		model?: string;
 		usage?: { input_tokens: number; output_tokens: number };
 	};
 	created_at: string;
+};
+
+type PlanSaveResponse = {
+	artifact: Job;
+	regeneration_job: Job | null;
 };
 
 type Bootstrap = {
@@ -378,7 +399,10 @@ function App() {
 		);
 	}
 
-	async function createJob( task: 'plan' | 'explain', payload = {} ) {
+	async function createJob(
+		task: 'plan' | 'explain' | 'conversation',
+		payload = {}
+	) {
 		if ( ! activeWorkspace ) {
 			return;
 		}
@@ -408,18 +432,35 @@ function App() {
 
 	async function savePlan( job: Job, content: string ) {
 		try {
-			const updated = await apiFetch< Job >( {
+			const saved = await apiFetch< PlanSaveResponse >( {
 				path: `${ rest }/jobs/${ job.id }/plan`,
 				method: 'POST',
 				data: { content },
 			} );
-			setJobs( ( items ) =>
+			setJobs( ( items ) => [
+				...items,
+				saved.artifact,
+				...( saved.regeneration_job ? [ saved.regeneration_job ] : [] ),
+			] );
+			setWorkspaces( ( items ) =>
 				items.map( ( item ) =>
-					item.id === updated.id ? updated : item
+					item.id === saved.artifact.workspace_id
+						? {
+								...item,
+								latest_job_id:
+									saved.regeneration_job?.id ??
+									saved.artifact.id,
+								latest_job_status:
+									saved.regeneration_job?.status ??
+									saved.artifact.status,
+						  }
+						: item
 				)
 			);
+			return true;
 		} catch ( reason: any ) {
 			setError( reason.message );
+			return false;
 		}
 	}
 
@@ -704,15 +745,28 @@ function WorkspaceView( {
 	activeTab: string;
 	onTabSelect: ( tab: string ) => void;
 	onCancel: ( job: Job ) => void;
-	onCreateJob: ( task: 'plan' | 'explain', payload?: object ) => void;
-	onSavePlan: ( job: Job, content: string ) => void;
+	onCreateJob: (
+		task: 'plan' | 'explain' | 'conversation',
+		payload?: object
+	) => void;
+	onSavePlan: ( job: Job, content: string ) => Promise< boolean >;
 } ) {
 	const target = workspace.target_metadata;
 	const tabs =
 		workspace.operation === 'explain'
 			? [ 'explain' ]
 			: [ 'plan', 'code', 'review' ];
-	const latestPlan = latestJobFor( jobs, 'plan' );
+	const latestPlan = latestPlanArtifact( jobs );
+	const latestPlanRun = latestJobForTask( jobs, 'plan' );
+	const latestStructureRun = latestJobForTask( jobs, 'plan_structure' );
+	const planConversationJobs = jobs.filter(
+		( job ) => job.task === 'conversation' && job.payload.stage === 'plan'
+	);
+	const explainConversationJobs = jobs.filter(
+		( job ) =>
+			job.task === 'explain' ||
+			( job.task === 'conversation' && job.payload.stage === 'explain' )
+	);
 	return (
 		<section className="workspace-editor">
 			<header className="workspace-editor__header">
@@ -767,9 +821,19 @@ function WorkspaceView( {
 					{ ! jobsLoading && activeTab === 'plan' && (
 						<PlanStage
 							job={ latestPlan }
+							latestRun={ latestPlanRun }
+							regenerationJob={ latestStructureRun }
+							conversationJobs={ planConversationJobs }
 							onCancel={ onCancel }
 							onCreate={ () => onCreateJob( 'plan' ) }
 							onSave={ onSavePlan }
+							onFollowUp={ ( message, artifactJobId ) =>
+								onCreateJob( 'conversation', {
+									stage: 'plan',
+									message,
+									artifact_job_id: artifactJobId,
+								} )
+							}
 						/>
 					) }
 					{ ! jobsLoading && activeTab === 'code' && (
@@ -780,12 +844,13 @@ function WorkspaceView( {
 					) }
 					{ ! jobsLoading && activeTab === 'explain' && (
 						<ExplainStage
-							jobs={ jobs.filter(
-								( job ) => job.task === 'explain'
-							) }
+							jobs={ explainConversationJobs }
 							onCancel={ onCancel }
 							onFollowUp={ ( message ) =>
-								onCreateJob( 'explain', { message } )
+								onCreateJob( 'conversation', {
+									stage: 'explain',
+									message,
+								} )
 							}
 						/>
 					) }
@@ -795,8 +860,78 @@ function WorkspaceView( {
 	);
 }
 
-function latestJobFor( jobs: Job[], task: string ): Job | null {
+function latestPlanArtifact( jobs: Job[] ): Job | null {
+	return (
+		[ ...jobs ]
+			.reverse()
+			.find(
+				( job ) =>
+					job.status === 'completed' &&
+					( ( job.task === 'plan' && !! job.result?.content ) ||
+						( job.task === 'plan_structure' &&
+							job.result?.artifact?.type === 'plan' &&
+							!! job.result.artifact.content ) ||
+						( job.task === 'conversation' &&
+							job.payload.stage === 'plan' &&
+							job.result?.outcome === 'artifact' &&
+							job.result.artifact?.type === 'plan' &&
+							!! job.result.artifact.content ) )
+			) ?? null
+	);
+}
+
+function latestJobForTask( jobs: Job[], task: string ): Job | null {
 	return [ ...jobs ].reverse().find( ( job ) => job.task === task ) ?? null;
+}
+
+function planArtifactContent( job: Job ): string {
+	return job.result?.artifact?.content || job.result?.content || '';
+}
+
+function planArtifactStructure( job: Job ): Record< string, unknown > | null {
+	if ( job.result?.structured ) {
+		return job.result.structured;
+	}
+
+	try {
+		const parsed = JSON.parse( planArtifactContent( job ) );
+		return parsed && typeof parsed === 'object' ? parsed : null;
+	} catch ( error ) {
+		return null;
+	}
+}
+
+function planMarkdown(
+	content: string,
+	structured: Record< string, unknown > | null
+): string {
+	if ( ! structured || ! content.trim().startsWith( '{' ) ) {
+		return content;
+	}
+
+	const title =
+		typeof structured.plugin_name === 'string'
+			? structured.plugin_name
+			: __( 'Implementation plan', 'wp-autoplugin' );
+	const sections = [ `# ${ title }` ];
+	Object.entries( structured ).forEach( ( [ key, value ] ) => {
+		if (
+			'plugin_name' === key ||
+			'project_structure' === key ||
+			typeof value !== 'string' ||
+			! value.trim()
+		) {
+			return;
+		}
+		sections.push(
+			`## ${ key
+				.replace( /_/g, ' ' )
+				.replace( /\b\w/g, ( letter ) =>
+					letter.toUpperCase()
+				) }\n\n${ value.trim() }`
+		);
+	} );
+	return sections.join( '\n\n' );
 }
 
 function JobStatus( {
@@ -854,16 +989,38 @@ function JobStatus( {
 
 function PlanStage( {
 	job,
+	latestRun,
+	regenerationJob,
+	conversationJobs,
 	onCancel,
 	onCreate,
 	onSave,
+	onFollowUp,
 }: {
 	job: Job | null;
+	latestRun: Job | null;
+	regenerationJob: Job | null;
+	conversationJobs: Job[];
 	onCancel: ( job: Job ) => void;
 	onCreate: () => void;
-	onSave: ( job: Job, content: string ) => void;
+	onSave: ( job: Job, content: string ) => Promise< boolean >;
+	onFollowUp: ( message: string, artifactJobId: number ) => void;
 } ) {
 	if ( ! job ) {
+		if ( latestRun ) {
+			return (
+				<>
+					<JobStatus job={ latestRun } onCancel={ onCancel } />
+					{ [ 'failed', 'cancelled' ].includes(
+						latestRun.status
+					) && (
+						<Button variant="secondary" onClick={ onCreate }>
+							{ __( 'Retry plan', 'wp-autoplugin' ) }
+						</Button>
+					) }
+				</>
+			);
+		}
 		return (
 			<EmptyStage
 				action={ __( 'Create plan', 'wp-autoplugin' ) }
@@ -884,20 +1041,66 @@ function PlanStage( {
 			</>
 		);
 	}
-	return <PlanEditor job={ job } onSave={ onSave } onRetry={ onCreate } />;
+	return (
+		<PlanEditor
+			job={ job }
+			conversationJobs={ conversationJobs }
+			regenerationJob={ regenerationJob }
+			onCancel={ onCancel }
+			onSave={ onSave }
+			onRetry={ onCreate }
+			onFollowUp={ onFollowUp }
+		/>
+	);
 }
 
 function PlanEditor( {
 	job,
+	conversationJobs,
+	regenerationJob,
+	onCancel,
 	onSave,
 	onRetry,
+	onFollowUp,
 }: {
 	job: Job;
-	onSave: ( job: Job, content: string ) => void;
+	conversationJobs: Job[];
+	regenerationJob: Job | null;
+	onCancel: ( job: Job ) => void;
+	onSave: ( job: Job, content: string ) => Promise< boolean >;
 	onRetry: () => void;
+	onFollowUp: ( message: string, artifactJobId: number ) => void;
 } ) {
+	const structure = planArtifactStructure( job );
+	const currentContent = planMarkdown(
+		planArtifactContent( job ),
+		structure
+	);
 	const [ editing, setEditing ] = useState( false );
-	const [ content, setContent ] = useState( job.result?.content || '' );
+	const [ saving, setSaving ] = useState( false );
+	const [ content, setContent ] = useState( currentContent );
+	const cancelEditing = useCallback( () => {
+		setContent( currentContent );
+		setEditing( false );
+	}, [ currentContent ] );
+	useEffect( () => {
+		setContent( currentContent );
+		setEditing( false );
+		setSaving( false );
+	}, [ currentContent ] );
+	useEffect( () => {
+		if ( ! editing || saving ) {
+			return;
+		}
+		const onKeyDown = ( event: KeyboardEvent ) => {
+			if ( 'Escape' === event.key ) {
+				event.preventDefault();
+				cancelEditing();
+			}
+		};
+		document.addEventListener( 'keydown', onKeyDown );
+		return () => document.removeEventListener( 'keydown', onKeyDown );
+	}, [ editing, saving, cancelEditing ] );
 	return (
 		<div className="plan-stage">
 			<div className="stage-toolbar">
@@ -910,35 +1113,69 @@ function PlanEditor( {
 					</small>
 				</div>
 				<div>
-					<Button variant="secondary" onClick={ onRetry }>
-						{ __( 'Retry plan', 'wp-autoplugin' ) }
-					</Button>
-					<Button
-						variant="primary"
-						onClick={ () => {
-							if ( editing ) {
-								onSave( job, content );
-							}
-							setEditing( ! editing );
-						} }
-					>
-						{ editing
-							? __( 'Save plan', 'wp-autoplugin' )
-							: __( 'Edit plan', 'wp-autoplugin' ) }
-					</Button>
+					{ editing ? (
+						<>
+							<Button
+								variant="secondary"
+								onClick={ cancelEditing }
+								disabled={ saving }
+							>
+								{ __( 'Cancel', 'wp-autoplugin' ) }
+							</Button>
+							<Button
+								variant="primary"
+								disabled={ saving }
+								isBusy={ saving }
+								onClick={ async () => {
+									setSaving( true );
+									if ( await onSave( job, content ) ) {
+										setEditing( false );
+									}
+									setSaving( false );
+								} }
+							>
+								{ __( 'Save plan', 'wp-autoplugin' ) }
+							</Button>
+						</>
+					) : (
+						<>
+							<Button variant="secondary" onClick={ onRetry }>
+								{ __( 'Retry plan', 'wp-autoplugin' ) }
+							</Button>
+							<Button
+								variant="primary"
+								onClick={ () => setEditing( true ) }
+							>
+								{ __( 'Edit plan', 'wp-autoplugin' ) }
+							</Button>
+						</>
+					) }
 				</div>
 			</div>
-			{ editing ? (
-				<TextareaControl
-					hideLabelFromVision
-					label={ __( 'Plan Markdown', 'wp-autoplugin' ) }
-					value={ content }
-					onChange={ setContent }
-					rows={ 20 }
-				/>
-			) : (
-				<Markdown content={ content } />
+			{ regenerationJob && regenerationJob.status !== 'completed' && (
+				<div className="plan-stage__regeneration">
+					<strong>
+						{ __( 'Updating project structure', 'wp-autoplugin' ) }
+					</strong>
+					<JobStatus job={ regenerationJob } onCancel={ onCancel } />
+				</div>
 			) }
+			<div className="plan-stage__overview">
+				<div className="plan-stage__content">
+					{ editing ? (
+						<TextareaControl
+							hideLabelFromVision
+							label={ __( 'Plan Markdown', 'wp-autoplugin' ) }
+							value={ content }
+							onChange={ setContent }
+							rows={ 20 }
+						/>
+					) : (
+						<Markdown content={ content } />
+					) }
+				</div>
+				<ProjectStructure structure={ structure } />
+			</div>
 			<div className="stage-next">
 				<span>
 					{ __(
@@ -950,7 +1187,89 @@ function PlanEditor( {
 					{ __( 'Continue to Code', 'wp-autoplugin' ) }
 				</Button>
 			</div>
+			<StageConversation
+				stage="plan"
+				jobs={ conversationJobs }
+				artifactJobId={ job.id }
+				onCancel={ onCancel }
+				onFollowUp={ ( message ) => onFollowUp( message, job.id ) }
+			/>
 		</div>
+	);
+}
+
+function ProjectStructure( {
+	structure,
+}: {
+	structure: Record< string, unknown > | null;
+} ) {
+	const projectStructure = structure?.project_structure as
+		| Record< string, unknown >
+		| undefined;
+	const directories = Array.isArray( projectStructure?.directories )
+		? projectStructure.directories.filter(
+				( directory ): directory is string =>
+					typeof directory === 'string'
+		  )
+		: [];
+	const files = Array.isArray( projectStructure?.files )
+		? projectStructure.files.filter(
+				( file ): file is Record< string, unknown > =>
+					!! file && typeof file === 'object'
+		  )
+		: [];
+
+	return (
+		<aside
+			className="project-structure"
+			aria-label={ __( 'Project structure', 'wp-autoplugin' ) }
+		>
+			<div className="project-structure__heading">
+				<strong>{ __( 'Project structure', 'wp-autoplugin' ) }</strong>
+				<small>
+					{ __( 'Files proposed by this plan', 'wp-autoplugin' ) }
+				</small>
+			</div>
+			{ directories.length > 0 && (
+				<ul className="project-structure__directories">
+					{ directories.map( ( directory ) => (
+						<li key={ directory }>{ directory }</li>
+					) ) }
+				</ul>
+			) }
+			{ files.length > 0 ? (
+				<ul className="project-structure__files">
+					{ files.map( ( file, index ) => (
+						<li key={ `${ String( file.path || '' ) }-${ index }` }>
+							<code>
+								{ String(
+									file.path ||
+										__( 'Unnamed file', 'wp-autoplugin' )
+								) }
+							</code>
+							<div>
+								{ typeof file.action === 'string' && (
+									<span>{ file.action }</span>
+								) }
+								{ typeof file.type === 'string' && (
+									<span>{ file.type }</span>
+								) }
+							</div>
+							{ typeof file.description === 'string' && (
+								<p>{ file.description }</p>
+							) }
+						</li>
+					) ) }
+				</ul>
+			) : (
+				<p className="project-structure__empty">
+					{ __(
+						'This plan does not include a file structure.',
+						'wp-autoplugin'
+					) }
+				</p>
+			) }
+		</aside>
 	);
 }
 
@@ -1047,9 +1366,37 @@ function ExplainStage( {
 	onCancel: ( job: Job ) => void;
 	onFollowUp: ( message: string ) => void;
 } ) {
-	const [ message, setMessage ] = useState( '' );
 	return (
-		<div className="explain-stage">
+		<StageConversation
+			stage="explain"
+			jobs={ jobs }
+			onCancel={ onCancel }
+			onFollowUp={ onFollowUp }
+		/>
+	);
+}
+
+function StageConversation( {
+	stage,
+	jobs,
+	artifactJobId,
+	onCancel,
+	onFollowUp,
+}: {
+	stage: 'plan' | 'explain';
+	jobs: Job[];
+	artifactJobId?: number;
+	onCancel: ( job: Job ) => void;
+	onFollowUp: ( message: string, artifactJobId?: number ) => void;
+} ) {
+	const [ message, setMessage ] = useState( '' );
+	const isPlan = stage === 'plan';
+	return (
+		<div
+			className={ `stage-conversation ${
+				isPlan ? 'stage-conversation--plan' : 'explain-stage'
+			}` }
+		>
 			<div className="explain-stage__messages">
 				{ jobs.map( ( job ) => (
 					<div className="explain-message" key={ job.id }>
@@ -1062,18 +1409,33 @@ function ExplainStage( {
 						</div>
 						<div className="explain-message__answer">
 							<strong>
-								{ __( 'Explain', 'wp-autoplugin' ) }
+								{ isPlan
+									? __( 'Plan assistant', 'wp-autoplugin' )
+									: __( 'Explain', 'wp-autoplugin' ) }
 							</strong>
 							{ job.status === 'completed' && job.result ? (
 								<>
-									<Markdown
-										content={ job.result.content || '' }
-									/>
+									{ job.result.outcome === 'artifact' ? (
+										<Notice
+											status="success"
+											isDismissible={ false }
+										>
+											{ __(
+												'Plan updated. The new version is now active above.',
+												'wp-autoplugin'
+											) }
+										</Notice>
+									) : (
+										<Markdown
+											content={ job.result.content || '' }
+										/>
+									) }
 									<Button
 										variant="secondary"
 										onClick={ () =>
 											onFollowUp(
-												job.payload.message || ''
+												job.payload.message || '',
+												artifactJobId
 											)
 										}
 									>
@@ -1096,7 +1458,8 @@ function ExplainStage( {
 											variant="secondary"
 											onClick={ () =>
 												onFollowUp(
-													job.payload.message || ''
+													job.payload.message || '',
+													artifactJobId
 												)
 											}
 										>
@@ -1115,11 +1478,22 @@ function ExplainStage( {
 			<div className="explain-stage__composer">
 				<TextareaControl
 					hideLabelFromVision
-					label={ __( 'Ask a follow-up question', 'wp-autoplugin' ) }
-					placeholder={ __(
-						'Ask a follow-up question…',
-						'wp-autoplugin'
-					) }
+					label={
+						isPlan
+							? __(
+									'Ask about or change the plan',
+									'wp-autoplugin'
+							  )
+							: __( 'Ask a follow-up question', 'wp-autoplugin' )
+					}
+					placeholder={
+						isPlan
+							? __(
+									'Ask a question or request a change…',
+									'wp-autoplugin'
+							  )
+							: __( 'Ask a follow-up question…', 'wp-autoplugin' )
+					}
 					value={ message }
 					onChange={ setMessage }
 					rows={ 3 }
@@ -1128,11 +1502,13 @@ function ExplainStage( {
 					variant="primary"
 					disabled={ ! message.trim() }
 					onClick={ () => {
-						onFollowUp( message );
+						onFollowUp( message, artifactJobId );
 						setMessage( '' );
 					} }
 				>
-					{ __( 'Ask', 'wp-autoplugin' ) }
+					{ isPlan
+						? __( 'Send', 'wp-autoplugin' )
+						: __( 'Ask', 'wp-autoplugin' ) }
 				</Button>
 			</div>
 		</div>
