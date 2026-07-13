@@ -101,15 +101,6 @@ const operations = [
 		value: 'hook_extension',
 	},
 	{
-		label: __( 'Fork or copy', 'wp-autoplugin' ),
-		description: __( 'Work in a separate copy.', 'wp-autoplugin' ),
-		requestLabel: __(
-			'What would you like to change in the copy?',
-			'wp-autoplugin'
-		),
-		value: 'fork',
-	},
-	{
 		label: __( 'Explain', 'wp-autoplugin' ),
 		description: __( 'Ask questions about the source.', 'wp-autoplugin' ),
 		requestLabel: __( 'What would you like to know?', 'wp-autoplugin' ),
@@ -287,13 +278,9 @@ function App() {
 		}
 		if ( target?.kind === 'theme' ) {
 			return operations.filter( ( item ) =>
-				[
-					'modify',
-					'fix',
-					'hook_extension',
-					'fork',
-					'explain',
-				].includes( item.value )
+				[ 'modify', 'fix', 'hook_extension', 'explain' ].includes(
+					item.value
+				)
 			);
 		}
 		return operations.filter( ( item ) => item.value !== 'create' );
@@ -707,10 +694,17 @@ function WorkspaceLauncher( {
 							value={ request }
 							rows={ 2 }
 							onChange={ onRequestChange }
-							help={ __(
-								'No source files are changed until you approve a staged revision.',
-								'wp-autoplugin'
-							) }
+							help={
+								target?.kind === 'new_plugin'
+									? __(
+											'No source files are changed until you approve a staged revision.',
+											'wp-autoplugin'
+									  )
+									: __(
+											'No source files are changed until you approve a staged revision. You can then save it as new or overwrite the existing target.',
+											'wp-autoplugin'
+									  )
+							}
 						/>
 					</div>
 					<Button

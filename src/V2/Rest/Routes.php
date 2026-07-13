@@ -13,7 +13,7 @@ use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
  */
 final class Routes {
 	private const NAMESPACE = 'wp-autoplugin/v2';
-	private const OPERATIONS = [ 'create', 'modify', 'fix', 'hook_extension', 'fork', 'explain' ];
+	private const OPERATIONS = [ 'create', 'modify', 'fix', 'hook_extension', 'explain' ];
 	private const TASKS      = [ 'plan', 'code', 'review', 'explain', 'conversation' ];
 	private const CONVERSATION_STAGES = [ 'plan', 'explain' ];
 
@@ -148,8 +148,8 @@ final class Routes {
 		if ( 'new_plugin' === $kind && 'create' !== $operation ) {
 			return new \WP_Error( 'wp_autoplugin_invalid_operation', __( 'A new plugin target only supports the create operation.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
-		if ( 'theme' === $kind && ! in_array( $operation, [ 'modify', 'fix', 'hook_extension', 'explain', 'fork' ], true ) ) {
-			return new \WP_Error( 'wp_autoplugin_invalid_operation', __( 'Themes can be modified, fixed, inspected, forked, or extended through hooks.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		if ( 'theme' === $kind && ! in_array( $operation, [ 'modify', 'fix', 'hook_extension', 'explain' ], true ) ) {
+			return new \WP_Error( 'wp_autoplugin_invalid_operation', __( 'Themes can be modified, fixed, inspected, or extended through hooks.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
 
 		try {
