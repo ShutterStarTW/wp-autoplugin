@@ -39,6 +39,9 @@ final class ExplainToolsTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '3:', $result['content'] );
 		$this->assertStringNotContainsString( '1: <?php', $result['content'] );
 		$this->assertArrayHasKey( 'includes/class-fixture.php', $result['inspected'] );
+		$this->assertSame( 'includes/class-fixture.php', $result['audit']['path'] );
+		$this->assertSame( 2, $result['audit']['start_line'] );
+		$this->assertSame( 3, $result['audit']['end_line'] );
 	}
 
 	public function test_rejects_traversal_and_unknown_arguments(): void {
@@ -59,11 +62,14 @@ final class ExplainToolsTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $decoded['files'] );
 		$this->assertSame( 2, $decoded['total'] );
 		$this->assertSame( 1, $decoded['next_offset'] );
+		$this->assertCount( 1, $list['audit']['returned_files'] );
 
 		$search = $this->tools->execute( 'search_code', [ 'query' => 'return 42', 'extension' => 'php' ] );
 		$decoded = json_decode( $search['content'], true );
 		$this->assertSame( 'includes/class-fixture.php', $decoded['hits'][0]['path'] );
 		$this->assertSame( 3, $decoded['hits'][0]['line'] );
+		$this->assertSame( 'return 42', $search['audit']['query'] );
+		$this->assertSame( [ 'includes/class-fixture.php' ], $search['audit']['matched_files'] );
 	}
 
 	public function test_detects_source_changes_and_rejects_symlinks(): void {

@@ -81,15 +81,24 @@ final class Explain_Tools {
 	/**
 	 * Initial structure and main-entry context.
 	 *
-	 * @return array{content:string,tree_fingerprint:string,inspected:array<string,string>}
+	 * @return array{content:string,tree_fingerprint:string,inspected:array<string,string>,audit:array<string,mixed>}
 	 */
 	public function bootstrap(): array {
-		$tree = $this->tree();
-		$main = $this->read_file( [ 'path' => $this->main_file, 'start_line' => 1, 'end_line' => 2000 ] );
+		$tree      = $this->tree();
+		$structure = $this->tree_context( $tree );
+		$main      = $this->read_file( [ 'path' => $this->main_file, 'start_line' => 1, 'end_line' => 2000 ] );
 		return [
-			'content'          => "Target metadata:\n" . wp_json_encode( $this->public_metadata(), JSON_PRETTY_PRINT ) . "\n\nSource structure:\n" . $this->tree_text( $tree ) . "\n\nMain entry file:\n" . $main['content'],
+			'content'          => "Target metadata:\n" . wp_json_encode( $this->public_metadata(), JSON_PRETTY_PRINT ) . "\n\nSource structure:\n" . $structure['content'] . "\n\nMain entry file:\n" . $main['content'],
 			'tree_fingerprint' => $this->fingerprint( $tree ),
 			'inspected'        => $main['inspected'],
+			'audit'            => [
+				'main_file'       => $this->main_file,
+				'main_read'       => $main['audit'],
+				'structure_files' => $structure['paths'],
+				'structure_total' => count( $tree ),
+				'structure_truncated' => count( $structure['paths'] ) < count( $tree ),
+				'metadata'        => $this->public_metadata(),
+			],
 		];
 	}
 
@@ -114,7 +123,7 @@ final class Explain_Tools {
 
 	/**
 	 * @param array<string, mixed> $arguments Validated by the tool itself.
-	 * @return array{content:string,bytes:int,inspected:array<string,string>,path:string}
+	 * @return array{content:string,bytes:int,inspected:array<string,string>,path:string,audit:array<string,mixed>}
 	 */
 	public function execute( string $name, array $arguments ): array {
 		$this->validate_arguments( $name, $arguments );
@@ -158,8 +167,26 @@ final class Explain_Tools {
 		$limit  = min( 200, max( 1, (int) ( $arguments['limit'] ?? 100 ) ) );
 		$tree   = $this->tree();
 		$page   = array_slice( $tree, $offset, $limit );
-		$content = wp_json_encode( [ 'files' => $page, 'offset' => $offset, 'next_offset' => $offset + count( $page ) < count( $tree ) ? $offset + count( $page ) : null, 'total' => count( $tree ) ], JSON_PRETTY_PRINT );
-		return $this->result( (string) $content );
+		do {
+			$next_offset = $offset + count( $page ) < count( $tree ) ? $offset + count( $page ) : null;
+			$content     = (string) wp_json_encode( [ 'files' => $page, 'offset' => $offset, 'next_offset' => $next_offset, 'total' => count( $tree ) ], JSON_PRETTY_PRINT );
+			if ( strlen( $content ) <= self::MAX_RESULT_BYTES || ! $page ) {
+				break;
+			}
+			array_pop( $page );
+		} while ( true );
+		return $this->result(
+			$content,
+			[],
+			'',
+			[
+				'offset'         => $offset,
+				'limit'          => $limit,
+				'returned_count' => count( $page ),
+				'total_files'    => count( $tree ),
+				'returned_files' => array_column( $page, 'path' ),
+			]
+		);
 	}
 
 	/** @param array<string, mixed> $arguments */
@@ -176,11 +203,29 @@ final class Explain_Tools {
 		$lines = preg_split( '/\R/', $contents );
 		$slice = array_slice( $lines ?: [], $start - 1, $end - $start + 1 );
 		$text  = [];
+		$used  = strlen( $relative ) + 1;
+		$truncated = false;
 		foreach ( $slice as $index => $line ) {
-			$text[] = sprintf( '%d: %s', $start + $index, $line );
+			$numbered = sprintf( '%d: %s', $start + $index, $line );
+			if ( $used + strlen( $numbered ) + 1 > self::MAX_RESULT_BYTES - 50 ) {
+				$truncated = true;
+				break;
+			}
+			$text[] = $numbered;
+			$used  += strlen( $numbered ) + 1;
 		}
-		$content = $relative . "\n" . implode( "\n", $text );
-		$result  = $this->result( $content, [ $relative => hash( 'sha256', $contents ) ], $relative );
+		$content = $relative . "\n" . implode( "\n", $text ) . ( $truncated ? "\n[Result truncated by WP-Autoplugin]" : '' );
+		$result  = $this->result(
+			$content,
+			[ $relative => hash( 'sha256', $contents ) ],
+			$relative,
+			[
+				'path'       => $relative,
+				'start_line' => $start,
+				'end_line'   => $text ? $start + count( $text ) - 1 : $start,
+				'truncated'  => $truncated,
+			]
+		);
 		return $result;
 	}
 
@@ -206,9 +251,10 @@ final class Explain_Tools {
 			if ( $extension && $extension !== strtolower( pathinfo( $relative, PATHINFO_EXTENSION ) ) ) {
 				continue;
 			}
-			if ( ++$scanned_files > self::MAX_SEARCH_FILES || $scanned_bytes + (int) $file['size'] > self::MAX_SEARCH_BYTES ) {
+			if ( $scanned_files >= self::MAX_SEARCH_FILES || $scanned_bytes + (int) $file['size'] > self::MAX_SEARCH_BYTES ) {
 				break;
 			}
+			++$scanned_files;
 			$path     = $this->safe_file( $relative );
 			$contents = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Read-only constrained source inspection.
 			if ( false === $contents ) {
@@ -225,11 +271,27 @@ final class Explain_Tools {
 				}
 			}
 		}
-		return $this->result( (string) wp_json_encode( [ 'query' => $query, 'hits' => $hits, 'truncated' => count( $hits ) >= self::MAX_SEARCH_HITS ], JSON_PRETTY_PRINT ), $inspected );
+		$truncated = count( $hits ) >= self::MAX_SEARCH_HITS;
+		return $this->result(
+			(string) wp_json_encode( [ 'query' => $query, 'hits' => $hits, 'truncated' => $truncated ], JSON_PRETTY_PRINT ),
+			$inspected,
+			'',
+			[
+				'query'         => $query,
+				'path_filter'   => $prefix,
+				'extension'     => $extension,
+				'scanned_files' => $scanned_files,
+				'scanned_bytes' => $scanned_bytes,
+				'match_count'   => count( $hits ),
+				'matched_files' => array_keys( $inspected ),
+				'truncated'     => $truncated,
+			]
+		);
 	}
 
 	private function metadata_result(): array {
-		return $this->result( (string) wp_json_encode( $this->public_metadata(), JSON_PRETTY_PRINT ) );
+		$metadata = $this->public_metadata();
+		return $this->result( (string) wp_json_encode( $metadata, JSON_PRETTY_PRINT ), [], '', [ 'metadata' => $metadata ] );
 	}
 
 	/** @return array<string, mixed> */
@@ -278,10 +340,24 @@ final class Explain_Tools {
 		return hash( 'sha256', (string) wp_json_encode( $tree ) );
 	}
 
-	/** @param array<int, array<string, mixed>> $tree */
-	private function tree_text( array $tree ): string {
-		$lines = array_map( static fn( array $file ): string => sprintf( '%s (%d bytes)', $file['path'], $file['size'] ), $tree );
-		return $this->truncate( implode( "\n", $lines ) );
+	/** @param array<int, array<string, mixed>> $tree @return array{content:string,paths:array<int,string>} */
+	private function tree_context( array $tree ): array {
+		$lines = $paths = [];
+		$bytes = 0;
+		foreach ( $tree as $file ) {
+			$line = sprintf( '%s (%d bytes)', $file['path'], $file['size'] );
+			if ( $bytes + strlen( $line ) + 1 > self::MAX_RESULT_BYTES - 50 ) {
+				break;
+			}
+			$lines[] = $line;
+			$paths[] = (string) $file['path'];
+			$bytes  += strlen( $line ) + 1;
+		}
+		$content = implode( "\n", $lines );
+		if ( count( $paths ) < count( $tree ) ) {
+			$content .= "\n[Structure truncated by WP-Autoplugin]";
+		}
+		return [ 'content' => $content, 'paths' => $paths ];
 	}
 
 	private function safe_file( string $relative ): string {
@@ -325,10 +401,10 @@ final class Explain_Tools {
 		return $path;
 	}
 
-	/** @param array<string, string> $inspected */
-	private function result( string $content, array $inspected = [], string $path = '' ): array {
+	/** @param array<string, string> $inspected @param array<string, mixed> $audit */
+	private function result( string $content, array $inspected = [], string $path = '', array $audit = [] ): array {
 		$content = $this->truncate( $content );
-		return [ 'content' => $content, 'bytes' => strlen( $content ), 'inspected' => $inspected, 'path' => $path ];
+		return [ 'content' => $content, 'bytes' => strlen( $content ), 'inspected' => $inspected, 'path' => $path, 'audit' => $audit ];
 	}
 
 	private function truncate( string $content ): string {

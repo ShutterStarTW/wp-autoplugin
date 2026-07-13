@@ -55,6 +55,11 @@ type Job = {
 		};
 		model?: string;
 		usage?: { input_tokens: number; output_tokens: number };
+		agent?: {
+			model_turns: number;
+			tool_calls: number;
+			source_bytes: number;
+		};
 	};
 	created_at: string;
 	latest_event?: {
@@ -63,6 +68,16 @@ type Job = {
 		level: string;
 		sequence: number;
 	} | null;
+};
+
+type JobEvent = {
+	id: number;
+	sequence: number;
+	level: string;
+	event: string;
+	message: string;
+	context: Record< string, unknown >;
+	created_at: string;
 };
 
 type PlanSaveResponse = {
@@ -1016,6 +1031,135 @@ function JobStatus( {
 	);
 }
 
+function AgentActivity( { job }: { job: Job } ) {
+	const [ expanded, setExpanded ] = useState( false );
+	const [ events, setEvents ] = useState< JobEvent[] >( [] );
+	const [ loading, setLoading ] = useState( false );
+	const [ error, setError ] = useState( '' );
+	const loadEvents = useCallback( () => {
+		setLoading( true );
+		setError( '' );
+		apiFetch< { items: JobEvent[] } >( {
+			path: `${ rest }/jobs/${ job.id }/events`,
+		} )
+			.then( ( response ) => setEvents( response.items ) )
+			.catch( ( reason ) => setError( reason.message ) )
+			.finally( () => setLoading( false ) );
+	}, [ job.id ] );
+
+	useEffect( () => {
+		if ( expanded ) {
+			loadEvents();
+		}
+	}, [ expanded, job.latest_event?.sequence, loadEvents ] );
+
+	const visibleEvents = events.filter(
+		( item ) =>
+			item.event.startsWith( 'agent_' ) ||
+			[
+				'started',
+				'completed',
+				'failed',
+				'cancelled',
+				'cancel_requested',
+			].includes( item.event )
+	);
+	const agent = job.result?.agent;
+
+	return (
+		<details
+			className="agent-activity"
+			onToggle={ ( event ) => setExpanded( event.currentTarget.open ) }
+		>
+			<summary>
+				<span>{ __( 'Agent activity', 'wp-autoplugin' ) }</span>
+				{ agent && (
+					<small>
+						{ sprintf(
+							/* translators: 1: model turns, 2: tool calls, 3: source bytes. */
+							__(
+								'%1$d model turns · %2$d tool calls · %3$s inspected',
+								'wp-autoplugin'
+							),
+							agent.model_turns,
+							agent.tool_calls,
+							formatBytes( agent.source_bytes )
+						) }
+					</small>
+				) }
+			</summary>
+			<div className="agent-activity__body">
+				{ loading && (
+					<p className="agent-activity__loading">
+						<Spinner />
+						{ __( 'Loading agent activity…', 'wp-autoplugin' ) }
+					</p>
+				) }
+				{ error && (
+					<Notice status="error" isDismissible={ false }>
+						{ error }
+					</Notice>
+				) }
+				{ ! loading && ! error && ! visibleEvents.length && (
+					<p>
+						{ __(
+							'No agent activity metadata is available for this job.',
+							'wp-autoplugin'
+						) }
+					</p>
+				) }
+				{ ! error && visibleEvents.length > 0 && (
+					<ol className="agent-activity__events">
+						{ visibleEvents.map( ( item ) => {
+							const hasContext =
+								item.context &&
+								Object.keys( item.context ).length > 0;
+							return (
+								<li
+									className={ `agent-activity__event agent-activity__event--${ item.level }` }
+									key={ item.id }
+								>
+									<div>
+										<strong>{ item.message }</strong>
+										<time>{ item.created_at } UTC</time>
+									</div>
+									{ hasContext && (
+										<details>
+											<summary>
+												{ __(
+													'View details',
+													'wp-autoplugin'
+												) }
+											</summary>
+											<pre>
+												{ JSON.stringify(
+													item.context,
+													null,
+													2
+												) }
+											</pre>
+										</details>
+									) }
+								</li>
+							);
+						} ) }
+					</ol>
+				) }
+			</div>
+		</details>
+	);
+}
+
+function formatBytes( bytes: number ): string {
+	if ( bytes < 1024 ) {
+		return `${ bytes } B`;
+	}
+	if ( bytes < 1024 * 1024 ) {
+		return `${ ( bytes / 1024 ).toFixed( 1 ) } KB`;
+	}
+	return `${ ( bytes / ( 1024 * 1024 ) ).toFixed( 1 ) } MB`;
+}
+
 function PlanStage( {
 	job,
 	latestRun,
@@ -1506,6 +1650,7 @@ function StageConversation( {
 									) }
 								</>
 							) }
+							{ ! isPlan && <AgentActivity job={ job } /> }
 						</div>
 					</div>
 				) ) }

@@ -49,6 +49,7 @@ final class Explain_Agent {
 		} catch ( \Throwable $error ) {
 			return new \WP_Error( 'agent_target_unavailable', $error->getMessage() );
 		}
+		$jobs = new Job_Repository();
 
 		if ( ! $run ) {
 			try {
@@ -61,6 +62,12 @@ final class Explain_Agent {
 					$bootstrap['tree_fingerprint'],
 					$bootstrap['inspected'],
 					strlen( $bootstrap['content'] )
+				);
+				$jobs->event(
+					(int) $job['id'],
+					'agent_bootstrap',
+					__( 'Provided target metadata, the source structure, and the main entry file to the model.', 'wp-autoplugin' ),
+					(array) $bootstrap['audit']
 				);
 			} catch ( \Throwable $error ) {
 				return new \WP_Error( 'agent_initialization_failed', $error->getMessage() );
@@ -86,7 +93,6 @@ final class Explain_Agent {
 				throw new \RuntimeException( __( 'The target changed during inspection. Start Explain again to inspect a consistent version.', 'wp-autoplugin' ) );
 			}
 
-			$jobs = new Job_Repository();
 			$jobs->event( (int) $job['id'], 'agent_turn', sprintf( /* translators: %d: agent model turn. */ __( 'Running Explain agent turn %d.', 'wp-autoplugin' ), (int) $run['model_turns'] + 1 ), [ 'turn' => (int) $run['model_turns'] + 1, 'model' => $transport->model() ] );
 			$response = $transport->send( $this->instructions( $run ), (array) $run['transcript'], $tools->definitions() );
 			if ( is_wp_error( $response ) ) {
@@ -160,7 +166,15 @@ final class Explain_Agent {
 				$inspected = array_merge( $inspected, $tool_result['inspected'] );
 				$transcript[] = [ 'role' => 'tool', 'call_id' => (string) $call['id'], 'name' => (string) $call['name'], 'content' => $tool_result['content'] ];
 				$runs->step( (int) $run['id'], 'tool', [ 'arguments' => $call['arguments'], 'content' => $tool_result['content'], 'bytes' => $tool_result['bytes'], 'hashes' => $tool_result['inspected'] ], (string) $call['name'], (string) $tool_result['path'] );
-				$jobs->event( (int) $job['id'], 'agent_tool', $this->tool_message( (string) $call['name'], (string) $tool_result['path'] ), [ 'tool' => (string) $call['name'], 'path' => (string) $tool_result['path'] ] );
+				$jobs->event(
+					(int) $job['id'],
+					'agent_tool',
+					$this->tool_message( (string) $call['name'], (string) $tool_result['path'] ),
+					array_merge(
+						[ 'tool' => (string) $call['name'], 'call_id' => (string) $call['id'] ],
+						(array) $tool_result['audit']
+					)
+				);
 			}
 
 			$next_generation = $generation + 1;
