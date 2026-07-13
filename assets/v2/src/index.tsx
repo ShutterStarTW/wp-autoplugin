@@ -845,6 +845,7 @@ function WorkspaceView( {
 					{ ! jobsLoading && activeTab === 'explain' && (
 						<ExplainStage
 							jobs={ explainConversationJobs }
+							initialMessage={ workspace.request }
 							onCancel={ onCancel }
 							onFollowUp={ ( message ) =>
 								onCreateJob( 'conversation', {
@@ -1359,10 +1360,12 @@ function ReviewStage( { plan }: { plan: Job | null } ) {
 
 function ExplainStage( {
 	jobs,
+	initialMessage,
 	onCancel,
 	onFollowUp,
 }: {
 	jobs: Job[];
+	initialMessage: string;
 	onCancel: ( job: Job ) => void;
 	onFollowUp: ( message: string ) => void;
 } ) {
@@ -1370,6 +1373,7 @@ function ExplainStage( {
 		<StageConversation
 			stage="explain"
 			jobs={ jobs }
+			initialMessage={ initialMessage }
 			onCancel={ onCancel }
 			onFollowUp={ onFollowUp }
 		/>
@@ -1379,12 +1383,14 @@ function ExplainStage( {
 function StageConversation( {
 	stage,
 	jobs,
+	initialMessage = '',
 	artifactJobId,
 	onCancel,
 	onFollowUp,
 }: {
 	stage: 'plan' | 'explain';
 	jobs: Job[];
+	initialMessage?: string;
 	artifactJobId?: number;
 	onCancel: ( job: Job ) => void;
 	onFollowUp: ( message: string, artifactJobId?: number ) => void;
@@ -1404,6 +1410,7 @@ function StageConversation( {
 							<strong>{ __( 'You', 'wp-autoplugin' ) }</strong>
 							<p>
 								{ job.payload.message ||
+									initialMessage ||
 									__( 'Initial question', 'wp-autoplugin' ) }
 							</p>
 						</div>
