@@ -7,6 +7,7 @@ use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
+use WP_Autoplugin\V2\Infrastructure\AI\Agent_Transport_Factory;
 
 /**
  * Capability-checked REST interface for the v2 admin application.
@@ -122,6 +123,7 @@ final class Routes {
 			'schema'    => Installer::SCHEMA_VERSION,
 			'queue'     => ( new Queue() )->status(),
 			'log_mode'  => get_option( 'wp_autoplugin_v2_log_mode', 'metadata' ),
+			'explain_agent' => ( new Agent_Transport_Factory() )->capability(),
 		] );
 	}
 
@@ -212,6 +214,13 @@ final class Routes {
 				return $payload;
 			}
 		}
+		$is_agentic_explain = 'explain' === $task || ( 'conversation' === $task && 'explain' === ( $payload['stage'] ?? '' ) );
+		if ( $is_agentic_explain ) {
+			$capability = ( new Agent_Transport_Factory() )->capability();
+			if ( ! $capability['available'] ) {
+				return new \WP_Error( 'wp_autoplugin_explain_agent_unavailable', $capability['message'], [ 'status' => 409 ] );
+			}
+		}
 		$job = null;
 		try {
 			$job    = $jobs->create( $workspace_id, $task, $payload, get_current_user_id() );
@@ -244,7 +253,9 @@ final class Routes {
 			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 
-		return rest_ensure_response( [ 'items' => ( new Job_Repository() )->list_for_workspace( $workspace_id ) ] );
+		$jobs = new Job_Repository();
+		$items = array_map( fn( array $job ): array => $this->with_latest_event( $job, $jobs ), $jobs->list_for_workspace( $workspace_id ) );
+		return rest_ensure_response( [ 'items' => $items ] );
 	}
 
 	/**
@@ -253,7 +264,7 @@ final class Routes {
 	public function job( \WP_REST_Request $request ) {
 		$job = ( new Job_Repository() )->find( (int) $request['id'] );
 		return $job && $this->workspace_for_current_user( (int) $job['workspace_id'] )
-			? rest_ensure_response( $job )
+			? rest_ensure_response( $this->with_latest_event( $job, new Job_Repository() ) )
 			: new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 	}
 
@@ -383,6 +394,13 @@ final class Routes {
 		return $workspace && (int) $workspace['created_by'] === get_current_user_id()
 			? $workspace
 			: null;
+	}
+
+	/** @param array<string, mixed> $job @return array<string, mixed> */
+	private function with_latest_event( array $job, Job_Repository $jobs ): array {
+		$latest = $jobs->latest_event( (int) $job['id'] );
+		$job['latest_event'] = $latest ? [ 'event' => $latest['event'], 'message' => $latest['message'], 'level' => $latest['level'], 'sequence' => $latest['sequence'] ] : null;
+		return $job;
 	}
 
 }

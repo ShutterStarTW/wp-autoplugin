@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
  * Creates and upgrades v2 operational tables.
  */
 final class Installer {
-	public const SCHEMA_VERSION = '2';
+	public const SCHEMA_VERSION = '3';
 	private const OPTION_NAME   = 'wp_autoplugin_v2_schema_version';
 
 	/**
@@ -46,6 +46,8 @@ final class Installer {
 			'usage',
 			'diagnostic_logs',
 			'prompt_templates',
+			'agent_runs',
+			'agent_steps',
 		];
 
 		if ( ! in_array( $suffix, $allowed, true ) ) {
@@ -206,6 +208,46 @@ final class Installer {
 			PRIMARY KEY  (id),
 			UNIQUE KEY slug_version (slug,version),
 			KEY task_active (task,is_active)
+		) $charset;";
+
+		$sql[] = 'CREATE TABLE ' . self::table( 'agent_runs' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			job_id bigint(20) unsigned NOT NULL,
+			status varchar(20) NOT NULL DEFAULT 'active',
+			generation int(10) unsigned NOT NULL DEFAULT 0,
+			model_turns smallint(5) unsigned NOT NULL DEFAULT 0,
+			tool_calls smallint(5) unsigned NOT NULL DEFAULT 0,
+			source_bytes bigint(20) unsigned NOT NULL DEFAULT 0,
+			input_tokens bigint(20) unsigned NOT NULL DEFAULT 0,
+			output_tokens bigint(20) unsigned NOT NULL DEFAULT 0,
+			provider varchar(50) NOT NULL,
+			model varchar(100) NOT NULL,
+			transcript longtext NULL,
+			tree_fingerprint char(64) NOT NULL,
+			inspected_files longtext NULL,
+			lease_token varchar(64) NULL,
+			lease_expires_at datetime NULL,
+			retry_count smallint(5) unsigned NOT NULL DEFAULT 0,
+			last_error text NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY job_id (job_id),
+			KEY status_lease (status,lease_expires_at)
+		) $charset;";
+
+		$sql[] = 'CREATE TABLE ' . self::table( 'agent_steps' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			run_id bigint(20) unsigned NOT NULL,
+			sequence int(10) unsigned NOT NULL,
+			kind varchar(20) NOT NULL,
+			tool_name varchar(50) NULL,
+			path varchar(500) NULL,
+			payload longtext NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY run_sequence (run_id,sequence),
+			KEY run_kind (run_id,kind)
 		) $charset;";
 
 		dbDelta( $sql );

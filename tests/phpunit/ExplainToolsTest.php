@@ -1,0 +1,80 @@
+<?php
+
+use WP_Autoplugin\V2\Domain\Target\Explain_Tools;
+
+/** Focused WordPress test-suite coverage for bounded Explain source tools. */
+final class ExplainToolsTest extends WP_UnitTestCase {
+	private string $root;
+	private Explain_Tools $tools;
+
+	protected function setUp(): void {
+		parent::setUp();
+		$this->root = sys_get_temp_dir() . '/wp-autoplugin-explain-' . wp_generate_password( 8, false );
+		mkdir( $this->root . '/includes', 0777, true );
+		file_put_contents( $this->root . '/plugin.php', "<?php\n/* Plugin Name: Fixture */\nrequire __DIR__ . '/includes/class-fixture.php';\n" );
+		file_put_contents( $this->root . '/includes/class-fixture.php', "<?php\nclass Fixture {\n\tpublic function answer() { return 42; }\n}\n" );
+
+		$reflection  = new ReflectionClass( Explain_Tools::class );
+		$this->tools = $reflection->newInstanceWithoutConstructor();
+		foreach ( [ 'target' => [ 'kind' => 'plugin', 'ref' => 'fixture/plugin.php', 'name' => 'Fixture' ], 'root' => $this->root, 'main_file' => 'plugin.php' ] as $property => $value ) {
+			$field = $reflection->getProperty( $property );
+			$field->setValue( $this->tools, $value );
+		}
+	}
+
+	protected function tearDown(): void {
+		if ( is_link( $this->root . '/linked.php' ) ) {
+			unlink( $this->root . '/linked.php' );
+		}
+		unlink( $this->root . '/includes/class-fixture.php' );
+		unlink( $this->root . '/plugin.php' );
+		rmdir( $this->root . '/includes' );
+		rmdir( $this->root );
+		parent::tearDown();
+	}
+
+	public function test_reads_only_requested_line_range(): void {
+		$result = $this->tools->execute( 'read_file', [ 'path' => 'includes/class-fixture.php', 'start_line' => 2, 'end_line' => 3 ] );
+		$this->assertStringContainsString( '2: class Fixture', $result['content'] );
+		$this->assertStringContainsString( '3:', $result['content'] );
+		$this->assertStringNotContainsString( '1: <?php', $result['content'] );
+		$this->assertArrayHasKey( 'includes/class-fixture.php', $result['inspected'] );
+	}
+
+	public function test_rejects_traversal_and_unknown_arguments(): void {
+		try {
+			$this->tools->execute( 'read_file', [ 'path' => '../wp-config.php' ] );
+			$this->fail( 'Traversal should fail.' );
+		} catch ( InvalidArgumentException $error ) {
+			$this->assertNotSame( '', $error->getMessage() );
+		}
+
+		$this->expectException( InvalidArgumentException::class );
+		$this->tools->execute( 'read_file', [ 'path' => 'plugin.php', 'unexpected' => true ] );
+	}
+
+	public function test_lists_and_searches_with_bounded_results(): void {
+		$list = $this->tools->execute( 'list_files', [ 'offset' => 0, 'limit' => 1 ] );
+		$decoded = json_decode( $list['content'], true );
+		$this->assertCount( 1, $decoded['files'] );
+		$this->assertSame( 2, $decoded['total'] );
+		$this->assertSame( 1, $decoded['next_offset'] );
+
+		$search = $this->tools->execute( 'search_code', [ 'query' => 'return 42', 'extension' => 'php' ] );
+		$decoded = json_decode( $search['content'], true );
+		$this->assertSame( 'includes/class-fixture.php', $decoded['hits'][0]['path'] );
+		$this->assertSame( 3, $decoded['hits'][0]['line'] );
+	}
+
+	public function test_detects_source_changes_and_rejects_symlinks(): void {
+		$bootstrap = $this->tools->bootstrap();
+		$this->assertTrue( $this->tools->inspected_unchanged( $bootstrap['inspected'] ) );
+		file_put_contents( $this->root . '/plugin.php', "<?php\n/* changed */\n" );
+		$this->assertFalse( $this->tools->inspected_unchanged( $bootstrap['inspected'] ) );
+
+		if ( function_exists( 'symlink' ) && symlink( $this->root . '/plugin.php', $this->root . '/linked.php' ) ) {
+			$this->expectException( InvalidArgumentException::class );
+			$this->tools->execute( 'read_file', [ 'path' => 'linked.php' ] );
+		}
+	}
+}

@@ -16,10 +16,10 @@ final class Capability_Matrix {
 			'provider'            => sanitize_key( $provider ),
 			'model'               => sanitize_text_field( $model ),
 			'direct_mode'         => true,
-			'native_read_tools'   => false,
+			'native_read_tools'   => in_array( sanitize_key( $provider ), [ 'openai', 'anthropic' ], true ),
 			'unified_patch'       => false,
 			'images'              => in_array( $model, \WP_Autoplugin\AI_Utils::get_supported_image_models(), true ),
-			'max_tool_iterations' => 0,
+			'max_tool_iterations' => in_array( sanitize_key( $provider ), [ 'openai', 'anthropic' ], true ) ? 8 : 0,
 		];
 
 		/**

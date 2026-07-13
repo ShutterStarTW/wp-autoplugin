@@ -38,6 +38,13 @@ $surface: #fff;
 .wp-autoplugin-v2 .components-card__body {
 	padding: 24px;
 }
+.job-error-message {
+	display: block;
+	max-height: 360px;
+	overflow: auto;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
 .workspace-launcher {
 	align-self: start;
 	width: 100%;

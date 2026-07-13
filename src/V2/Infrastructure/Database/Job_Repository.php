@@ -104,6 +104,19 @@ final class Job_Repository extends Repository {
 		);
 	}
 
+	/** @return array<string, mixed>|null */
+	public function latest_event( int $job_id ): ?array {
+		$row = $this->wpdb->get_row(
+			$this->wpdb->prepare( 'SELECT sequence, level, event, message FROM ' . Installer::table( 'job_events' ) . ' WHERE job_id = %d ORDER BY sequence DESC LIMIT 1', $job_id ),
+			ARRAY_A
+		);
+		if ( ! $row ) {
+			return null;
+		}
+		$row['sequence'] = (int) $row['sequence'];
+		return $row;
+	}
+
 	/**
 	 * Request cancellation. The runner checks this between every bounded step.
 	 */

@@ -57,6 +57,12 @@ type Job = {
 		usage?: { input_tokens: number; output_tokens: number };
 	};
 	created_at: string;
+	latest_event?: {
+		event: string;
+		message: string;
+		level: string;
+		sequence: number;
+	} | null;
 };
 
 type PlanSaveResponse = {
@@ -66,6 +72,12 @@ type PlanSaveResponse = {
 
 type Bootstrap = {
 	queue: { degraded: boolean; message: string };
+	explain_agent: {
+		available: boolean;
+		provider: string;
+		model: string;
+		message: string;
+	};
 };
 
 declare global {
@@ -471,6 +483,7 @@ function App() {
 				allowedOperations={ allowedOperations }
 				request={ request }
 				busy={ busy }
+				explainCapability={ bootstrap?.explain_agent ?? null }
 				onTargetSearch={ setTargetSearch }
 				onTargetSelect={ setTargetKey }
 				onTargetKindSelect={ selectTargetKind }
@@ -633,6 +646,7 @@ function WorkspaceLauncher( {
 	allowedOperations,
 	request,
 	busy,
+	explainCapability,
 	onTargetSearch,
 	onTargetSelect,
 	onTargetKindSelect,
@@ -648,6 +662,7 @@ function WorkspaceLauncher( {
 	allowedOperations: typeof operations;
 	request: string;
 	busy: boolean;
+	explainCapability: Bootstrap[ 'explain_agent' ] | null;
 	onTargetSearch: ( value: string ) => void;
 	onTargetSelect: ( value: string ) => void;
 	onTargetKindSelect: ( value: string ) => void;
@@ -683,6 +698,13 @@ function WorkspaceLauncher( {
 						selected={ operation }
 						onSelect={ onOperationSelect }
 					/>
+					{ operation === 'explain' &&
+						explainCapability &&
+						! explainCapability.available && (
+							<Notice status="warning" isDismissible={ false }>
+								{ explainCapability.message }
+							</Notice>
+						) }
 					<div className="workspace-request">
 						<TextareaControl
 							label={
@@ -709,7 +731,12 @@ function WorkspaceLauncher( {
 					</div>
 					<Button
 						variant="primary"
-						disabled={ busy || ! request.trim() }
+						disabled={
+							busy ||
+							! request.trim() ||
+							( operation === 'explain' &&
+								! explainCapability?.available )
+						}
 						isBusy={ busy }
 						onClick={ onStart }
 					>
@@ -961,9 +988,16 @@ function JobStatus( {
 					job.progress
 				) }
 			</p>
+			{ ! terminal && job.latest_event?.message && (
+				<p className="job-status__event">
+					{ job.latest_event.message }
+				</p>
+			) }
 			{ job.error_message && (
 				<Notice status="error" isDismissible={ false }>
-					{ job.error_message }
+					<span className="job-error-message">
+						{ job.error_message }
+					</span>
 				</Notice>
 			) }
 			{ job.status === 'completed' && job.result && (
