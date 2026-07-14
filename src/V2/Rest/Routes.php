@@ -3,6 +3,7 @@
 namespace WP_Autoplugin\V2\Rest;
 
 use WP_Autoplugin\V2\Domain\Target\Target_Scanner;
+use WP_Autoplugin\V2\Domain\AI\Agent_Task;
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
@@ -123,7 +124,8 @@ final class Routes {
 			'schema'    => Installer::SCHEMA_VERSION,
 			'queue'     => ( new Queue() )->status(),
 			'log_mode'  => get_option( 'wp_autoplugin_v2_log_mode', 'metadata' ),
-			'explain_agent' => ( new Agent_Transport_Factory() )->capability(),
+			'explain_agent' => ( new Agent_Transport_Factory() )->capability( 'explain' ),
+			'plan_agent'    => ( new Agent_Transport_Factory() )->capability( 'plan' ),
 		] );
 	}
 
@@ -201,7 +203,8 @@ final class Routes {
 	 */
 	public function create_job( \WP_REST_Request $request ) {
 		$workspace_id = (int) $request['workspace_id'];
-		if ( ! $this->workspace_for_current_user( $workspace_id ) ) {
+		$workspace    = $this->workspace_for_current_user( $workspace_id );
+		if ( ! $workspace ) {
 			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 
@@ -214,11 +217,12 @@ final class Routes {
 				return $payload;
 			}
 		}
-		$is_agentic_explain = 'explain' === $task || ( 'conversation' === $task && 'explain' === ( $payload['stage'] ?? '' ) );
-		if ( $is_agentic_explain ) {
-			$capability = ( new Agent_Transport_Factory() )->capability();
+		$agent_job = [ 'task' => $task, 'payload' => $payload ];
+		if ( Agent_Task::uses_source_tools( $agent_job, $workspace ) ) {
+			$stage      = Agent_Task::stage( $agent_job ) ?: 'explain';
+			$capability = ( new Agent_Transport_Factory() )->capability( $stage );
 			if ( ! $capability['available'] ) {
-				return new \WP_Error( 'wp_autoplugin_explain_agent_unavailable', $capability['message'], [ 'status' => 409 ] );
+				return new \WP_Error( 'wp_autoplugin_source_agent_unavailable', $capability['message'], [ 'status' => 409 ] );
 			}
 		}
 		$job = null;

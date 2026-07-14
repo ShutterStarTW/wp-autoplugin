@@ -56,7 +56,7 @@ final class Anthropic_Agent_Transport implements Agent_Transport {
 			return new \WP_Error( 'agent_provider_http', $message, [ 'retryable' => 429 === $status || $status >= 500, 'ambiguous' => false, 'status' => $status ] );
 		}
 		if ( 'max_tokens' === ( $data['stop_reason'] ?? '' ) ) {
-			return new \WP_Error( 'agent_response_incomplete', __( 'The model reached its output limit before completing the Explain turn.', 'wp-autoplugin' ) );
+			return new \WP_Error( 'agent_response_incomplete', __( 'The model reached its output limit before completing the agent turn.', 'wp-autoplugin' ) );
 		}
 
 		$text = '';

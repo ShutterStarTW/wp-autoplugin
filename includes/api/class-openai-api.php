@@ -193,28 +193,7 @@ class OpenAI_API extends API {
 			'content' => $prompt,
 		];
 
-		$body = [
-			'model'    => $this->model,
-			'messages' => $messages,
-		];
-
-		// Handle special case for o3-mini-* models.
-		if ( in_array( $this->model, [ 'o3-mini', 'o3', 'o4-mini' ], true ) ) {
-			$body['max_completion_tokens'] = $this->max_tokens;
-			$body['reasoning_effort']      = $this->reasoning_effort;
-		} elseif ( 'o1' === $this->model || 'o1-preview' === $this->model ) {
-			$body['max_completion_tokens'] = $this->max_tokens;
-		} elseif ( in_array( $this->model, [ 'gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-5-codex' ], true ) ) {
-			$body['max_completion_tokens'] = $this->max_tokens;
-		} else {
-			$body['temperature'] = $this->temperature;
-			$body['max_tokens']  = $this->max_tokens;
-		}
-
-		// Keep only allowed keys in the override body.
-		$allowed_keys  = $this->get_allowed_parameters();
-		$override_body = array_intersect_key( $override_body, array_flip( $allowed_keys ) );
-		$body          = array_merge( $body, $override_body );
+		$body = $this->build_request_body( $messages, $override_body );
 
 		$response = wp_remote_post(
 			$this->api_url,
@@ -245,12 +224,7 @@ class OpenAI_API extends API {
 				'content' => $data['choices'][0]['message']['content'],
 			];
 
-			$body = [
-				'model'       => $this->model,
-				'temperature' => $this->temperature,
-				'max_tokens'  => $this->max_tokens,
-				'messages'    => $messages,
-			];
+			$body = $this->build_request_body( $messages, $override_body );
 
 			$response = wp_remote_post(
 				$this->api_url,
@@ -288,6 +262,53 @@ class OpenAI_API extends API {
 		} else {
 			return new \WP_Error( 'api_error', 'Error communicating with the API.' . "\n" . print_r( $data, true ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_print_r
 		}
+	}
+
+	/**
+	 * Build a Chat Completions request with model-compatible token parameters.
+	 *
+	 * @param array $messages Conversation messages.
+	 * @param array $override_body Allowed request overrides.
+	 * @return array
+	 */
+	protected function build_request_body( $messages, $override_body = [] ) {
+		$body = [
+			'model'    => $this->model,
+			'messages' => $messages,
+		];
+
+		if ( $this->uses_max_completion_tokens() ) {
+			$body['max_completion_tokens'] = $this->max_tokens;
+			if ( ! empty( $this->reasoning_effort ) ) {
+				$body['reasoning_effort'] = $this->reasoning_effort;
+			}
+		} else {
+			$body['temperature'] = $this->temperature;
+			$body['max_tokens']  = $this->max_tokens;
+		}
+
+		$allowed_keys  = $this->get_allowed_parameters();
+		$override_body = array_intersect_key( $override_body, array_flip( $allowed_keys ) );
+		$body          = array_merge( $body, $override_body );
+
+		if ( $this->uses_max_completion_tokens() ) {
+			if ( isset( $body['max_tokens'] ) && ! isset( $override_body['max_completion_tokens'] ) ) {
+				$body['max_completion_tokens'] = $body['max_tokens'];
+			}
+			unset( $body['max_tokens'], $body['temperature'] );
+		}
+
+		return $body;
+	}
+
+	/**
+	 * Whether the Chat Completions model rejects the legacy max_tokens field.
+	 *
+	 * @return bool
+	 */
+	protected function uses_max_completion_tokens() {
+		return str_starts_with( $this->model, 'gpt-5' )
+			|| in_array( $this->model, [ 'o1', 'o1-preview', 'o3-mini', 'o3', 'o4-mini' ], true );
 	}
 
 	/**

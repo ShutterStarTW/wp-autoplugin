@@ -3,9 +3,9 @@
 namespace WP_Autoplugin\V2\Domain\Target;
 
 /**
- * Bounded, read-only source tools for the Explain agent.
+ * Bounded, read-only source tools for Plan and Explain agents.
  */
-final class Explain_Tools {
+final class Source_Tools {
 	private const EXTENSIONS       = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'md', 'txt', 'xml', 'html' ];
 	private const SKIPPED          = [ '.git', 'node_modules', 'vendor', 'tests' ];
 	private const MAX_FILE_BYTES   = 262144;
@@ -44,7 +44,7 @@ final class Explain_Tools {
 			],
 			[
 				'name'        => 'read_file',
-				'description' => 'Read a source file with line numbers. Use start_line and end_line for large files.',
+				'description' => 'Read a source file with line numbers. Path must be an exact relative file path returned by list_files or search_code, without a line anchor, wildcard, or directory. Use start_line and end_line for large files.',
 				'parameters'  => [
 					'type'       => 'object',
 					'properties' => [
@@ -123,17 +123,21 @@ final class Explain_Tools {
 
 	/**
 	 * @param array<string, mixed> $arguments Validated by the tool itself.
-	 * @return array{content:string,bytes:int,inspected:array<string,string>,path:string,audit:array<string,mixed>}
+	 * @return array{content:string,bytes:int,inspected:array<string,string>,path:string,audit:array<string,mixed>,error:bool}
 	 */
 	public function execute( string $name, array $arguments ): array {
-		$this->validate_arguments( $name, $arguments );
-		return match ( $name ) {
-			'list_files'         => $this->list_files( $arguments ),
-			'read_file'          => $this->read_file( $arguments ),
-			'search_code'        => $this->search_code( $arguments ),
-			'get_target_metadata'=> $this->metadata_result(),
-			default              => throw new \InvalidArgumentException( __( 'The model requested an unsupported source tool.', 'wp-autoplugin' ) ),
-		};
+		try {
+			$this->validate_arguments( $name, $arguments );
+			return match ( $name ) {
+				'list_files'         => $this->list_files( $arguments ),
+				'read_file'          => $this->read_file( $arguments ),
+				'search_code'        => $this->search_code( $arguments ),
+				'get_target_metadata'=> $this->metadata_result(),
+				default              => throw new \InvalidArgumentException( __( 'The model requested an unsupported source tool.', 'wp-autoplugin' ) ),
+			};
+		} catch ( \InvalidArgumentException | \RuntimeException $error ) {
+			return $this->error_result( $name, $arguments, $error->getMessage() );
+		}
 	}
 
 	/** @param array<string, mixed> $arguments */
@@ -404,7 +408,28 @@ final class Explain_Tools {
 	/** @param array<string, string> $inspected @param array<string, mixed> $audit */
 	private function result( string $content, array $inspected = [], string $path = '', array $audit = [] ): array {
 		$content = $this->truncate( $content );
-		return [ 'content' => $content, 'bytes' => strlen( $content ), 'inspected' => $inspected, 'path' => $path, 'audit' => $audit ];
+		return [ 'content' => $content, 'bytes' => strlen( $content ), 'inspected' => $inspected, 'path' => $path, 'audit' => $audit, 'error' => false ];
+	}
+
+	/** @param array<string, mixed> $arguments */
+	private function error_result( string $name, array $arguments, string $message ): array {
+		$path    = isset( $arguments['path'] ) && is_scalar( $arguments['path'] ) ? substr( trim( (string) $arguments['path'] ), 0, 500 ) : '';
+		$content = (string) wp_json_encode(
+			[
+				'error' => $message,
+				'tool'  => sanitize_key( $name ),
+				'path'  => $path,
+			],
+			JSON_PRETTY_PRINT
+		);
+		return [
+			'content'   => $this->truncate( $content ),
+			'bytes'     => strlen( $content ),
+			'inspected' => [],
+			'path'      => $path,
+			'audit'     => [ 'tool' => sanitize_key( $name ), 'requested_path' => $path, 'error' => $message ],
+			'error'     => true,
+		];
 	}
 
 	private function truncate( string $content ): string {
@@ -429,7 +454,7 @@ final class Explain_Tools {
 		}
 		$real = $path ? realpath( $path ) : false;
 		if ( false === $real ) {
-			throw new \InvalidArgumentException( __( 'The Explain target is no longer available.', 'wp-autoplugin' ) );
+			throw new \InvalidArgumentException( __( 'The source target is no longer available.', 'wp-autoplugin' ) );
 		}
 		return wp_normalize_path( $real );
 	}

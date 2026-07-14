@@ -1,11 +1,11 @@
 <?php
 
-use WP_Autoplugin\V2\Domain\Target\Explain_Tools;
+use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 
-/** Focused WordPress test-suite coverage for bounded Explain source tools. */
-final class ExplainToolsTest extends WP_UnitTestCase {
+/** Focused WordPress test-suite coverage for bounded agent source tools. */
+final class SourceToolsTest extends WP_UnitTestCase {
 	private string $root;
-	private Explain_Tools $tools;
+	private Source_Tools $tools;
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -14,7 +14,7 @@ final class ExplainToolsTest extends WP_UnitTestCase {
 		file_put_contents( $this->root . '/plugin.php', "<?php\n/* Plugin Name: Fixture */\nrequire __DIR__ . '/includes/class-fixture.php';\n" );
 		file_put_contents( $this->root . '/includes/class-fixture.php', "<?php\nclass Fixture {\n\tpublic function answer() { return 42; }\n}\n" );
 
-		$reflection  = new ReflectionClass( Explain_Tools::class );
+		$reflection  = new ReflectionClass( Source_Tools::class );
 		$this->tools = $reflection->newInstanceWithoutConstructor();
 		foreach ( [ 'target' => [ 'kind' => 'plugin', 'ref' => 'fixture/plugin.php', 'name' => 'Fixture' ], 'root' => $this->root, 'main_file' => 'plugin.php' ] as $property => $value ) {
 			$field = $reflection->getProperty( $property );
@@ -45,15 +45,14 @@ final class ExplainToolsTest extends WP_UnitTestCase {
 	}
 
 	public function test_rejects_traversal_and_unknown_arguments(): void {
-		try {
-			$this->tools->execute( 'read_file', [ 'path' => '../wp-config.php' ] );
-			$this->fail( 'Traversal should fail.' );
-		} catch ( InvalidArgumentException $error ) {
-			$this->assertNotSame( '', $error->getMessage() );
-		}
+		$traversal = $this->tools->execute( 'read_file', [ 'path' => '../wp-config.php' ] );
+		$this->assertTrue( $traversal['error'] );
+		$this->assertSame( [], $traversal['inspected'] );
+		$this->assertStringNotContainsString( 'DB_PASSWORD', $traversal['content'] );
 
-		$this->expectException( InvalidArgumentException::class );
-		$this->tools->execute( 'read_file', [ 'path' => 'plugin.php', 'unexpected' => true ] );
+		$unknown = $this->tools->execute( 'read_file', [ 'path' => 'plugin.php', 'unexpected' => true ] );
+		$this->assertTrue( $unknown['error'] );
+		$this->assertSame( 'plugin.php', $unknown['audit']['requested_path'] );
 	}
 
 	public function test_lists_and_searches_with_bounded_results(): void {
@@ -79,8 +78,9 @@ final class ExplainToolsTest extends WP_UnitTestCase {
 		$this->assertFalse( $this->tools->inspected_unchanged( $bootstrap['inspected'] ) );
 
 		if ( function_exists( 'symlink' ) && symlink( $this->root . '/plugin.php', $this->root . '/linked.php' ) ) {
-			$this->expectException( InvalidArgumentException::class );
-			$this->tools->execute( 'read_file', [ 'path' => 'linked.php' ] );
+			$result = $this->tools->execute( 'read_file', [ 'path' => 'linked.php' ] );
+			$this->assertTrue( $result['error'] );
+			$this->assertSame( [], $result['inspected'] );
 		}
 	}
 }

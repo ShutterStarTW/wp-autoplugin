@@ -2,8 +2,10 @@
 
 namespace WP_Autoplugin\V2\Infrastructure\Queue;
 
+use WP_Autoplugin\V2\Domain\AI\Agent_Task;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Agent_Run_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 
 /**
  * Executes one bounded job and persists every terminal state.
@@ -16,7 +18,8 @@ final class Job_Runner {
 	public function run( int $job_id, int $generation = 0 ): void {
 		$jobs = new Job_Repository();
 		$job  = $jobs->find( $job_id );
-		$is_agent_job = $job && ( 'explain' === $job['task'] || ( 'conversation' === $job['task'] && 'explain' === ( $job['payload']['stage'] ?? '' ) ) );
+		$workspace    = $job ? ( new Workspace_Repository() )->find( (int) $job['workspace_id'] ) : null;
+		$is_agent_job = $job && $workspace && Agent_Task::uses_source_tools( $job, $workspace );
 
 		if ( ! $job || ! in_array( $job['status'], $is_agent_job ? [ 'queued', 'running', 'retrying' ] : [ 'queued', 'retrying' ], true ) ) {
 			return;

@@ -33,7 +33,7 @@ final class Queue {
 				continue;
 			}
 			$this->dispatch( $args[0], $args[1], true );
-			$jobs->event( $args[0], 'agent_recovered', __( 'Recovered a stalled Explain continuation.', 'wp-autoplugin' ), [ 'generation' => $args[1] ], 'warning' );
+			$jobs->event( $args[0], 'agent_recovered', __( 'Recovered a stalled source-agent continuation.', 'wp-autoplugin' ), [ 'generation' => $args[1] ], 'warning' );
 		}
 	}
 

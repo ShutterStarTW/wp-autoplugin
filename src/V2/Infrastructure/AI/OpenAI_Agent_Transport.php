@@ -47,7 +47,7 @@ final class OpenAI_Agent_Transport implements Agent_Transport {
 			return $this->http_error( $status, $data );
 		}
 		if ( 'incomplete' === ( $data['status'] ?? '' ) ) {
-			return new \WP_Error( 'agent_response_incomplete', __( 'The model reached its output limit before completing the Explain turn.', 'wp-autoplugin' ) );
+			return new \WP_Error( 'agent_response_incomplete', __( 'The model reached its output limit before completing the agent turn.', 'wp-autoplugin' ) );
 		}
 
 		$text = '';

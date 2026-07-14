@@ -2,7 +2,9 @@
 
 namespace WP_Autoplugin\V2\Orchestration;
 
-use WP_Autoplugin\V2\Domain\Target\Explain_Tools;
+use WP_Autoplugin\V2\Domain\AI\Agent_Task;
+use WP_Autoplugin\V2\Domain\AI\Plan_Response;
+use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 use WP_Autoplugin\V2\Infrastructure\AI\Agent_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\Database\Agent_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
@@ -10,8 +12,8 @@ use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 
-/** Executes one durable, read-only Explain agent turn per queue callback. */
-final class Explain_Agent {
+/** Executes one durable, read-only Plan or Explain agent turn per callback. */
+final class Source_Agent {
 	private const MAX_MODEL_TURNS = 8;
 	private const MAX_TOOL_CALLS  = 20;
 	private const MAX_TOOL_BATCH  = 10;
@@ -28,7 +30,8 @@ final class Explain_Agent {
 	 * @return array<string, mixed>|\WP_Error|null
 	 */
 	public function execute( $result, array $job, int $generation = 0 ) {
-		if ( null !== $result || ! $this->supports( $job ) ) {
+		$stage = Agent_Task::stage( $job );
+		if ( null !== $result || null === $stage ) {
 			return $result;
 		}
 
@@ -36,16 +39,19 @@ final class Explain_Agent {
 		if ( ! $workspace ) {
 			return new \WP_Error( 'workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ) );
 		}
+		if ( ! Agent_Task::uses_source_tools( $job, $workspace ) ) {
+			return $result;
+		}
 		$runs      = new Agent_Run_Repository();
 		$run       = $runs->find_by_job( (int) $job['id'] );
 		$factory   = new Agent_Transport_Factory();
-		$transport = $run ? $factory->create_for( (string) $run['provider'], (string) $run['model'] ) : $factory->create();
+		$transport = $run ? $factory->create_for( (string) $run['provider'], (string) $run['model'] ) : $factory->create( $stage );
 		if ( is_wp_error( $transport ) ) {
 			return $transport;
 		}
 
 		try {
-			$tools = new Explain_Tools( (array) $workspace['target_metadata'] );
+			$tools = new Source_Tools( (array) $workspace['target_metadata'] );
 		} catch ( \Throwable $error ) {
 			return new \WP_Error( 'agent_target_unavailable', $error->getMessage() );
 		}
@@ -84,40 +90,50 @@ final class Explain_Agent {
 
 		try {
 			if ( self::MAX_MODEL_TURNS <= (int) $run['model_turns'] ) {
-				throw new \RuntimeException( __( 'Explain stopped after reaching its model-turn limit.', 'wp-autoplugin' ) );
+				throw new \RuntimeException( sprintf( /* translators: %s: workspace stage. */ __( '%s stopped after reaching its model-turn limit.', 'wp-autoplugin' ), $this->label( $stage ) ) );
 			}
 			if ( self::MAX_TOOL_CALLS <= (int) $run['tool_calls'] || self::MAX_SOURCE_BYTES <= (int) $run['source_bytes'] ) {
-				throw new \RuntimeException( __( 'Explain stopped after reaching its source-inspection limit.', 'wp-autoplugin' ) );
+				throw new \RuntimeException( sprintf( /* translators: %s: workspace stage. */ __( '%s stopped after reaching its source-inspection limit.', 'wp-autoplugin' ), $this->label( $stage ) ) );
 			}
 			if ( $run['tree_fingerprint'] !== $tools->tree_fingerprint() || ! $tools->inspected_unchanged( (array) $run['inspected_files'] ) ) {
-				throw new \RuntimeException( __( 'The target changed during inspection. Start Explain again to inspect a consistent version.', 'wp-autoplugin' ) );
+				throw new \RuntimeException( sprintf( /* translators: %s: workspace stage. */ __( 'The target changed during inspection. Start %s again to inspect a consistent version.', 'wp-autoplugin' ), $this->label( $stage ) ) );
 			}
 
-			$jobs->event( (int) $job['id'], 'agent_turn', sprintf( /* translators: %d: agent model turn. */ __( 'Running Explain agent turn %d.', 'wp-autoplugin' ), (int) $run['model_turns'] + 1 ), [ 'turn' => (int) $run['model_turns'] + 1, 'model' => $transport->model() ] );
-			$response = $transport->send( $this->instructions( $run ), (array) $run['transcript'], $tools->definitions() );
+			$jobs->event( (int) $job['id'], 'agent_turn', sprintf( /* translators: 1: workspace stage, 2: agent model turn. */ __( 'Running %1$s agent turn %2$d.', 'wp-autoplugin' ), $this->label( $stage ), (int) $run['model_turns'] + 1 ), [ 'turn' => (int) $run['model_turns'] + 1, 'model' => $transport->model(), 'stage' => $stage ] );
+			$response = $transport->send( $this->instructions( $run, $stage, 'conversation' === $job['task'] ), (array) $run['transcript'], $tools->definitions() );
 			if ( is_wp_error( $response ) ) {
 				return $this->provider_failure( $response, $job, $run, $token, $runs );
 			}
 
 			$usage = (array) ( $response['usage'] ?? [] );
-			( new Usage_Repository() )->record( (int) $job['id'], $transport->provider(), $transport->model(), 'explain', $usage );
+			( new Usage_Repository() )->record( (int) $job['id'], $transport->provider(), $transport->model(), $stage, $usage );
 			$model_turns   = (int) $run['model_turns'] + 1;
 			$input_tokens  = (int) $run['input_tokens'] + (int) ( $usage['input_tokens'] ?? 0 );
 			$output_tokens = (int) $run['output_tokens'] + (int) ( $usage['output_tokens'] ?? 0 );
 			$runs->step( (int) $run['id'], 'model', [ 'type' => $response['type'], 'request_id' => (string) ( $response['request_id'] ?? '' ), 'usage' => $usage, 'response' => $response ] );
 
 			if ( 'final' === ( $response['type'] ?? '' ) ) {
+				if ( 'plan' === $stage ) {
+					$task_result = ( new Plan_Response() )->parse(
+						(string) $response['content'],
+						'conversation' === $job['task'],
+						(int) ( $job['payload']['artifact_job_id'] ?? 0 )
+					);
+					if ( is_wp_error( $task_result ) ) {
+						throw new \RuntimeException( $this->with_debug_response( $task_result->get_error_message(), $response ) );
+					}
+				} else {
+					$task_result = [ 'content' => (string) $response['content'], 'outcome' => 'answer' ];
+				}
 				$runs->checkpoint( (int) $run['id'], $token, [ 'model_turns' => $model_turns, 'input_tokens' => $input_tokens, 'output_tokens' => $output_tokens, 'last_error' => null ] );
 				$run = $runs->find_by_job( (int) $job['id'] ) ?: $run;
 				$runs->terminate_by_job( (int) $job['id'], 'completed' );
-				return [
-					'content'  => (string) $response['content'],
-					'outcome'  => 'answer',
+				return array_merge( $task_result, [
 					'model'    => $transport->model(),
 					'provider' => $transport->provider(),
 					'usage'    => [ 'input_tokens' => $input_tokens, 'output_tokens' => $output_tokens ],
 					'agent'    => [ 'model_turns' => $model_turns, 'tool_calls' => (int) $run['tool_calls'], 'source_bytes' => (int) $run['source_bytes'] ],
-				];
+				] );
 			}
 
 			$calls = (array) ( $response['tool_calls'] ?? [] );
@@ -136,10 +152,11 @@ final class Explain_Agent {
 						self::MAX_TOOL_BATCH
 					)
 					: sprintf(
-						/* translators: 1: requested tool count, 2: remaining tool count. */
-						__( 'The model requested %1$d source tools, but only %2$d remain in this Explain job.', 'wp-autoplugin' ),
+						/* translators: 1: requested tool count, 2: remaining tool count, 3: workspace stage. */
+						__( 'The model requested %1$d source tools, but only %2$d remain in this %3$s job.', 'wp-autoplugin' ),
 						$requested,
-						max( 0, $remaining )
+						max( 0, $remaining ),
+						$this->label( $stage )
 					);
 				$jobs->event(
 					(int) $job['id'],
@@ -161,19 +178,21 @@ final class Explain_Agent {
 				$tool_result = $tools->execute( (string) $call['name'], $call['arguments'] );
 				$source_bytes += (int) $tool_result['bytes'];
 				if ( $source_bytes > self::MAX_SOURCE_BYTES ) {
-					throw new \RuntimeException( __( 'Explain stopped after reaching its source-inspection byte limit.', 'wp-autoplugin' ) );
+					throw new \RuntimeException( sprintf( /* translators: %s: workspace stage. */ __( '%s stopped after reaching its source-inspection byte limit.', 'wp-autoplugin' ), $this->label( $stage ) ) );
 				}
 				$inspected = array_merge( $inspected, $tool_result['inspected'] );
 				$transcript[] = [ 'role' => 'tool', 'call_id' => (string) $call['id'], 'name' => (string) $call['name'], 'content' => $tool_result['content'] ];
 				$runs->step( (int) $run['id'], 'tool', [ 'arguments' => $call['arguments'], 'content' => $tool_result['content'], 'bytes' => $tool_result['bytes'], 'hashes' => $tool_result['inspected'] ], (string) $call['name'], (string) $tool_result['path'] );
+				$tool_failed = ! empty( $tool_result['error'] );
 				$jobs->event(
 					(int) $job['id'],
-					'agent_tool',
-					$this->tool_message( (string) $call['name'], (string) $tool_result['path'] ),
+					$tool_failed ? 'agent_tool_error' : 'agent_tool',
+					$tool_failed ? __( 'A source-tool request was rejected; the agent can correct it on the next turn.', 'wp-autoplugin' ) : $this->tool_message( (string) $call['name'], (string) $tool_result['path'] ),
 					array_merge(
 						[ 'tool' => (string) $call['name'], 'call_id' => (string) $call['id'] ],
 						(array) $tool_result['audit']
-					)
+					),
+					$tool_failed ? 'warning' : 'info'
 				);
 			}
 
@@ -203,22 +222,25 @@ final class Explain_Agent {
 		}
 	}
 
-	/** @param array<string, mixed> $job */
-	private function supports( array $job ): bool {
-		return 'explain' === ( $job['task'] ?? '' ) || ( 'conversation' === ( $job['task'] ?? '' ) && 'explain' === ( $job['payload']['stage'] ?? '' ) );
-	}
-
 	/** @param array<string, mixed> $run */
-	private function instructions( array $run ): string {
+	private function instructions( array $run, string $stage, bool $follow_up ): string {
 		$remaining_calls = max( 0, self::MAX_TOOL_CALLS - (int) $run['tool_calls'] );
 		$turn_limit      = min( self::MAX_TOOL_BATCH, $remaining_calls );
 		$remaining_bytes = max( 0, self::MAX_SOURCE_BYTES - (int) $run['source_bytes'] );
-		return sprintf(
-			'You are a read-only WordPress source-code explanation agent. Inspect only what is needed to answer confidently. Use the provided tools to examine relevant files; never claim to write, execute, install, activate, or modify code. Prefer searches and targeted line-range reads. Cite relative file paths and line numbers when they support the answer. When sufficient evidence is available, return a clear Markdown answer instead of requesting more tools. In this turn you may request at most %1$d tool calls, with %2$d calls and approximately %3$d source-result bytes remaining for the whole job. Never exceed the per-turn tool-call limit; split additional inspection across later turns.',
+		$budget = sprintf(
+			'In this turn you may request at most %1$d tool calls, with %2$d calls and approximately %3$d source-result bytes remaining for the whole job. Never exceed the per-turn tool-call limit; split additional inspection across later turns.',
 			$turn_limit,
 			$remaining_calls,
 			$remaining_bytes
 		);
+		if ( 'explain' === $stage ) {
+			return 'You are a read-only WordPress source-code explanation agent. Inspect only what is needed to answer confidently. Use the provided tools to examine relevant files; never claim to write, execute, install, activate, or modify code. Prefer searches and targeted line-range reads. Cite relative file paths and line numbers when they support the answer. When sufficient evidence is available, return a clear Markdown answer instead of requesting more tools. ' . $budget;
+		}
+
+		$outcomes = $follow_up
+			? 'For a question or ambiguity, return {"outcome":"answer","content":"concise Markdown answer"} and omit structured. Only when the administrator clearly requests a Plan change, use outcome "artifact" with the complete replacement Plan and file map.'
+			: 'The initial Plan must use outcome "artifact".';
+		return 'You are a read-only WordPress implementation planning agent. Inspect the existing plugin or theme until you have enough evidence to plan the requested fix, modification, or hook extension accurately. Prefer searches and targeted line-range reads. Cite relevant relative paths and line numbers in the Plan. Never write code, change files, execute code, install, activate, or claim that implementation has occurred. Keep the proposed change set minimal and consistent with the target architecture. When inspection is sufficient, return only one valid JSON object with no Markdown fence in this shape: {"outcome":"artifact","content":"complete Plan in Markdown","structured":{"project_structure":{"directories":["relative/directory/"],"files":[{"path":"relative/file.php","type":"php","description":"brief purpose","action":"update"}]}}}. File type must be php, js, or css. File action must be add, update, or delete. Paths must be relative to the target root and unique. ' . $outcomes . ' ' . $budget;
 	}
 
 	/** @param array<string, mixed> $response */
@@ -236,21 +258,41 @@ final class Explain_Agent {
 
 	/** @param array<string, mixed> $workspace @param array<string, mixed> $job */
 	private function initial_message( array $workspace, array $job, string $bootstrap ): string {
-		$question = 'conversation' === $job['task'] ? trim( (string) ( $job['payload']['message'] ?? '' ) ) : trim( (string) $workspace['request'] );
-		$history  = $this->history( (int) $workspace['id'], (int) $job['id'] );
-		return "Question:\n{$question}\n\nRecent Explain conversation:\n{$history}\n\nThe initial target inspection follows. Do not assume unshown file contents.\n\n{$bootstrap}";
+		$stage   = Agent_Task::stage( $job ) ?: 'explain';
+		$message = 'conversation' === $job['task'] ? trim( (string) ( $job['payload']['message'] ?? '' ) ) : trim( (string) $workspace['request'] );
+		$history = $this->history( (int) $workspace['id'], (int) $job['id'], $stage );
+		if ( 'explain' === $stage ) {
+			return "Question:\n{$message}\n\nRecent Explain conversation:\n{$history}\n\nThe initial target inspection follows. Do not assume unshown file contents.\n\n{$bootstrap}";
+		}
+
+		$artifact = '';
+		if ( 'conversation' === $job['task'] ) {
+			$artifact_id = (int) ( $job['payload']['artifact_job_id'] ?? 0 );
+			$parent      = $artifact_id ? ( new Job_Repository() )->find( $artifact_id ) : null;
+			if ( ! $parent || (int) $workspace['id'] !== (int) $parent['workspace_id'] || ! ( new Job_Repository() )->is_plan_artifact( $parent ) ) {
+				throw new \RuntimeException( __( 'A completed Plan artifact is required for this follow-up.', 'wp-autoplugin' ) );
+			}
+			$artifact = (string) ( $parent['result']['artifact']['content'] ?? $parent['result']['content'] ?? '' );
+		}
+
+		$operation = (string) $workspace['operation'];
+		$request   = trim( (string) $workspace['request'] );
+		$current   = $artifact ? "\n\nCurrent Plan artifact:\n{$artifact}" : '';
+		$follow_up = 'conversation' === $job['task'] ? "\n\nAdministrator's new message:\n{$message}" : '';
+		return "Original workspace request:\n{$request}\n\nOperation:\n{$operation}{$current}\n\nRecent Plan conversation:\n{$history}{$follow_up}\n\nThe initial target inspection follows. Do not assume unshown file contents.\n\n{$bootstrap}";
 	}
 
-	private function history( int $workspace_id, int $current_job_id ): string {
+	private function history( int $workspace_id, int $current_job_id, string $stage ): string {
 		$messages = [];
 		foreach ( ( new Job_Repository() )->list_for_workspace( $workspace_id ) as $item ) {
-			if ( (int) $item['id'] === $current_job_id || ! $this->supports( $item ) ) {
+			if ( (int) $item['id'] === $current_job_id || $stage !== Agent_Task::stage( $item ) || ( 'plan' === $stage && 'conversation' !== $item['task'] ) ) {
 				continue;
 			}
 			if ( ! empty( $item['payload']['message'] ) ) {
 				$messages[] = 'Administrator: ' . $item['payload']['message'];
 			}
-			if ( 'completed' === $item['status'] && ! empty( $item['result']['content'] ) ) {
+			$is_current_plan_artifact = 'plan' === $stage && 'artifact' === ( $item['result']['outcome'] ?? '' );
+			if ( ! $is_current_plan_artifact && 'completed' === $item['status'] && ! empty( $item['result']['content'] ) ) {
 				$messages[] = 'Assistant: ' . $item['result']['content'];
 			}
 		}
@@ -271,7 +313,7 @@ final class Explain_Agent {
 		}
 		$runs->terminate_by_job( (int) $job['id'], 'failed' );
 		if ( ! empty( $data['ambiguous'] ) ) {
-			return new \WP_Error( 'agent_provider_timeout', __( 'The provider request timed out with an unknown completion state. Use Retry answer to avoid automatic duplicate billing.', 'wp-autoplugin' ) );
+			return new \WP_Error( 'agent_provider_timeout', __( 'The provider request timed out with an unknown completion state. Retry the job manually to avoid automatic duplicate billing.', 'wp-autoplugin' ) );
 		}
 		return $error;
 	}
@@ -285,5 +327,9 @@ final class Explain_Agent {
 			'search_code' => __( 'Searching the target source.', 'wp-autoplugin' ),
 			default => __( 'Inspecting target metadata.', 'wp-autoplugin' ),
 		};
+	}
+
+	private function label( string $stage ): string {
+		return 'plan' === $stage ? __( 'Plan', 'wp-autoplugin' ) : __( 'Explain', 'wp-autoplugin' );
 	}
 }

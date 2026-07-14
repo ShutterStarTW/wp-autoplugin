@@ -87,12 +87,15 @@ type PlanSaveResponse = {
 
 type Bootstrap = {
 	queue: { degraded: boolean; message: string };
-	explain_agent: {
-		available: boolean;
-		provider: string;
-		model: string;
-		message: string;
-	};
+	explain_agent: AgentCapability;
+	plan_agent: AgentCapability;
+};
+
+type AgentCapability = {
+	available: boolean;
+	provider: string;
+	model: string;
+	message: string;
 };
 
 declare global {
@@ -499,6 +502,7 @@ function App() {
 				request={ request }
 				busy={ busy }
 				explainCapability={ bootstrap?.explain_agent ?? null }
+				planCapability={ bootstrap?.plan_agent ?? null }
 				onTargetSearch={ setTargetSearch }
 				onTargetSelect={ setTargetKey }
 				onTargetKindSelect={ selectTargetKind }
@@ -526,8 +530,7 @@ function App() {
 		<main className="wp-autoplugin-v2">
 			<header className="wp-autoplugin-v2__header">
 				<div>
-					<p className="eyebrow">WP-Autoplugin v2</p>
-					<h1>{ __( 'Local AI workspace', 'wp-autoplugin' ) }</h1>
+					<p className="eyebrow">WP-Autoplugin</p>
 				</div>
 				<a href={ window.wpAutopluginV2.settingsUrl }>
 					{ __( 'Provider settings', 'wp-autoplugin' ) }
@@ -662,6 +665,7 @@ function WorkspaceLauncher( {
 	request,
 	busy,
 	explainCapability,
+	planCapability,
 	onTargetSearch,
 	onTargetSelect,
 	onTargetKindSelect,
@@ -677,7 +681,8 @@ function WorkspaceLauncher( {
 	allowedOperations: typeof operations;
 	request: string;
 	busy: boolean;
-	explainCapability: Bootstrap[ 'explain_agent' ] | null;
+	explainCapability: AgentCapability | null;
+	planCapability: AgentCapability | null;
 	onTargetSearch: ( value: string ) => void;
 	onTargetSelect: ( value: string ) => void;
 	onTargetKindSelect: ( value: string ) => void;
@@ -685,6 +690,8 @@ function WorkspaceLauncher( {
 	onRequestChange: ( value: string ) => void;
 	onStart: () => void;
 } ) {
+	const requiresPlanAgent =
+		!! target && target.kind !== 'new_plugin' && operation !== 'explain';
 	return (
 		<div className="workspace-new-canvas">
 			<Card className="workspace-launcher">
@@ -720,6 +727,13 @@ function WorkspaceLauncher( {
 								{ explainCapability.message }
 							</Notice>
 						) }
+					{ requiresPlanAgent &&
+						planCapability &&
+						! planCapability.available && (
+							<Notice status="warning" isDismissible={ false }>
+								{ planCapability.message }
+							</Notice>
+						) }
 					<div className="workspace-request">
 						<TextareaControl
 							label={
@@ -750,7 +764,8 @@ function WorkspaceLauncher( {
 							busy ||
 							! request.trim() ||
 							( operation === 'explain' &&
-								! explainCapability?.available )
+								! explainCapability?.available ) ||
+							( requiresPlanAgent && ! planCapability?.available )
 						}
 						isBusy={ busy }
 						onClick={ onStart }
@@ -1150,6 +1165,13 @@ function AgentActivity( { job }: { job: Job } ) {
 	);
 }
 
+function hasAgentActivity( job: Job ): boolean {
+	return (
+		!! job.result?.agent ||
+		!! job.latest_event?.event.startsWith( 'agent_' )
+	);
+}
+
 function formatBytes( bytes: number ): string {
 	if ( bytes < 1024 ) {
 		return `${ bytes } B`;
@@ -1184,6 +1206,9 @@ function PlanStage( {
 			return (
 				<>
 					<JobStatus job={ latestRun } onCancel={ onCancel } />
+					{ hasAgentActivity( latestRun ) && (
+						<AgentActivity job={ latestRun } />
+					) }
 					{ [ 'failed', 'cancelled' ].includes(
 						latestRun.status
 					) && (
@@ -1325,6 +1350,9 @@ function PlanEditor( {
 					) }
 				</div>
 			</div>
+			{ job.task === 'plan' && hasAgentActivity( job ) && (
+				<AgentActivity job={ job } />
+			) }
 			{ regenerationJob && regenerationJob.status !== 'completed' && (
 				<div className="plan-stage__regeneration">
 					<strong>
@@ -1650,7 +1678,9 @@ function StageConversation( {
 									) }
 								</>
 							) }
-							{ ! isPlan && <AgentActivity job={ job } /> }
+							{ hasAgentActivity( job ) && (
+								<AgentActivity job={ job } />
+							) }
 						</div>
 					</div>
 				) ) }

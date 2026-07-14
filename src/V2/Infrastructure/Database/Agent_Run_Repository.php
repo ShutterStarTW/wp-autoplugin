@@ -31,7 +31,7 @@ final class Agent_Run_Repository extends Repository {
 
 		$run = $this->find_by_job( $job_id );
 		if ( ! $run ) {
-			throw new \RuntimeException( __( 'Could not initialize the Explain agent.', 'wp-autoplugin' ) );
+			throw new \RuntimeException( __( 'Could not initialize the source agent.', 'wp-autoplugin' ) );
 		}
 
 		return $run;
