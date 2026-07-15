@@ -166,6 +166,18 @@ class OpenAI_API extends API {
 	}
 
 	/**
+	 * Override the model's reasoning effort for a v2 request.
+	 *
+	 * @param string $effort Reasoning effort supported by the selected model.
+	 */
+	public function set_reasoning_effort( $effort ) {
+		$effort = sanitize_key( $effort );
+		if ( in_array( $effort, [ 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max' ], true ) ) {
+			$this->reasoning_effort = $effort;
+		}
+	}
+
+	/**
 	 * Send a prompt to the API.
 	 *
 	 * @param string $prompt The prompt.

@@ -4,10 +4,13 @@ namespace WP_Autoplugin\V2\Orchestration;
 
 use WP_Autoplugin\Admin\Api_Handler;
 use WP_Autoplugin\AI_Utils;
+use WP_Autoplugin\Anthropic_API;
+use WP_Autoplugin\OpenAI_API;
 use WP_Autoplugin\Plugin_Explainer;
 use WP_Autoplugin\Plugin_Extender;
 use WP_Autoplugin\Plugin_Fixer;
 use WP_Autoplugin\Plugin_Generator;
+use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 use WP_Autoplugin\V2\Domain\Target\Source_Reader;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
@@ -54,10 +57,16 @@ final class Legacy_Orchestrator {
 		if ( ! $api ) {
 			return new \WP_Error( 'provider_not_configured', __( 'Configure an API key and model for this task before starting the job.', 'wp-autoplugin' ) );
 		}
+		$effort = Model_Effort::for_role( 'explain' === $stage ? 'reviewer' : 'planner' );
+		if ( '' !== $effort && $api instanceof OpenAI_API ) {
+			$api->set_reasoning_effort( $effort );
+		} elseif ( '' !== $effort && $api instanceof Anthropic_API ) {
+			$api->set_effort( $effort );
+		}
 
 		$jobs = new Job_Repository();
 		$jobs->update( (int) $job['id'], [ 'progress' => 25 ] );
-		$jobs->event( (int) $job['id'], 'provider_request', __( 'Sending a redacted task request to the selected provider.', 'wp-autoplugin' ), [ 'model' => $model, 'task' => $job['task'] ] );
+		$jobs->event( (int) $job['id'], 'provider_request', __( 'Sending a redacted task request to the selected provider.', 'wp-autoplugin' ), [ 'model' => $model, 'effort' => $effort, 'task' => $job['task'] ] );
 
 		$target  = (array) $workspace['target_metadata'];
 		$files   = ( new Source_Reader() )->read( $target );
@@ -130,6 +139,7 @@ final class Legacy_Orchestrator {
 			'structured' => is_array( $structured ) ? $structured : null,
 			'model'      => $model,
 			'provider'   => $provider,
+			'effort'     => $effort,
 			'usage'      => [
 				'input_tokens'  => (int) ( $usage['input_tokens'] ?? 0 ),
 				'output_tokens' => (int) ( $usage['output_tokens'] ?? 0 ),

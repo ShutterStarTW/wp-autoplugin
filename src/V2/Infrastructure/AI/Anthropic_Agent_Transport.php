@@ -6,9 +6,10 @@ use WP_Autoplugin\V2\Domain\AI\Agent_Transport;
 
 /** Anthropic Messages API native tool-use transport. */
 final class Anthropic_Agent_Transport implements Agent_Transport {
-	public function __construct( private string $api_key, private string $selected_model ) {}
+	public function __construct( private string $api_key, private string $selected_model, private string $selected_effort = '' ) {}
 	public function provider(): string { return 'anthropic'; }
 	public function model(): string { return $this->selected_model; }
+	public function effort(): string { return $this->selected_effort; }
 
 	public function send( string $instructions, array $transcript, array $tools ) {
 		$messages = [];
@@ -36,12 +37,16 @@ final class Anthropic_Agent_Transport implements Agent_Transport {
 			}
 		}
 		$native_tools = array_map( static fn( array $tool ): array => [ 'name' => $tool['name'], 'description' => $tool['description'], 'input_schema' => $tool['parameters'] ], $tools );
+		$body = [ 'model' => $this->selected_model, 'system' => $instructions, 'messages' => $messages, 'tools' => $native_tools, 'tool_choice' => [ 'type' => 'auto' ], 'max_tokens' => 4096 ];
+		if ( '' !== $this->selected_effort ) {
+			$body['output_config'] = [ 'effort' => $this->selected_effort ];
+		}
 		$response = wp_remote_post(
 			'https://api.anthropic.com/v1/messages',
 			[
 				'timeout' => 25,
 				'headers' => [ 'x-api-key' => $this->api_key, 'anthropic-version' => '2023-06-01', 'content-type' => 'application/json' ],
-				'body'    => wp_json_encode( [ 'model' => $this->selected_model, 'system' => $instructions, 'messages' => $messages, 'tools' => $native_tools, 'tool_choice' => [ 'type' => 'auto' ], 'max_tokens' => 4096 ] ),
+				'body'    => wp_json_encode( $body ),
 			]
 		);
 		if ( is_wp_error( $response ) ) {

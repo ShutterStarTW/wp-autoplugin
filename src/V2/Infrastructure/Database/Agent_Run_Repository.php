@@ -11,7 +11,7 @@ final class Agent_Run_Repository extends Repository {
 	 * @param array<string, string>             $inspected  Relative paths keyed to source hashes.
 	 * @return array<string, mixed>
 	 */
-	public function create( int $job_id, string $provider, string $model, array $transcript, string $tree_fingerprint, array $inspected, int $source_bytes = 0 ): array {
+	public function create( int $job_id, string $provider, string $model, string $effort, array $transcript, string $tree_fingerprint, array $inspected, int $source_bytes = 0 ): array {
 		$now = $this->now();
 		$this->wpdb->insert(
 			Installer::table( 'agent_runs' ),
@@ -20,6 +20,7 @@ final class Agent_Run_Repository extends Repository {
 				'status'           => 'active',
 				'provider'         => sanitize_key( $provider ),
 				'model'            => sanitize_text_field( $model ),
+				'effort'           => sanitize_key( $effort ),
 				'transcript'       => $this->json( $transcript ),
 				'tree_fingerprint' => $tree_fingerprint,
 				'inspected_files'  => $this->json( $inspected ),

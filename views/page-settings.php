@@ -13,6 +13,8 @@
 namespace WP_Autoplugin;
 
 use WP_Autoplugin\Admin\Admin;
+use WP_Autoplugin\V2\Admin\Model_Settings;
+use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -81,7 +83,8 @@ function render_model_dropdown( $name, $selected_value ) {
 			<tr valign="top">
 				<th scope="row"><?php esc_html_e( 'Default Model', 'wp-autoplugin' ); ?></th>
 				<td>
-					<select name="wp_autoplugin_model" id="wp_autoplugin_model">
+					<div class="wp-autoplugin-model-setting">
+						<select name="wp_autoplugin_model" id="wp_autoplugin_model">
 						<?php
 						$models = Admin::get_models();
 						foreach ( $models as $provider => $model ) {
@@ -100,7 +103,9 @@ function render_model_dropdown( $name, $selected_value ) {
 							}
 							?>
 						</optgroup>
-					</select>
+						</select>
+						<?php Model_Settings::render_effort_dropdown( 'default' ); ?>
+					</div>
 					<p>
 						<button type="button" id="toggle-specialized-models" class="button-link"><?php esc_html_e( 'Show specialized model settings', 'wp-autoplugin' ); ?> <span class="dashicons dashicons-arrow-down-alt2"></span></button>
 					</p>
@@ -120,21 +125,30 @@ function render_model_dropdown( $name, $selected_value ) {
 				<tr valign="top">
 					<th scope="row"><?php esc_html_e( 'Planner Model', 'wp-autoplugin' ); ?></th>
 					<td>
-						<?php render_model_dropdown( 'wp_autoplugin_planner_model', get_option( 'wp_autoplugin_planner_model' ) ); ?>
+						<div class="wp-autoplugin-model-setting">
+							<?php render_model_dropdown( 'wp_autoplugin_planner_model', get_option( 'wp_autoplugin_planner_model' ) ); ?>
+							<?php Model_Settings::render_effort_dropdown( 'planner' ); ?>
+						</div>
 						<p class="description"><?php esc_html_e( 'Used for planning plugin extensions and analyzing hooks. Falls back to Default Model if not set.', 'wp-autoplugin' ); ?></p>
 					</td>
 				</tr>
 				<tr valign="top">
 					<th scope="row"><?php esc_html_e( 'Coder Model', 'wp-autoplugin' ); ?></th>
 					<td>
-						<?php render_model_dropdown( 'wp_autoplugin_coder_model', get_option( 'wp_autoplugin_coder_model' ) ); ?>
+						<div class="wp-autoplugin-model-setting">
+							<?php render_model_dropdown( 'wp_autoplugin_coder_model', get_option( 'wp_autoplugin_coder_model' ) ); ?>
+							<?php Model_Settings::render_effort_dropdown( 'coder' ); ?>
+						</div>
 						<p class="description"><?php esc_html_e( 'Used for generating and fixing code. Falls back to Default Model if not set.', 'wp-autoplugin' ); ?></p>
 					</td>
 				</tr>
 				<tr valign="top">
 					<th scope="row"><?php esc_html_e( 'Reviewer Model', 'wp-autoplugin' ); ?></th>
 					<td>
-						<?php render_model_dropdown( 'wp_autoplugin_reviewer_model', get_option( 'wp_autoplugin_reviewer_model' ) ); ?>
+						<div class="wp-autoplugin-model-setting">
+							<?php render_model_dropdown( 'wp_autoplugin_reviewer_model', get_option( 'wp_autoplugin_reviewer_model' ) ); ?>
+							<?php Model_Settings::render_effort_dropdown( 'reviewer' ); ?>
+						</div>
 						<p class="description"><?php esc_html_e( 'Used for explaining code and reviewing generated plugins. Falls back to Default Model if not set.', 'wp-autoplugin' ); ?></p>
 					</td>
 				</tr>
@@ -217,6 +231,64 @@ function render_model_dropdown( $name, $selected_value ) {
 	jQuery(document).ready(function($) {
 		let customModels = JSON.parse($('#wp_autoplugin_custom_models').val() || '[]');
 		const nonce = $('#wp_autoplugin_settings_nonce').val();
+		const effortCapabilities = <?php echo wp_json_encode( Model_Effort::capabilities() ); ?>;
+		const effortModelFields = {
+			default: '#wp_autoplugin_model',
+			planner: '#wp_autoplugin_planner_model',
+			coder: '#wp_autoplugin_coder_model',
+			reviewer: '#wp_autoplugin_reviewer_model',
+		};
+		const effortLabels = {
+			none: '<?php echo esc_js( __( 'None', 'wp-autoplugin' ) ); ?>',
+			minimal: '<?php echo esc_js( __( 'Minimal', 'wp-autoplugin' ) ); ?>',
+			low: '<?php echo esc_js( __( 'Low', 'wp-autoplugin' ) ); ?>',
+			medium: '<?php echo esc_js( __( 'Medium', 'wp-autoplugin' ) ); ?>',
+			high: '<?php echo esc_js( __( 'High', 'wp-autoplugin' ) ); ?>',
+			xhigh: '<?php echo esc_js( __( 'Extra high', 'wp-autoplugin' ) ); ?>',
+			max: '<?php echo esc_js( __( 'Maximum', 'wp-autoplugin' ) ); ?>',
+			modelDefault: '<?php echo esc_js( __( 'model default', 'wp-autoplugin' ) ); ?>',
+		};
+		const selectedEfforts = {
+			default: '<?php echo esc_js( (string) get_option( Model_Effort::option_name( 'default' ), '' ) ); ?>',
+			planner: '<?php echo esc_js( (string) get_option( Model_Effort::option_name( 'planner' ), '' ) ); ?>',
+			coder: '<?php echo esc_js( (string) get_option( Model_Effort::option_name( 'coder' ), '' ) ); ?>',
+			reviewer: '<?php echo esc_js( (string) get_option( Model_Effort::option_name( 'reviewer' ), '' ) ); ?>',
+		};
+
+		function updateEffortControl(role) {
+			const model = $(effortModelFields[role]).val();
+			const capability = effortCapabilities[model];
+			const $wrapper = $(`.wp-autoplugin-model-effort[data-effort-role="${role}"]`);
+			const $select = $wrapper.find('select');
+
+			if (!capability) {
+				$wrapper.prop('hidden', true);
+				return;
+			}
+
+			const effort = capability.levels.includes(selectedEfforts[role])
+				? selectedEfforts[role]
+				: capability.default;
+			$select.empty();
+			capability.levels.forEach((level) => {
+				const suffix = level === capability.default ? ` (${effortLabels.modelDefault})` : '';
+				$select.append($('<option>', { value: level, text: `${effortLabels[level]}${suffix}` }));
+			});
+			$select.val(effort);
+			selectedEfforts[role] = effort;
+			$wrapper.prop('hidden', false);
+		}
+
+		function updateEffortControls() {
+			Object.keys(effortModelFields).forEach(updateEffortControl);
+		}
+
+		Object.entries(effortModelFields).forEach(([role, selector]) => {
+			$(selector).on('change', () => updateEffortControl(role));
+		});
+		$('.wp-autoplugin-model-effort-select').on('change', function() {
+			selectedEfforts[$(this).closest('.wp-autoplugin-model-effort').data('effort-role')] = $(this).val();
+		});
 		
 		// Toggle specialized models section
 		$('#toggle-specialized-models').on('click', function() {
@@ -293,6 +365,7 @@ function render_model_dropdown( $name, $selected_value ) {
 			$('#wp_autoplugin_planner_model').val(selectedPlanner);
 			$('#wp_autoplugin_coder_model').val(selectedCoder);
 			$('#wp_autoplugin_reviewer_model').val(selectedReviewer);
+			updateEffortControls();
 		}
 
 		$('#add-custom-model').on('click', function() {
@@ -478,5 +551,16 @@ function render_model_dropdown( $name, $selected_value ) {
 		border-radius: 4px;
 		padding: 0 2rem;
 		margin-bottom: 15px;
+	}
+
+	.wp-autoplugin-model-setting {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+
+	.wp-autoplugin-model-effort[hidden] {
+		display: none;
 	}
 </style>

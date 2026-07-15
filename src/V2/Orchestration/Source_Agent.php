@@ -45,7 +45,7 @@ final class Source_Agent {
 		$runs      = new Agent_Run_Repository();
 		$run       = $runs->find_by_job( (int) $job['id'] );
 		$factory   = new Agent_Transport_Factory();
-		$transport = $run ? $factory->create_for( (string) $run['provider'], (string) $run['model'] ) : $factory->create( $stage );
+		$transport = $run ? $factory->create_for( (string) $run['provider'], (string) $run['model'], (string) $run['effort'] ) : $factory->create( $stage );
 		if ( is_wp_error( $transport ) ) {
 			return $transport;
 		}
@@ -64,6 +64,7 @@ final class Source_Agent {
 					(int) $job['id'],
 					$transport->provider(),
 					$transport->model(),
+					$transport->effort(),
 					[ [ 'role' => 'user', 'content' => $this->initial_message( $workspace, $job, $bootstrap['content'] ) ] ],
 					$bootstrap['tree_fingerprint'],
 					$bootstrap['inspected'],
@@ -99,7 +100,7 @@ final class Source_Agent {
 				throw new \RuntimeException( sprintf( /* translators: %s: workspace stage. */ __( 'The target changed during inspection. Start %s again to inspect a consistent version.', 'wp-autoplugin' ), $this->label( $stage ) ) );
 			}
 
-			$jobs->event( (int) $job['id'], 'agent_turn', sprintf( /* translators: 1: workspace stage, 2: agent model turn. */ __( 'Running %1$s agent turn %2$d.', 'wp-autoplugin' ), $this->label( $stage ), (int) $run['model_turns'] + 1 ), [ 'turn' => (int) $run['model_turns'] + 1, 'model' => $transport->model(), 'stage' => $stage ] );
+			$jobs->event( (int) $job['id'], 'agent_turn', sprintf( /* translators: 1: workspace stage, 2: agent model turn. */ __( 'Running %1$s agent turn %2$d.', 'wp-autoplugin' ), $this->label( $stage ), (int) $run['model_turns'] + 1 ), [ 'turn' => (int) $run['model_turns'] + 1, 'model' => $transport->model(), 'effort' => $transport->effort(), 'stage' => $stage ] );
 			$response = $transport->send( $this->instructions( $run, $stage, 'conversation' === $job['task'] ), (array) $run['transcript'], $tools->definitions() );
 			if ( is_wp_error( $response ) ) {
 				return $this->provider_failure( $response, $job, $run, $token, $runs );
@@ -131,6 +132,7 @@ final class Source_Agent {
 				return array_merge( $task_result, [
 					'model'    => $transport->model(),
 					'provider' => $transport->provider(),
+					'effort'   => $transport->effort(),
 					'usage'    => [ 'input_tokens' => $input_tokens, 'output_tokens' => $output_tokens ],
 					'agent'    => [ 'model_turns' => $model_turns, 'tool_calls' => (int) $run['tool_calls'], 'source_bytes' => (int) $run['source_bytes'] ],
 				] );

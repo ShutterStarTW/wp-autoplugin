@@ -3,6 +3,7 @@
 namespace WP_Autoplugin\V2;
 
 use WP_Autoplugin\V2\Admin\Assets;
+use WP_Autoplugin\V2\Admin\Model_Settings;
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Queue\Job_Runner;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
@@ -21,6 +22,7 @@ final class Application {
 		Installer::maybe_upgrade();
 
 		( new Assets() )->register();
+		( new Model_Settings() )->register();
 		( new Routes() )->register();
 		( new Source_Agent() )->register();
 		( new Legacy_Orchestrator() )->register();

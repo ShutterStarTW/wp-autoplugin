@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
  * Creates and upgrades v2 operational tables.
  */
 final class Installer {
-	public const SCHEMA_VERSION = '3';
+	public const SCHEMA_VERSION = '5';
 	private const OPTION_NAME   = 'wp_autoplugin_v2_schema_version';
 
 	/**
@@ -222,6 +222,7 @@ final class Installer {
 			output_tokens bigint(20) unsigned NOT NULL DEFAULT 0,
 			provider varchar(50) NOT NULL,
 			model varchar(100) NOT NULL,
+			effort varchar(20) NOT NULL DEFAULT '',
 			transcript longtext NULL,
 			tree_fingerprint char(64) NOT NULL,
 			inspected_files longtext NULL,
@@ -251,7 +252,32 @@ final class Installer {
 		) $charset;";
 
 		dbDelta( $sql );
-		update_option( self::OPTION_NAME, self::SCHEMA_VERSION, false );
+
+		/*
+		 * dbDelta can miss an empty-string-default column on an existing table.
+		 * Keep the declarative schema above for clean installs and explicitly
+		 * repair this additive column before marking the migration complete.
+		 */
+		$agent_runs = self::table( 'agent_runs' );
+		maybe_add_column(
+			$agent_runs,
+			'effort',
+			"ALTER TABLE $agent_runs ADD effort varchar(20) NOT NULL DEFAULT '' AFTER model"
+		);
+
+		if ( self::column_exists( $agent_runs, 'effort' ) ) {
+			update_option( self::OPTION_NAME, self::SCHEMA_VERSION, false );
+		}
+	}
+
+	/**
+	 * Check whether an additive migration column is present.
+	 */
+	private static function column_exists( string $table, string $column ): bool {
+		global $wpdb;
+
+		$query = $wpdb->prepare( "SHOW COLUMNS FROM $table LIKE %s", $column ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
+		return null !== $wpdb->get_var( $query ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
 	}
 
 	/**
@@ -269,6 +295,10 @@ final class Installer {
 				'wp_autoplugin_google_api_key'    => false,
 				'wp_autoplugin_xai_api_key'       => false,
 				'wp_autoplugin_custom_models'      => false,
+				'wp_autoplugin_default_model_effort'  => false,
+				'wp_autoplugin_planner_model_effort'  => false,
+				'wp_autoplugin_coder_model_effort'    => false,
+				'wp_autoplugin_reviewer_model_effort' => false,
 			]
 		);
 	}

@@ -31,7 +31,7 @@ class Anthropic_API extends API {
 	/**
 	 * Temperature parameter.
 	 *
-	 * @var float
+	 * @var float|null
 	 */
 	private $temperature = 0.2;
 
@@ -41,6 +41,13 @@ class Anthropic_API extends API {
 	 * @var int
 	 */
 	private $max_tokens = 4096;
+
+	/**
+	 * Output effort selected by v2.
+	 *
+	 * @var string
+	 */
+	private $effort = '';
 
 	/**
 	 * Set the model, and the parameters based on the model.
@@ -84,8 +91,20 @@ class Anthropic_API extends API {
 		];
 
 		if ( isset( $model_params[ $model ] ) ) {
-			$this->temperature = $model_params[ $model ]['temperature'];
-			$this->max_tokens  = $model_params[ $model ]['max_tokens'];
+			$this->temperature = $model_params[ $model ]['temperature'] ?? null;
+			$this->max_tokens = $model_params[ $model ]['max_tokens'];
+		}
+	}
+
+	/**
+	 * Set the output effort for a v2 request.
+	 *
+	 * @param string $effort Effort supported by the selected Claude model.
+	 */
+	public function set_effort( $effort ) {
+		$effort = sanitize_key( $effort );
+		if ( in_array( $effort, [ 'low', 'medium', 'high', 'xhigh', 'max' ], true ) ) {
+			$this->effort = $effort;
 		}
 	}
 
@@ -107,10 +126,9 @@ class Anthropic_API extends API {
 		$prompt         .= AI_Utils::get_language_instruction( $json_mode );
 
 		$payload = [
-			'model'       => $this->model,
-			'temperature' => $this->temperature,
-			'max_tokens'  => $this->max_tokens,
-			'messages'    => [
+			'model'      => $this->model,
+			'max_tokens' => $this->max_tokens,
+			'messages'   => [
 				[
 					'role'    => 'user',
 					'content' => [
@@ -122,9 +140,16 @@ class Anthropic_API extends API {
 				],
 			],
 		];
+		if ( null !== $this->temperature ) {
+			$payload['temperature'] = $this->temperature;
+		}
 
 		if ( ! empty( $system_message ) ) {
 			$payload['system'] = $system_message;
+		}
+
+		if ( '' !== $this->effort ) {
+			$payload['output_config'] = [ 'effort' => $this->effort ];
 		}
 
 		if ( isset( $override_body['messages'] ) ) {
@@ -138,7 +163,7 @@ class Anthropic_API extends API {
 		}
 
 		// Keep only allowed keys alongside overrides.
-		$allowed_keys  = [ 'model', 'temperature', 'max_tokens', 'messages', 'system', 'thinking' ];
+		$allowed_keys  = [ 'model', 'temperature', 'max_tokens', 'messages', 'system', 'thinking', 'output_config' ];
 		$override_body = array_intersect_key( $override_body, array_flip( $allowed_keys ) );
 		$body          = array_merge( $payload, $override_body );
 
@@ -183,6 +208,7 @@ class Anthropic_API extends API {
 		// If stop_reason is "max_tokens", the response is too long.
 		// We need to send a new request with the whole conversation so far, so the AI can continue from where it left off.
 		if ( isset( $data['stop_reason'] ) && 'max_tokens' === $data['stop_reason'] ) {
+			$messages   = (array) $body['messages'];
 			$messages[] = [
 				'role'    => 'assistant',
 				'content' => $data['content'][0]['text'],
@@ -194,11 +220,19 @@ class Anthropic_API extends API {
 			];
 
 			$body = [
-				'model'       => $this->model,
-				'temperature' => $this->temperature,
-				'max_tokens'  => $this->max_tokens,
-				'messages'    => $messages,
+				'model'      => $this->model,
+				'max_tokens' => $this->max_tokens,
+				'messages'   => $messages,
 			];
+			if ( null !== $this->temperature ) {
+				$body['temperature'] = $this->temperature;
+			}
+			if ( '' !== $this->effort ) {
+				$body['output_config'] = [ 'effort' => $this->effort ];
+			}
+			if ( ! empty( $system_message ) ) {
+				$body['system'] = $system_message;
+			}
 
 			$response = wp_remote_post(
 				'https://api.anthropic.com/v1/messages',

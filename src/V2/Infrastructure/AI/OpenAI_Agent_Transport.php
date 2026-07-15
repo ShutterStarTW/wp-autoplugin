@@ -6,9 +6,10 @@ use WP_Autoplugin\V2\Domain\AI\Agent_Transport;
 
 /** OpenAI Responses API native function-call transport. */
 final class OpenAI_Agent_Transport implements Agent_Transport {
-	public function __construct( private string $api_key, private string $selected_model ) {}
+	public function __construct( private string $api_key, private string $selected_model, private string $selected_effort = '' ) {}
 	public function provider(): string { return 'openai'; }
 	public function model(): string { return $this->selected_model; }
+	public function effort(): string { return $this->selected_effort; }
 
 	public function send( string $instructions, array $transcript, array $tools ) {
 		$input = [];
@@ -30,12 +31,16 @@ final class OpenAI_Agent_Transport implements Agent_Transport {
 			static fn( array $tool ): array => [ 'type' => 'function', 'name' => $tool['name'], 'description' => $tool['description'], 'parameters' => $tool['parameters'], 'strict' => false ],
 			$tools
 		);
+		$body = [ 'model' => $this->selected_model, 'instructions' => $instructions, 'input' => $input, 'tools' => $native_tools, 'tool_choice' => 'auto', 'parallel_tool_calls' => true, 'max_output_tokens' => 4096, 'store' => false ];
+		if ( '' !== $this->selected_effort ) {
+			$body['reasoning'] = [ 'effort' => $this->selected_effort ];
+		}
 		$response = wp_remote_post(
 			'https://api.openai.com/v1/responses',
 			[
 				'timeout' => 25,
 				'headers' => [ 'Authorization' => 'Bearer ' . $this->api_key, 'Content-Type' => 'application/json' ],
-				'body'    => wp_json_encode( [ 'model' => $this->selected_model, 'instructions' => $instructions, 'input' => $input, 'tools' => $native_tools, 'tool_choice' => 'auto', 'parallel_tool_calls' => true, 'max_output_tokens' => 4096, 'store' => false ] ),
+				'body'    => wp_json_encode( $body ),
 			]
 		);
 		if ( is_wp_error( $response ) ) {

@@ -8,6 +8,7 @@ namespace WP_Autoplugin\V2\Domain\AI;
 interface Agent_Transport {
 	public function provider(): string;
 	public function model(): string;
+	public function effort(): string;
 
 	/**
 	 * @param array<int, array<string, mixed>> $transcript Canonical conversation items.
