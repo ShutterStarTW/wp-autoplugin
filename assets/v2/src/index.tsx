@@ -125,7 +125,7 @@ const operations = [
 		value: 'fix',
 	},
 	{
-		label: __( 'Hook extension', 'wp-autoplugin' ),
+		label: __( 'Create extension', 'wp-autoplugin' ),
 		description: __( 'Build against discovered hooks.', 'wp-autoplugin' ),
 		requestLabel: __( 'What should the extension do?', 'wp-autoplugin' ),
 		value: 'hook_extension',
@@ -1597,6 +1597,13 @@ function StageConversation( {
 } ) {
 	const [ message, setMessage ] = useState( '' );
 	const isPlan = stage === 'plan';
+	const submitMessage = () => {
+		if ( ! message.trim() ) {
+			return;
+		}
+		onFollowUp( message, artifactJobId );
+		setMessage( '' );
+	};
 	return (
 		<div
 			className={ `stage-conversation ${
@@ -1706,15 +1713,22 @@ function StageConversation( {
 					}
 					value={ message }
 					onChange={ setMessage }
+					onKeyDown={ ( event ) => {
+						if (
+							'Enter' === event.key &&
+							! event.shiftKey &&
+							! event.nativeEvent.isComposing
+						) {
+							event.preventDefault();
+							submitMessage();
+						}
+					} }
 					rows={ 3 }
 				/>
 				<Button
 					variant="primary"
 					disabled={ ! message.trim() }
-					onClick={ () => {
-						onFollowUp( message, artifactJobId );
-						setMessage( '' );
-					} }
+					onClick={ submitMessage }
 				>
 					{ isPlan
 						? __( 'Send', 'wp-autoplugin' )
