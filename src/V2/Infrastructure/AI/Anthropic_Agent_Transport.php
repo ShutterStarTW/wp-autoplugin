@@ -3,13 +3,18 @@
 namespace WP_Autoplugin\V2\Infrastructure\AI;
 
 use WP_Autoplugin\V2\Domain\AI\Agent_Transport;
+use WP_Autoplugin\V2\Domain\AI\Direct_Transport;
 
 /** Anthropic Messages API native tool-use transport. */
-final class Anthropic_Agent_Transport implements Agent_Transport {
+final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transport {
 	public function __construct( private string $api_key, private string $selected_model, private string $selected_effort = '' ) {}
 	public function provider(): string { return 'anthropic'; }
 	public function model(): string { return $this->selected_model; }
 	public function effort(): string { return $this->selected_effort; }
+
+	public function complete( string $instructions, string $input ) {
+		return $this->send( $instructions, [ [ 'role' => 'user', 'content' => $input ] ], [] );
+	}
 
 	public function send( string $instructions, array $transcript, array $tools ) {
 		$messages = [];
@@ -37,7 +42,11 @@ final class Anthropic_Agent_Transport implements Agent_Transport {
 			}
 		}
 		$native_tools = array_map( static fn( array $tool ): array => [ 'name' => $tool['name'], 'description' => $tool['description'], 'input_schema' => $tool['parameters'] ], $tools );
-		$body = [ 'model' => $this->selected_model, 'system' => $instructions, 'messages' => $messages, 'tools' => $native_tools, 'tool_choice' => [ 'type' => 'auto' ], 'max_tokens' => 4096 ];
+		$body = [ 'model' => $this->selected_model, 'system' => $instructions, 'messages' => $messages, 'max_tokens' => 4096 ];
+		if ( $native_tools ) {
+			$body['tools']       = $native_tools;
+			$body['tool_choice'] = [ 'type' => 'auto' ];
+		}
 		if ( '' !== $this->selected_effort ) {
 			$body['output_config'] = [ 'effort' => $this->selected_effort ];
 		}

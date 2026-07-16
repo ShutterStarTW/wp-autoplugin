@@ -60,6 +60,69 @@ final class PlanResponseTest extends WP_UnitTestCase {
 		$this->assertWPError( ( new Plan_Response() )->parse( '{"outcome":"answer","content":"Need more detail."}' ) );
 	}
 
+	public function test_parses_new_plugin_plan_with_add_only_files(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => "# Example Plugin\n\nCreate the requested behavior.",
+				'structured' => [
+					'plugin_name'       => 'Example Plugin',
+					'project_structure' => [
+						'directories' => [ 'includes' ],
+						'files'       => [
+							[ 'path' => 'example-plugin.php', 'type' => 'php', 'description' => 'Bootstrap the plugin.', 'action' => 'add' ],
+						],
+					],
+				],
+			]
+		);
+
+		$result = ( new Plan_Response() )->parse( (string) $response, false, 0, 'create' );
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( 'Example Plugin', $result['structured']['plugin_name'] );
+		$this->assertSame( 'add', $result['structured']['project_structure']['files'][0]['action'] );
+	}
+
+	public function test_rejects_new_plugin_plan_that_updates_a_file(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => '# Invalid new plugin',
+				'structured' => [
+					'plugin_name'       => 'Invalid Plugin',
+					'project_structure' => [
+						'directories' => [],
+						'files'       => [
+							[ 'path' => 'existing.php', 'type' => 'php', 'description' => 'Invalid update.', 'action' => 'update' ],
+						],
+					],
+				],
+			]
+		);
+
+		$this->assertWPError( ( new Plan_Response() )->parse( (string) $response, false, 0, 'create' ) );
+	}
+
+	public function test_rejects_new_plugin_plan_without_a_php_file(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => '# Invalid new plugin',
+				'structured' => [
+					'plugin_name'       => 'Invalid Plugin',
+					'project_structure' => [
+						'directories' => [],
+						'files'       => [
+							[ 'path' => 'assets/style.css', 'type' => 'css', 'description' => 'Styles only.', 'action' => 'add' ],
+						],
+					],
+				],
+			]
+		);
+
+		$this->assertWPError( ( new Plan_Response() )->parse( (string) $response, false, 0, 'create' ) );
+	}
+
 	public function test_parses_feasible_hook_extension_as_separate_plugin(): void {
 		$response = wp_json_encode(
 			[

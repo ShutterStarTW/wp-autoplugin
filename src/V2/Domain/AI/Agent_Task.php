@@ -35,4 +35,15 @@ final class Agent_Task {
 		return 'plan' === $stage
 			&& 'new_plugin' !== ( $workspace['target_metadata']['kind'] ?? $workspace['target_kind'] ?? '' );
 	}
+
+	/**
+	 * New-plugin planning uses a direct v2 request because there is no source target.
+	 *
+	 * @param array<string, mixed> $job       Durable job.
+	 * @param array<string, mixed> $workspace Durable workspace.
+	 */
+	public static function uses_direct_plan( array $job, array $workspace ): bool {
+		return 'plan' === self::stage( $job )
+			&& 'new_plugin' === ( $workspace['target_metadata']['kind'] ?? $workspace['target_kind'] ?? '' );
+	}
 }

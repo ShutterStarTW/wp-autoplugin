@@ -3,13 +3,18 @@
 namespace WP_Autoplugin\V2\Infrastructure\AI;
 
 use WP_Autoplugin\V2\Domain\AI\Agent_Transport;
+use WP_Autoplugin\V2\Domain\AI\Direct_Transport;
 
 /** OpenAI Responses API native function-call transport. */
-final class OpenAI_Agent_Transport implements Agent_Transport {
+final class OpenAI_Agent_Transport implements Agent_Transport, Direct_Transport {
 	public function __construct( private string $api_key, private string $selected_model, private string $selected_effort = '' ) {}
 	public function provider(): string { return 'openai'; }
 	public function model(): string { return $this->selected_model; }
 	public function effort(): string { return $this->selected_effort; }
+
+	public function complete( string $instructions, string $input ) {
+		return $this->send( $instructions, [ [ 'role' => 'user', 'content' => $input ] ], [] );
+	}
 
 	public function send( string $instructions, array $transcript, array $tools ) {
 		$input = [];
@@ -31,7 +36,12 @@ final class OpenAI_Agent_Transport implements Agent_Transport {
 			static fn( array $tool ): array => [ 'type' => 'function', 'name' => $tool['name'], 'description' => $tool['description'], 'parameters' => $tool['parameters'], 'strict' => false ],
 			$tools
 		);
-		$body = [ 'model' => $this->selected_model, 'instructions' => $instructions, 'input' => $input, 'tools' => $native_tools, 'tool_choice' => 'auto', 'parallel_tool_calls' => true, 'max_output_tokens' => 4096, 'store' => false ];
+		$body = [ 'model' => $this->selected_model, 'instructions' => $instructions, 'input' => $input, 'max_output_tokens' => 4096, 'store' => false ];
+		if ( $native_tools ) {
+			$body['tools']               = $native_tools;
+			$body['tool_choice']          = 'auto';
+			$body['parallel_tool_calls'] = true;
+		}
 		if ( '' !== $this->selected_effort ) {
 			$body['reasoning'] = [ 'effort' => $this->selected_effort ];
 		}

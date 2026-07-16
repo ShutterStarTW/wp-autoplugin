@@ -89,6 +89,7 @@ type Bootstrap = {
 	queue: { degraded: boolean; message: string };
 	explain_agent: AgentCapability;
 	plan_agent: AgentCapability;
+	direct_plan: AgentCapability;
 };
 
 type AgentCapability = {
@@ -503,6 +504,7 @@ function App() {
 				busy={ busy }
 				explainCapability={ bootstrap?.explain_agent ?? null }
 				planCapability={ bootstrap?.plan_agent ?? null }
+				directPlanCapability={ bootstrap?.direct_plan ?? null }
 				onTargetSearch={ setTargetSearch }
 				onTargetSelect={ setTargetKey }
 				onTargetKindSelect={ selectTargetKind }
@@ -666,6 +668,7 @@ function WorkspaceLauncher( {
 	busy,
 	explainCapability,
 	planCapability,
+	directPlanCapability,
 	onTargetSearch,
 	onTargetSelect,
 	onTargetKindSelect,
@@ -683,6 +686,7 @@ function WorkspaceLauncher( {
 	busy: boolean;
 	explainCapability: AgentCapability | null;
 	planCapability: AgentCapability | null;
+	directPlanCapability: AgentCapability | null;
 	onTargetSearch: ( value: string ) => void;
 	onTargetSelect: ( value: string ) => void;
 	onTargetKindSelect: ( value: string ) => void;
@@ -690,8 +694,9 @@ function WorkspaceLauncher( {
 	onRequestChange: ( value: string ) => void;
 	onStart: () => void;
 } ) {
-	const requiresPlanAgent =
-		!! target && target.kind !== 'new_plugin' && operation !== 'explain';
+	const requiresPlan = !! target && operation !== 'explain';
+	const effectivePlanCapability =
+		target?.kind === 'new_plugin' ? directPlanCapability : planCapability;
 	return (
 		<div className="workspace-new-canvas">
 			<Card className="workspace-launcher">
@@ -727,11 +732,11 @@ function WorkspaceLauncher( {
 								{ explainCapability.message }
 							</Notice>
 						) }
-					{ requiresPlanAgent &&
-						planCapability &&
-						! planCapability.available && (
+					{ requiresPlan &&
+						effectivePlanCapability &&
+						! effectivePlanCapability.available && (
 							<Notice status="warning" isDismissible={ false }>
-								{ planCapability.message }
+								{ effectivePlanCapability.message }
 							</Notice>
 						) }
 					<div className="workspace-request">
@@ -765,7 +770,8 @@ function WorkspaceLauncher( {
 							! request.trim() ||
 							( operation === 'explain' &&
 								! explainCapability?.available ) ||
-							( requiresPlanAgent && ! planCapability?.available )
+							( requiresPlan &&
+								! effectivePlanCapability?.available )
 						}
 						isBusy={ busy }
 						onClick={ onStart }

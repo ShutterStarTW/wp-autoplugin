@@ -9,6 +9,7 @@ use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 use WP_Autoplugin\V2\Infrastructure\AI\Agent_Transport_Factory;
+use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
 
 /**
  * Capability-checked REST interface for the v2 admin application.
@@ -126,6 +127,7 @@ final class Routes {
 			'log_mode'  => get_option( 'wp_autoplugin_v2_log_mode', 'metadata' ),
 			'explain_agent' => ( new Agent_Transport_Factory() )->capability( 'explain' ),
 			'plan_agent'    => ( new Agent_Transport_Factory() )->capability( 'plan' ),
+			'direct_plan'   => ( new Direct_Transport_Factory() )->capability( 'plan' ),
 		] );
 	}
 
@@ -223,6 +225,11 @@ final class Routes {
 			$capability = ( new Agent_Transport_Factory() )->capability( $stage );
 			if ( ! $capability['available'] ) {
 				return new \WP_Error( 'wp_autoplugin_source_agent_unavailable', $capability['message'], [ 'status' => 409 ] );
+			}
+		} elseif ( Agent_Task::uses_direct_plan( $agent_job, $workspace ) ) {
+			$capability = ( new Direct_Transport_Factory() )->capability( 'plan' );
+			if ( ! $capability['available'] ) {
+				return new \WP_Error( 'wp_autoplugin_direct_plan_unavailable', $capability['message'], [ 'status' => 409 ] );
 			}
 		}
 		$job = null;

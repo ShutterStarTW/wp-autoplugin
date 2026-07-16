@@ -2,15 +2,13 @@
 
 namespace WP_Autoplugin\V2\Domain\AI;
 
-use WP_Autoplugin\AI_Utils;
-
 /** Validates a native Plan agent's terminal response. */
 final class Plan_Response {
 	/**
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function parse( string $response, bool $follow_up = false, int $parent_job_id = 0, string $operation = '' ) {
-		$decoded = json_decode( AI_Utils::strip_code_fences( trim( $response ), 'json' ), true );
+		$decoded = json_decode( Json_Response::strip_fence( $response ), true );
 		$outcome = is_array( $decoded ) ? (string) ( $decoded['outcome'] ?? '' ) : '';
 		$content = is_array( $decoded ) && is_string( $decoded['content'] ?? null ) ? trim( $decoded['content'] ) : '';
 
@@ -27,7 +25,13 @@ final class Plan_Response {
 		}
 
 		$structured = [ 'project_structure' => $structure ];
-		if ( 'hook_extension' === $operation ) {
+		if ( 'create' === $operation ) {
+			$creation = $this->creation( $decoded['structured'] ?? null, $structure );
+			if ( is_wp_error( $creation ) ) {
+				return $creation;
+			}
+			$structured = array_merge( $creation, $structured );
+		} elseif ( 'hook_extension' === $operation ) {
 			$extension = $this->extension( $decoded['structured'] ?? null, $structure );
 			if ( is_wp_error( $extension ) ) {
 				return $extension;
@@ -49,6 +53,33 @@ final class Plan_Response {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Validate the new-plugin contract independently of existing-target Plans.
+	 *
+	 * @param mixed                $value     Raw structured response.
+	 * @param array<string, mixed> $structure Normalized project structure.
+	 * @return array<string, string>|\WP_Error
+	 */
+	private function creation( $value, array $structure ) {
+		$plugin_name = is_array( $value ) && is_string( $value['plugin_name'] ?? null ) ? trim( $value['plugin_name'] ) : '';
+		$has_php     = false;
+		if ( '' === $plugin_name || ! $structure['files'] ) {
+			return $this->creation_error();
+		}
+		foreach ( $structure['files'] as $file ) {
+			if ( 'add' !== $file['action'] ) {
+				return $this->creation_error();
+			}
+			$has_php = $has_php || 'php' === $file['type'];
+		}
+
+		return $has_php ? [ 'plugin_name' => $plugin_name ] : $this->creation_error();
+	}
+
+	private function creation_error(): \WP_Error {
+		return new \WP_Error( 'plan_agent_creation_invalid', __( 'The provider returned an invalid new-plugin Plan. No Plan artifact was changed.', 'wp-autoplugin' ) );
 	}
 
 	/**

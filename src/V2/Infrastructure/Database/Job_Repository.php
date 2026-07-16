@@ -2,7 +2,7 @@
 
 namespace WP_Autoplugin\V2\Infrastructure\Database;
 
-use WP_Autoplugin\AI_Utils;
+use WP_Autoplugin\V2\Domain\AI\Json_Response;
 
 /**
  * Durable job state and append-only event persistence.
@@ -199,7 +199,7 @@ final class Job_Repository extends Repository {
 		}
 
 		$now        = $this->now();
-		$structured = json_decode( AI_Utils::strip_code_fences( trim( $content ), 'json' ), true );
+		$structured = json_decode( Json_Response::strip_fence( $content ), true );
 		if ( ! is_array( $structured ) && is_array( $source['result']['structured'] ?? null ) ) {
 			// Markdown edits change the narrative Plan, not its static file map.
 			$structured = $source['result']['structured'];
