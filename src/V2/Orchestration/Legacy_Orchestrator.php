@@ -11,6 +11,7 @@ use WP_Autoplugin\Plugin_Extender;
 use WP_Autoplugin\Plugin_Fixer;
 use WP_Autoplugin\Plugin_Generator;
 use WP_Autoplugin\V2\Domain\AI\Model_Effort;
+use WP_Autoplugin\V2\Domain\AI\Plan_Response;
 use WP_Autoplugin\V2\Domain\Target\Source_Reader;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
@@ -173,7 +174,39 @@ final class Legacy_Orchestrator {
 
 		$plan           = $this->artifact_content( $artifact );
 		$source_context = empty( $files ) ? __( 'No target source is available for this workspace.', 'wp-autoplugin' ) : AI_Utils::build_code_context( $files );
-		$prompt         = <<<PROMPT
+		$is_extension   = 'hook_extension' === (string) $workspace['operation'];
+		if ( $is_extension ) {
+			$prior_structure = (string) wp_json_encode( (array) ( $artifact['result']['structured'] ?? [] ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+			$prompt = <<<PROMPT
+You are regenerating structured metadata for an administrator-edited Plan for a separate WordPress extension plugin. This is read-only planning work: do not write code or claim to modify files. The extension must not modify, delete, replace, or copy files in the inspected target.
+
+Original workspace request:
+"""
+{$workspace['request']}
+"""
+
+Administrator-edited Plan in Markdown:
+"""
+$plan
+"""
+
+Prior validated extension metadata:
+"""
+$prior_structure
+"""
+
+Bounded read-only target source context:
+"""
+$source_context
+"""
+
+Return only a valid JSON object in this exact shape:
+{"technically_feasible":true,"plugin_name":"Name of the new extension plugin","hooks":["verified_target_hook_or_wordpress_core_hook"],"project_structure":{"directories":["relative/directory/"],"files":[{"path":"extension-plugin.php","type":"php","description":"brief purpose","action":"add"}]}}
+
+If the edited Plan is feasible without changing the target, use technically_feasible true, list every target or WordPress core hook needed, and include a minimal non-empty file map containing only add actions. Paths are relative to the new extension plugin root. If it is infeasible, use technically_feasible false and return empty hooks, directories, and files. `type` must be `php`, `js`, or `css`. Do not include code or Markdown.
+PROMPT;
+		} else {
+			$prompt = <<<PROMPT
 You are preparing the file map for a WordPress development Plan. This is read-only planning work: do not write code or claim to modify files.
 
 Original workspace request:
@@ -196,6 +229,7 @@ Return only a valid JSON object in this exact shape:
 
 List only files that must be added, updated, or deleted to implement the Plan. `type` must be `php`, `js`, or `css`; `action` must be `add`, `update`, or `delete`. Keep the structure minimal. Paths must be relative to the target root. Do not include code or Markdown.
 PROMPT;
+		}
 		$response       = $api->send_prompt( $prompt, '', [ 'response_format' => [ 'type' => 'json_object' ] ] );
 		if ( is_wp_error( $response ) ) {
 			return $response;
@@ -206,8 +240,21 @@ PROMPT;
 			return new \WP_Error( 'plan_structure_response_invalid', __( 'The provider returned an invalid project structure. The Plan was not changed.', 'wp-autoplugin' ) );
 		}
 
-		$structured                      = is_array( $artifact['result']['structured'] ?? null ) ? $artifact['result']['structured'] : [];
-		$structured['project_structure'] = $decoded['project_structure'];
+		if ( $is_extension ) {
+			$validation = ( new Plan_Response() )->parse(
+				(string) wp_json_encode( [ 'outcome' => 'artifact', 'content' => $plan, 'structured' => $decoded ] ),
+				false,
+				0,
+				'hook_extension'
+			);
+			if ( is_wp_error( $validation ) ) {
+				return $validation;
+			}
+			$structured = $validation['structured'];
+		} else {
+			$structured                      = is_array( $artifact['result']['structured'] ?? null ) ? $artifact['result']['structured'] : [];
+			$structured['project_structure'] = $decoded['project_structure'];
+		}
 
 		return [
 			'content'         => $plan,

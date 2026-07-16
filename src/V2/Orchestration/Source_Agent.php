@@ -60,6 +60,15 @@ final class Source_Agent {
 		if ( ! $run ) {
 			try {
 				$bootstrap = $tools->bootstrap();
+				if ( 'hook_extension' === (string) $workspace['operation'] ) {
+					$hooks = $tools->execute( 'list_hooks', [ 'offset' => 0, 'limit' => 25 ] );
+					if ( ! empty( $hooks['error'] ) ) {
+						throw new \RuntimeException( __( 'The target hooks could not be inspected.', 'wp-autoplugin' ) );
+					}
+					$bootstrap['content'] .= "\n\nDiscovered target hook contexts (first bounded page):\n" . $hooks['content'];
+					$bootstrap['inspected'] = array_merge( $bootstrap['inspected'], $hooks['inspected'] );
+					$bootstrap['audit']['hooks'] = $hooks['audit'];
+				}
 				$run = $runs->create(
 					(int) $job['id'],
 					$transport->provider(),
@@ -73,7 +82,9 @@ final class Source_Agent {
 				$jobs->event(
 					(int) $job['id'],
 					'agent_bootstrap',
-					__( 'Provided target metadata, the source structure, and the main entry file to the model.', 'wp-autoplugin' ),
+					'hook_extension' === (string) $workspace['operation']
+						? __( 'Provided target metadata, source structure, main entry file, and discovered hook contexts to the model.', 'wp-autoplugin' )
+						: __( 'Provided target metadata, the source structure, and the main entry file to the model.', 'wp-autoplugin' ),
 					(array) $bootstrap['audit']
 				);
 			} catch ( \Throwable $error ) {
@@ -101,7 +112,7 @@ final class Source_Agent {
 			}
 
 			$jobs->event( (int) $job['id'], 'agent_turn', sprintf( /* translators: 1: workspace stage, 2: agent model turn. */ __( 'Running %1$s agent turn %2$d.', 'wp-autoplugin' ), $this->label( $stage ), (int) $run['model_turns'] + 1 ), [ 'turn' => (int) $run['model_turns'] + 1, 'model' => $transport->model(), 'effort' => $transport->effort(), 'stage' => $stage ] );
-			$response = $transport->send( $this->instructions( $run, $stage, 'conversation' === $job['task'] ), (array) $run['transcript'], $tools->definitions() );
+			$response = $transport->send( $this->instructions( $run, $stage, 'conversation' === $job['task'], (string) $workspace['operation'] ), (array) $run['transcript'], $tools->definitions() );
 			if ( is_wp_error( $response ) ) {
 				return $this->provider_failure( $response, $job, $run, $token, $runs );
 			}
@@ -118,7 +129,8 @@ final class Source_Agent {
 					$task_result = ( new Plan_Response() )->parse(
 						(string) $response['content'],
 						'conversation' === $job['task'],
-						(int) ( $job['payload']['artifact_job_id'] ?? 0 )
+						(int) ( $job['payload']['artifact_job_id'] ?? 0 ),
+						(string) $workspace['operation']
 					);
 					if ( is_wp_error( $task_result ) ) {
 						throw new \RuntimeException( $this->with_debug_response( $task_result->get_error_message(), $response ) );
@@ -225,7 +237,7 @@ final class Source_Agent {
 	}
 
 	/** @param array<string, mixed> $run */
-	private function instructions( array $run, string $stage, bool $follow_up ): string {
+	private function instructions( array $run, string $stage, bool $follow_up, string $operation ): string {
 		$remaining_calls = max( 0, self::MAX_TOOL_CALLS - (int) $run['tool_calls'] );
 		$turn_limit      = min( self::MAX_TOOL_BATCH, $remaining_calls );
 		$remaining_bytes = max( 0, self::MAX_SOURCE_BYTES - (int) $run['source_bytes'] );
@@ -242,7 +254,10 @@ final class Source_Agent {
 		$outcomes = $follow_up
 			? 'For a question or ambiguity, return {"outcome":"answer","content":"concise Markdown answer"} and omit structured. Only when the administrator clearly requests a Plan change, use outcome "artifact" with the complete replacement Plan and file map.'
 			: 'The initial Plan must use outcome "artifact".';
-		return 'You are a read-only WordPress implementation planning agent. Inspect the existing plugin or theme until you have enough evidence to plan the requested fix, modification, or hook extension accurately. Prefer searches and targeted line-range reads. Cite relevant relative paths and line numbers in the Plan. Never write code, change files, execute code, install, activate, or claim that implementation has occurred. Keep the proposed change set minimal and consistent with the target architecture. When inspection is sufficient, return only one valid JSON object with no Markdown fence in this shape: {"outcome":"artifact","content":"complete Plan in Markdown","structured":{"project_structure":{"directories":["relative/directory/"],"files":[{"path":"relative/file.php","type":"php","description":"brief purpose","action":"update"}]}}}. File type must be php, js, or css. File action must be add, update, or delete. Paths must be relative to the target root and unique. ' . $outcomes . ' ' . $budget;
+		if ( 'hook_extension' === $operation ) {
+			return 'You are a read-only WordPress extension-plugin planning agent. Plan a whole new plugin that extends the inspected target; never propose editing, deleting, replacing, or copying files inside the target plugin or theme. The initial context includes the first bounded page of statically discovered target hooks with file, line, and surrounding source context. Use list_hooks to inspect additional pages when available, and use targeted searches and line-range reads to understand the relevant hook call sites, arguments, return values, timing, and surrounding control flow. You may also use established WordPress core hooks and public APIs where appropriate, but clearly distinguish them from hooks verified in the target source and never invent a target hook. Determine whether the administrator\'s request is technically feasible using the discovered target hooks and/or WordPress core hooks without changing the target. Cite relevant target paths and line numbers in the Markdown Plan. If feasible, explain the new extension plugin architecture, name every hook it will use and how callbacks interact with the observed context, and return only add actions for paths relative to the new extension plugin root. If infeasible, clearly explain the technical blocker and which required interception point is absent, and return an empty project structure. Never write code, change files, execute code, install, activate, or claim implementation occurred. When inspection is sufficient, return only one valid JSON object with no Markdown fence in this shape: {"outcome":"artifact","content":"complete feasible Plan or infeasibility explanation in Markdown","structured":{"technically_feasible":true,"plugin_name":"Name of the new extension plugin","hooks":["verified_target_hook_or_wordpress_core_hook"],"project_structure":{"directories":["relative/directory/"],"files":[{"path":"extension-plugin.php","type":"php","description":"brief purpose","action":"add"}]}}}. For an infeasible result, technically_feasible must be false, plugin_name may be empty, hooks may be empty, and directories and files must both be empty. A feasible result requires a non-empty plugin_name, at least one hook, and at least one file; every file action must be add. File type must be php, js, or css. Paths must be relative to the new extension plugin root and unique. ' . $outcomes . ' ' . $budget;
+		}
+		return 'You are a read-only WordPress implementation planning agent. Inspect the existing plugin or theme until you have enough evidence to plan the requested fix or modification accurately. Prefer searches and targeted line-range reads. Cite relevant relative paths and line numbers in the Plan. Never write code, change files, execute code, install, activate, or claim that implementation has occurred. Keep the proposed change set minimal and consistent with the target architecture. When inspection is sufficient, return only one valid JSON object with no Markdown fence in this shape: {"outcome":"artifact","content":"complete Plan in Markdown","structured":{"project_structure":{"directories":["relative/directory/"],"files":[{"path":"relative/file.php","type":"php","description":"brief purpose","action":"update"}]}}}. File type must be php, js, or css. File action must be add, update, or delete. Paths must be relative to the target root and unique. ' . $outcomes . ' ' . $budget;
 	}
 
 	/** @param array<string, mixed> $response */
@@ -327,6 +342,7 @@ final class Source_Agent {
 		return match ( $tool ) {
 			'list_files' => __( 'Inspecting the target file structure.', 'wp-autoplugin' ),
 			'search_code' => __( 'Searching the target source.', 'wp-autoplugin' ),
+			'list_hooks' => __( 'Inspecting discovered target hooks and their source context.', 'wp-autoplugin' ),
 			default => __( 'Inspecting target metadata.', 'wp-autoplugin' ),
 		};
 	}

@@ -9,7 +9,7 @@ final class Plan_Response {
 	/**
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function parse( string $response, bool $follow_up = false, int $parent_job_id = 0 ) {
+	public function parse( string $response, bool $follow_up = false, int $parent_job_id = 0, string $operation = '' ) {
 		$decoded = json_decode( AI_Utils::strip_code_fences( trim( $response ), 'json' ), true );
 		$outcome = is_array( $decoded ) ? (string) ( $decoded['outcome'] ?? '' ) : '';
 		$content = is_array( $decoded ) && is_string( $decoded['content'] ?? null ) ? trim( $decoded['content'] ) : '';
@@ -26,10 +26,19 @@ final class Plan_Response {
 			return $structure;
 		}
 
+		$structured = [ 'project_structure' => $structure ];
+		if ( 'hook_extension' === $operation ) {
+			$extension = $this->extension( $decoded['structured'] ?? null, $structure );
+			if ( is_wp_error( $extension ) ) {
+				return $extension;
+			}
+			$structured = array_merge( $extension, $structured );
+		}
+
 		$result = [
 			'content'    => $content,
 			'outcome'    => 'artifact',
-			'structured' => [ 'project_structure' => $structure ],
+			'structured' => $structured,
 		];
 		if ( $follow_up ) {
 			$result['artifact'] = [
@@ -40,6 +49,56 @@ final class Plan_Response {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Validate the separate-plugin contract for hook-extension Plans.
+	 *
+	 * @param mixed                $value     Raw structured response.
+	 * @param array<string, mixed> $structure Normalized project structure.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function extension( $value, array $structure ) {
+		if ( ! is_array( $value ) || ! is_bool( $value['technically_feasible'] ?? null ) ) {
+			return $this->extension_error();
+		}
+
+		$feasible   = $value['technically_feasible'];
+		$plugin_name = is_string( $value['plugin_name'] ?? null ) ? trim( $value['plugin_name'] ) : '';
+		$hooks       = [];
+		if ( is_array( $value['hooks'] ?? null ) ) {
+			foreach ( $value['hooks'] as $hook ) {
+				if ( ! is_string( $hook ) || '' === trim( $hook ) ) {
+					return $this->extension_error();
+				}
+				$hooks[] = trim( $hook );
+			}
+		} else {
+			return $this->extension_error();
+		}
+
+		if ( $feasible ) {
+			if ( '' === $plugin_name || ! $hooks || ! $structure['files'] ) {
+				return $this->extension_error();
+			}
+			foreach ( $structure['files'] as $file ) {
+				if ( 'add' !== $file['action'] ) {
+					return $this->extension_error();
+				}
+			}
+		} elseif ( $structure['directories'] || $structure['files'] ) {
+			return $this->extension_error();
+		}
+
+		return [
+			'technically_feasible' => $feasible,
+			'plugin_name'           => $plugin_name,
+			'hooks'                 => array_values( array_unique( $hooks ) ),
+		];
+	}
+
+	private function extension_error(): \WP_Error {
+		return new \WP_Error( 'plan_agent_extension_invalid', __( 'The provider returned an invalid extension Plan. No Plan artifact was changed.', 'wp-autoplugin' ) );
 	}
 
 	/**

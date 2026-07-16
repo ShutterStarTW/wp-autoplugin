@@ -59,4 +59,72 @@ final class PlanResponseTest extends WP_UnitTestCase {
 	public function test_initial_plan_cannot_finish_as_answer(): void {
 		$this->assertWPError( ( new Plan_Response() )->parse( '{"outcome":"answer","content":"Need more detail."}' ) );
 	}
+
+	public function test_parses_feasible_hook_extension_as_separate_plugin(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => '# Fixture Companion\n\nUse the verified fixture hook.',
+				'structured' => [
+					'technically_feasible' => true,
+					'plugin_name'           => 'Fixture Companion',
+					'hooks'                 => [ 'fixture_before_answer' ],
+					'project_structure'     => [
+						'directories' => [ 'includes' ],
+						'files'       => [
+							[ 'path' => 'fixture-companion.php', 'type' => 'php', 'description' => 'Bootstrap the extension.', 'action' => 'add' ],
+						],
+					],
+				],
+			]
+		);
+
+		$result = ( new Plan_Response() )->parse( (string) $response, false, 0, 'hook_extension' );
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertTrue( $result['structured']['technically_feasible'] );
+		$this->assertSame( 'Fixture Companion', $result['structured']['plugin_name'] );
+		$this->assertSame( 'add', $result['structured']['project_structure']['files'][0]['action'] );
+	}
+
+	public function test_parses_infeasible_hook_extension_with_empty_file_map(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => '# Not technically feasible\n\nThe required interception point is unavailable.',
+				'structured' => [
+					'technically_feasible' => false,
+					'plugin_name'           => '',
+					'hooks'                 => [],
+					'project_structure'     => [ 'directories' => [], 'files' => [] ],
+				],
+			]
+		);
+
+		$result = ( new Plan_Response() )->parse( (string) $response, false, 0, 'hook_extension' );
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertFalse( $result['structured']['technically_feasible'] );
+		$this->assertSame( [], $result['structured']['project_structure']['files'] );
+	}
+
+	public function test_rejects_hook_extension_that_modifies_target_files(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => '# Invalid extension',
+				'structured' => [
+					'technically_feasible' => true,
+					'plugin_name'           => 'Invalid Companion',
+					'hooks'                 => [ 'init' ],
+					'project_structure'     => [
+						'directories' => [],
+						'files'       => [
+							[ 'path' => 'target.php', 'type' => 'php', 'description' => 'Modify the target.', 'action' => 'update' ],
+						],
+					],
+				],
+			]
+		);
+
+		$this->assertWPError( ( new Plan_Response() )->parse( (string) $response, false, 0, 'hook_extension' ) );
+	}
 }

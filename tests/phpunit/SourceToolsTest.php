@@ -12,7 +12,7 @@ final class SourceToolsTest extends WP_UnitTestCase {
 		$this->root = sys_get_temp_dir() . '/wp-autoplugin-explain-' . wp_generate_password( 8, false );
 		mkdir( $this->root . '/includes', 0777, true );
 		file_put_contents( $this->root . '/plugin.php', "<?php\n/* Plugin Name: Fixture */\nrequire __DIR__ . '/includes/class-fixture.php';\n" );
-		file_put_contents( $this->root . '/includes/class-fixture.php', "<?php\nclass Fixture {\n\tpublic function answer() { return 42; }\n}\n" );
+		file_put_contents( $this->root . '/includes/class-fixture.php', "<?php\nclass Fixture {\n\tpublic function answer() {\n\t\tdo_action( 'fixture_before_answer', \$this );\n\t\treturn apply_filters( 'fixture_answer', 42, \$this );\n\t}\n}\n" );
 
 		$reflection  = new ReflectionClass( Source_Tools::class );
 		$this->tools = $reflection->newInstanceWithoutConstructor();
@@ -36,7 +36,7 @@ final class SourceToolsTest extends WP_UnitTestCase {
 	public function test_reads_only_requested_line_range(): void {
 		$result = $this->tools->execute( 'read_file', [ 'path' => 'includes/class-fixture.php', 'start_line' => 2, 'end_line' => 3 ] );
 		$this->assertStringContainsString( '2: class Fixture', $result['content'] );
-		$this->assertStringContainsString( '3:', $result['content'] );
+		$this->assertStringContainsString( '3: \tpublic function answer()', $result['content'] );
 		$this->assertStringNotContainsString( '1: <?php', $result['content'] );
 		$this->assertArrayHasKey( 'includes/class-fixture.php', $result['inspected'] );
 		$this->assertSame( 'includes/class-fixture.php', $result['audit']['path'] );
@@ -63,12 +63,27 @@ final class SourceToolsTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $decoded['next_offset'] );
 		$this->assertCount( 1, $list['audit']['returned_files'] );
 
-		$search = $this->tools->execute( 'search_code', [ 'query' => 'return 42', 'extension' => 'php' ] );
+		$search = $this->tools->execute( 'search_code', [ 'query' => 'return apply_filters', 'extension' => 'php' ] );
 		$decoded = json_decode( $search['content'], true );
 		$this->assertSame( 'includes/class-fixture.php', $decoded['hits'][0]['path'] );
-		$this->assertSame( 3, $decoded['hits'][0]['line'] );
-		$this->assertSame( 'return 42', $search['audit']['query'] );
+		$this->assertSame( 5, $decoded['hits'][0]['line'] );
+		$this->assertSame( 'return apply_filters', $search['audit']['query'] );
 		$this->assertSame( [ 'includes/class-fixture.php' ], $search['audit']['matched_files'] );
+	}
+
+	public function test_lists_discovered_hooks_with_source_context(): void {
+		$result  = $this->tools->execute( 'list_hooks', [ 'offset' => 0, 'limit' => 1 ] );
+		$decoded = json_decode( $result['content'], true );
+
+		$this->assertFalse( $result['error'] );
+		$this->assertSame( 2, $decoded['total'] );
+		$this->assertSame( 1, $decoded['next_offset'] );
+		$this->assertSame( 'fixture_before_answer', $decoded['hooks'][0]['name'] );
+		$this->assertSame( 'action', $decoded['hooks'][0]['type'] );
+		$this->assertSame( 'includes/class-fixture.php', $decoded['hooks'][0]['path'] );
+		$this->assertSame( 4, $decoded['hooks'][0]['line'] );
+		$this->assertStringContainsString( "4: \t\tdo_action", $decoded['hooks'][0]['context'] );
+		$this->assertSame( [ 'includes/class-fixture.php' ], $result['audit']['matched_files'] );
 	}
 
 	public function test_detects_source_changes_and_rejects_symlinks(): void {

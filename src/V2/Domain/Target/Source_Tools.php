@@ -14,6 +14,10 @@ final class Source_Tools {
 	private const MAX_SEARCH_FILES = 200;
 	private const MAX_SEARCH_BYTES = 2097152;
 	private const MAX_SEARCH_HITS  = 50;
+	private const MAX_HOOK_FILES   = 1000;
+	private const MAX_HOOK_BYTES   = 16777216;
+	private const MAX_HOOKS        = 1000;
+	private const HOOK_CONTEXT_LINES = 3;
 
 	/** @var array<string, mixed> */
 	private array $target;
@@ -75,6 +79,18 @@ final class Source_Tools {
 				'description' => 'Return the target headers and source statistics without reading source files.',
 				'parameters'  => [ 'type' => 'object', 'properties' => new \stdClass(), 'additionalProperties' => false ],
 			],
+			[
+				'name'        => 'list_hooks',
+				'description' => 'List statically named action and filter hooks discovered in the target PHP source, including file, line, and bounded surrounding context. Results are sorted and paginated.',
+				'parameters'  => [
+					'type'                 => 'object',
+					'properties'           => [
+						'offset' => [ 'type' => 'integer', 'minimum' => 0 ],
+						'limit'  => [ 'type' => 'integer', 'minimum' => 1, 'maximum' => 50 ],
+					],
+					'additionalProperties' => false,
+				],
+			],
 		];
 	}
 
@@ -133,6 +149,7 @@ final class Source_Tools {
 				'read_file'          => $this->read_file( $arguments ),
 				'search_code'        => $this->search_code( $arguments ),
 				'get_target_metadata'=> $this->metadata_result(),
+				'list_hooks'         => $this->list_hooks( $arguments ),
 				default              => throw new \InvalidArgumentException( __( 'The model requested an unsupported source tool.', 'wp-autoplugin' ) ),
 			};
 		} catch ( \InvalidArgumentException | \RuntimeException $error ) {
@@ -147,6 +164,7 @@ final class Source_Tools {
 			'read_file' => [ 'path', 'start_line', 'end_line' ],
 			'search_code' => [ 'query', 'path', 'extension' ],
 			'get_target_metadata' => [],
+			'list_hooks' => [ 'offset', 'limit' ],
 			default => throw new \InvalidArgumentException( __( 'The model requested an unsupported source tool.', 'wp-autoplugin' ) ),
 		};
 		if ( array_diff( array_keys( $arguments ), $allowed ) ) {
@@ -296,6 +314,218 @@ final class Source_Tools {
 	private function metadata_result(): array {
 		$metadata = $this->public_metadata();
 		return $this->result( (string) wp_json_encode( $metadata, JSON_PRETTY_PRINT ), [], '', [ 'metadata' => $metadata ] );
+	}
+
+	/** @param array<string, mixed> $arguments */
+	private function list_hooks( array $arguments ): array {
+		$offset = max( 0, (int) ( $arguments['offset'] ?? 0 ) );
+		$limit  = min( 50, max( 1, (int) ( $arguments['limit'] ?? 25 ) ) );
+		$hooks  = $inspected = [];
+		$scanned_files = $scanned_bytes = 0;
+		$scan_truncated = false;
+
+		foreach ( $this->tree() as $file ) {
+			$relative = (string) $file['path'];
+			if ( 'php' !== $file['type'] || $this->is_skipped_hook_path( $relative ) ) {
+				continue;
+			}
+			if ( $scanned_files >= self::MAX_HOOK_FILES || $scanned_bytes + (int) $file['size'] > self::MAX_HOOK_BYTES || count( $hooks ) >= self::MAX_HOOKS ) {
+				$scan_truncated = true;
+				break;
+			}
+			++$scanned_files;
+			$path     = $this->safe_file( $relative );
+			$contents = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Read-only constrained source inspection.
+			if ( false === $contents ) {
+				continue;
+			}
+			$scanned_bytes += strlen( $contents );
+			$inspected[ $relative ] = hash( 'sha256', $contents );
+			$discovered = $this->discover_file_hooks( $relative, $contents );
+			if ( $discovered ) {
+				$remaining = self::MAX_HOOKS - count( $hooks );
+				$hooks = array_merge( $hooks, array_slice( $discovered, 0, $remaining ) );
+				if ( count( $discovered ) > $remaining || count( $hooks ) >= self::MAX_HOOKS ) {
+					$scan_truncated = true;
+					break;
+				}
+			}
+		}
+
+		usort(
+			$hooks,
+			static fn( array $a, array $b ): int => [ $a['path'], $a['line'], $a['name'] ] <=> [ $b['path'], $b['line'], $b['name'] ]
+		);
+		$total = count( $hooks );
+		$page  = array_slice( $hooks, $offset, $limit );
+		do {
+			$next_offset = $offset + count( $page ) < $total ? $offset + count( $page ) : null;
+			$content = (string) wp_json_encode(
+				[
+					'hooks'          => $page,
+					'offset'         => $offset,
+					'next_offset'    => $next_offset,
+					'total'          => $total,
+					'scan_truncated' => $scan_truncated,
+				],
+				JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+			);
+			if ( strlen( $content ) <= self::MAX_RESULT_BYTES || ! $page ) {
+				break;
+			}
+			array_pop( $page );
+		} while ( true );
+
+		$returned_files = [];
+		foreach ( $page as $hook ) {
+			$returned_files[ $hook['path'] ] = true;
+		}
+		return $this->result(
+			$content,
+			$inspected,
+			'',
+			[
+				'offset'          => $offset,
+				'limit'           => $limit,
+				'returned_count'  => count( $page ),
+				'total_hooks'     => $total,
+				'next_offset'     => $next_offset,
+				'scanned_files'   => $scanned_files,
+				'scanned_bytes'   => $scanned_bytes,
+				'matched_files'   => array_keys( $returned_files ),
+				'scan_truncated'  => $scan_truncated,
+			]
+		);
+	}
+
+	private function is_skipped_hook_path( string $path ): bool {
+		$components = explode( '/', $path );
+		return (bool) array_intersect( $components, [ 'docs', 'build', 'dist' ] );
+	}
+
+	/** @return array<int, array{name:string,type:string,path:string,line:int,context:string}> */
+	private function discover_file_hooks( string $relative, string $contents ): array {
+		$methods = [
+			'apply_filters'            => 'filter',
+			'apply_filters_ref_array'  => 'filter',
+			'apply_filters_deprecated' => 'filter',
+			'do_action'                => 'action',
+			'do_action_ref_array'      => 'action',
+			'do_action_deprecated'     => 'action',
+		];
+		$tokens = token_get_all( $contents );
+		$lines  = preg_split( '/\R/', $contents ) ?: [];
+		$hooks  = [];
+
+		foreach ( $tokens as $index => $token ) {
+			if ( ! is_array( $token ) || T_STRING !== $token[0] ) {
+				continue;
+			}
+			$method = strtolower( $token[1] );
+			if ( ! isset( $methods[ $method ] ) || $this->is_method_call( $tokens, $index ) ) {
+				continue;
+			}
+			$open = $this->next_code_token( $tokens, $index + 1 );
+			if ( null === $open || '(' !== $this->token_text( $tokens[ $open ] ) ) {
+				continue;
+			}
+			$argument = $this->next_code_token( $tokens, $open + 1 );
+			if ( null === $argument || ! is_array( $tokens[ $argument ] ) || T_CONSTANT_ENCAPSED_STRING !== $tokens[ $argument ][0] ) {
+				continue;
+			}
+			$after_argument = $this->next_code_token( $tokens, $argument + 1 );
+			if ( null === $after_argument || ! in_array( $this->token_text( $tokens[ $after_argument ] ), [ ',', ')' ], true ) ) {
+				continue;
+			}
+			$name = $this->decode_hook_name( (string) $tokens[ $argument ][1] );
+			if ( '' === $name ) {
+				continue;
+			}
+			$line = (int) $token[2];
+			$hooks[] = [
+				'name'    => $name,
+				'type'    => $methods[ $method ],
+				'path'    => $relative,
+				'line'    => $line,
+				'context' => $this->hook_context( $lines, $line ),
+			];
+		}
+
+		return $hooks;
+	}
+
+	/** @param array<int, mixed> $tokens */
+	private function is_method_call( array $tokens, int $index ): bool {
+		for ( $position = $index - 1; $position >= 0; --$position ) {
+			$token = $tokens[ $position ];
+			if ( is_array( $token ) && in_array( $token[0], [ T_WHITESPACE, T_COMMENT, T_DOC_COMMENT ], true ) ) {
+				continue;
+			}
+			return is_array( $token ) && in_array( $token[0], [ T_OBJECT_OPERATOR, T_DOUBLE_COLON ], true );
+		}
+		return false;
+	}
+
+	/** @param array<int, mixed> $tokens */
+	private function next_code_token( array $tokens, int $index ): ?int {
+		for ( $count = count( $tokens ); $index < $count; ++$index ) {
+			$token = $tokens[ $index ];
+			if ( is_array( $token ) && in_array( $token[0], [ T_WHITESPACE, T_COMMENT, T_DOC_COMMENT ], true ) ) {
+				continue;
+			}
+			return $index;
+		}
+		return null;
+	}
+
+	/** @param mixed $token */
+	private function token_text( $token ): string {
+		return is_array( $token ) ? (string) $token[1] : (string) $token;
+	}
+
+	private function decode_hook_name( string $literal ): string {
+		if ( strlen( $literal ) < 2 ) {
+			return '';
+		}
+		$quote = $literal[0];
+		$value = substr( $literal, 1, -1 );
+		return "'" === $quote
+			? str_replace( [ '\\\\', "\\'" ], [ '\\', "'" ], $value )
+			: stripcslashes( $value );
+	}
+
+	/** @param array<int, string> $lines */
+	private function hook_context( array $lines, int $line ): string {
+		$hook_index = max( 0, $line - 1 );
+		$end        = $this->hook_statement_end( $lines, $hook_index );
+		$start      = max( 0, $hook_index - self::HOOK_CONTEXT_LINES );
+		$end        = min( count( $lines ) - 1, $end + self::HOOK_CONTEXT_LINES, $hook_index + 30 );
+		$context    = [];
+		foreach ( array_slice( $lines, $start, $end - $start + 1, true ) as $index => $text ) {
+			$context[] = sprintf( '%d: %s', $index + 1, $text );
+		}
+		return implode( "\n", $context );
+	}
+
+	/** @param array<int, string> $lines */
+	private function hook_statement_end( array $lines, int $start ): int {
+		$depth = 0;
+		$found = false;
+		$limit = min( count( $lines ), $start + 30 );
+		for ( $index = $start; $index < $limit; ++$index ) {
+			$length = strlen( $lines[ $index ] );
+			for ( $character = 0; $character < $length; ++$character ) {
+				if ( '(' === $lines[ $index ][ $character ] ) {
+					++$depth;
+					$found = true;
+				} elseif ( ')' === $lines[ $index ][ $character ] && $found ) {
+					$depth = max( 0, $depth - 1 );
+				} elseif ( ';' === $lines[ $index ][ $character ] && $found && 0 === $depth ) {
+					return $index;
+				}
+			}
+		}
+		return max( $start, $limit - 1 );
 	}
 
 	/** @return array<string, mixed> */
