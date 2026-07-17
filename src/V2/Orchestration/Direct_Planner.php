@@ -44,7 +44,7 @@ final class Direct_Planner {
 		$jobs->event(
 			(int) $job['id'],
 			'provider_request',
-			__( 'Sending a direct v2 Plan request to the selected provider.', 'wp-autoplugin' ),
+			__( 'Sending a plan request to the selected provider.', 'wp-autoplugin' ),
 			[
 				'model'          => $transport->model(),
 				'effort'         => $transport->effort(),
