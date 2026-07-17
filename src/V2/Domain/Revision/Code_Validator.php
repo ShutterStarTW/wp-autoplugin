@@ -4,29 +4,48 @@ namespace WP_Autoplugin\V2\Domain\Revision;
 
 use WP_Autoplugin\V2\Domain\AI\Json_Response;
 
-/** Deterministic validation for complete new-plugin source revisions. */
+/** Deterministic validation for complete plugin projects and target-relative change sets. */
 final class Code_Validator {
-	public const MAX_FILES          = 20;
-	public const MAX_FILE_BYTES     = 65536;
-	public const MAX_PROJECT_BYTES  = 262144;
-	private const SUPPORTED_TYPES   = [ 'php', 'js', 'css' ];
+	public const MAX_FILES         = 20;
+	public const MAX_FILE_BYTES    = 65536;
+	public const MAX_PROJECT_BYTES = 262144;
+	private const SUPPORTED_TYPES  = [ 'php', 'js', 'css' ];
 
 	/**
 	 * Normalize and validate structured Plan metadata before billable work.
 	 *
 	 * @param array<string, mixed> $structured Plan structured data.
+	 * @param array<string, mixed> $context    Workspace and target context.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function plan( array $structured ) {
+	public function plan( array $structured, array $context = [] ) {
+		$operation = sanitize_key( (string) ( $context['operation'] ?? 'create' ) );
+		if ( in_array( $operation, [ 'modify', 'fix' ], true ) ) {
+			return $this->change_plan( $structured, $context, $operation );
+		}
+
+		if ( 'hook_extension' === $operation && false === ( $structured['technically_feasible'] ?? null ) ) {
+			return new \WP_Error( 'code_extension_infeasible', __( 'This extension Plan is not technically feasible and cannot generate Code.', 'wp-autoplugin' ) );
+		}
+
 		$project = $structured['project_structure'] ?? null;
 		$raw     = is_array( $project ) && is_array( $project['files'] ?? null ) ? $project['files'] : [];
+		$root    = ( new Project_Root_Normalizer() )->normalize(
+			[
+				'directories' => is_array( $project ) && is_array( $project['directories'] ?? null ) ? $project['directories'] : [],
+				'files'       => $raw,
+			],
+			(string) ( $structured['main_file'] ?? '' )
+		);
+		$raw       = $root['structure']['files'];
+		$main_file = $root['main_file'];
 		if ( ! $raw || count( $raw ) > self::MAX_FILES ) {
 			return new \WP_Error( 'code_plan_files_invalid', sprintf( __( 'Code generation requires between 1 and %d planned files.', 'wp-autoplugin' ), self::MAX_FILES ) );
 		}
 
 		$files = [];
 		foreach ( $raw as $file ) {
-			$action      = is_array( $file ) ? sanitize_key( (string) ( $file['action'] ?? '' ) ) : '';
+			$action = is_array( $file ) ? sanitize_key( (string) ( $file['action'] ?? '' ) ) : '';
 			if ( 'add' !== $action ) {
 				return new \WP_Error( 'code_plan_manifest_invalid', __( 'The Plan file map is invalid. Regenerate the Plan before generating Code.', 'wp-autoplugin' ) );
 			}
@@ -34,10 +53,10 @@ final class Code_Validator {
 				'path'        => is_array( $file ) ? $file['path'] ?? '' : '',
 				'type'        => is_array( $file ) ? $file['type'] ?? '' : '',
 				'description' => is_array( $file ) ? $file['description'] ?? '' : '',
+				'operation'   => 'add',
 			];
 		}
 
-		$main_file = (string) ( $structured['main_file'] ?? '' );
 		if ( '' === $main_file ) {
 			$root_php = array_values(
 				array_filter(
@@ -52,9 +71,12 @@ final class Code_Validator {
 		}
 		$manifest = $this->manifest(
 			[
-				'plugin_name' => $structured['plugin_name'] ?? '',
-				'main_file'   => $main_file,
-				'files'       => $files,
+				'scope'         => 'project',
+				'artifact_kind' => 'plugin',
+				'operation'     => $operation,
+				'plugin_name'   => $structured['plugin_name'] ?? '',
+				'main_file'     => $main_file,
+				'files'         => $files,
 			]
 		);
 		if ( is_wp_error( $manifest ) ) {
@@ -67,12 +89,17 @@ final class Code_Validator {
 	}
 
 	/**
-	 * Normalize a revision-owned complete project manifest.
+	 * Normalize a revision-owned project or change-set manifest.
 	 *
 	 * @param array<string, mixed> $manifest Raw manifest.
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function manifest( array $manifest ) {
+		$scope = sanitize_key( (string) ( $manifest['scope'] ?? 'project' ) );
+		if ( 'changes' === $scope ) {
+			return $this->change_manifest( $manifest );
+		}
+
 		$plugin_name = trim( (string) ( $manifest['plugin_name'] ?? '' ) );
 		$raw_files   = is_array( $manifest['files'] ?? null ) ? $manifest['files'] : [];
 		if ( '' === $plugin_name || ! $raw_files || count( $raw_files ) > self::MAX_FILES ) {
@@ -85,34 +112,39 @@ final class Code_Validator {
 			$path        = is_array( $file ) ? $this->path( (string) ( $file['path'] ?? '' ) ) : '';
 			$type        = is_array( $file ) ? sanitize_key( (string) ( $file['type'] ?? '' ) ) : '';
 			$description = is_array( $file ) ? trim( (string) ( $file['description'] ?? '' ) ) : '';
+			$operation   = is_array( $file ) ? sanitize_key( (string) ( $file['operation'] ?? $file['action'] ?? 'add' ) ) : '';
 			$extension   = strtolower( (string) pathinfo( $path, PATHINFO_EXTENSION ) );
-			if ( '' === $path || isset( $seen[ $path ] ) || ! in_array( $type, self::SUPPORTED_TYPES, true ) || $extension !== $type || '' === $description ) {
+			if ( '' === $path || isset( $seen[ $path ] ) || ! in_array( $type, self::SUPPORTED_TYPES, true ) || $extension !== $type || '' === $description || 'add' !== $operation ) {
 				return new \WP_Error( 'code_manifest_invalid', __( 'The project manifest contains an unsafe, duplicate, unsupported, or undescribed file.', 'wp-autoplugin' ) );
 			}
 			$seen[ $path ] = true;
-			$files[]       = compact( 'path', 'type', 'description' );
+			$files[]       = compact( 'path', 'type', 'description', 'operation' );
 		}
 
-		$main_file = $this->path( (string) ( $manifest['main_file'] ?? '' ) );
+		$main_file  = $this->path( (string) ( $manifest['main_file'] ?? '' ) );
 		$main_index = array_search( $main_file, array_column( $files, 'path' ), true );
 		if ( '' === $main_file || str_contains( $main_file, '/' ) || false === $main_index || 'php' !== $files[ $main_index ]['type'] ) {
 			return new \WP_Error( 'code_manifest_main_file_invalid', __( 'The project main_file must identify a root-level PHP file in the manifest.', 'wp-autoplugin' ) );
 		}
 
 		return [
-			'plugin_name' => $plugin_name,
-			'main_file'   => $main_file,
-			'files'       => $files,
+			'scope'         => 'project',
+			'artifact_kind' => 'plugin',
+			'operation'     => sanitize_key( (string) ( $manifest['operation'] ?? 'create' ) ),
+			'plugin_name'   => $plugin_name,
+			'main_file'     => $main_file,
+			'files'         => $files,
 		];
 	}
 
 	/**
 	 * Parse and validate one provider response against its expected manifest row.
 	 *
-	 * @param array<string, mixed> $expected Expected file.
+	 * @param array<string, mixed>        $expected Expected file.
+	 * @param string|array<string, mixed> $policy   Legacy main path or normalized manifest.
 	 * @return array<string, string>|\WP_Error
 	 */
-	public function response( string $response, array $expected, string $main_file ) {
+	public function response( string $response, array $expected, $policy ) {
 		if ( str_contains( $response, '```' ) ) {
 			return $this->error( $expected['path'], 0, 'markdown_fence', __( 'The response must be JSON without Markdown code fences.', 'wp-autoplugin' ) );
 		}
@@ -124,15 +156,18 @@ final class Code_Validator {
 			return $this->error( $expected['path'], 0, 'wrong_path', __( 'The provider returned a different file path than requested.', 'wp-autoplugin' ) );
 		}
 
+		$manifest = is_array( $policy )
+			? $policy
+			: [ 'scope' => 'project', 'artifact_kind' => 'plugin', 'main_file' => (string) $policy ];
 		$issues = $this->file_issues(
 			[
 				'path'        => $decoded['path'],
 				'type'        => $expected['type'],
-				'change_type' => 'add',
+				'change_type' => $expected['operation'] ?? 'add',
 				'content'     => $decoded['content'],
 			],
 			$expected,
-			$main_file
+			$manifest
 		);
 		if ( $issues ) {
 			return new \WP_Error( 'code_validation_failed', $issues[0]['message'], [ 'issues' => $issues, 'retryable' => true ] );
@@ -142,10 +177,10 @@ final class Code_Validator {
 	}
 
 	/**
-	 * Validate the exact complete project represented by a manifest.
+	 * Validate the exact complete project or planned change set represented by a manifest.
 	 *
-	 * @param array<int, array<string, mixed>> $files    Complete source files.
-	 * @param array<string, mixed>             $manifest Normalized Plan manifest.
+	 * @param array<int, array<string, mixed>> $files    Complete staged files.
+	 * @param array<string, mixed>             $manifest Normalized manifest.
 	 * @return array<int, array<string, mixed>>
 	 */
 	public function project_issues( array $files, array $manifest ): array {
@@ -159,38 +194,133 @@ final class Code_Validator {
 		foreach ( $files as $file ) {
 			$path = $this->path( (string) ( $file['path'] ?? '' ) );
 			if ( '' !== $path && isset( $actual[ $path ] ) ) {
-				$issues[] = $this->issue( $path, 0, 'duplicate_path', __( 'The project contains a duplicate file path.', 'wp-autoplugin' ) );
+				$issues[] = $this->issue( $path, 0, 'duplicate_path', __( 'The staged revision contains a duplicate file path.', 'wp-autoplugin' ) );
 				continue;
 			}
-			$actual[ $path ] = true;
+			if ( '' !== $path ) {
+				$actual[ $path ] = true;
+			}
 			if ( ! isset( $expected[ $path ] ) ) {
-				$issues[] = $this->issue( $path, 0, 'unexpected_file', __( 'The project contains a file that is not in the Plan.', 'wp-autoplugin' ) );
+				$issues[] = $this->issue( $path, 0, 'unexpected_file', __( 'The staged revision contains a file that is not in the Plan.', 'wp-autoplugin' ) );
 				continue;
 			}
 			$content = (string) ( $file['content'] ?? '' );
 			$total  += strlen( $content );
-			$issues = array_merge( $issues, $this->file_issues( $file, $expected[ $path ], (string) $manifest['main_file'] ) );
+			$issues = array_merge( $issues, $this->file_issues( $file, $expected[ $path ], $manifest ) );
 		}
 		foreach ( $expected as $path => $file ) {
 			if ( ! isset( $actual[ $path ] ) ) {
-				$issues[] = $this->issue( $path, 0, 'missing_file', __( 'A planned file is missing from the project.', 'wp-autoplugin' ) );
+				$issues[] = $this->issue( $path, 0, 'missing_file', __( 'A planned file is missing from the staged revision.', 'wp-autoplugin' ) );
 			}
 		}
 		if ( $total > self::MAX_PROJECT_BYTES ) {
-			$issues[] = $this->issue( '', 0, 'project_too_large', __( 'The complete project exceeds the 256 KiB staging limit.', 'wp-autoplugin' ) );
+			$issues[] = $this->issue( '', 0, 'project_too_large', __( 'The staged revision exceeds the 256 KiB limit.', 'wp-autoplugin' ) );
 		}
 
 		return $issues;
 	}
 
-	/** @param array<string, mixed> $file @param array<string, mixed> $expected */
-	private function file_issues( array $file, array $expected, string $main_file ): array {
-		$path         = $this->path( (string) ( $file['path'] ?? '' ) );
-		$type         = sanitize_key( (string) ( $file['type'] ?? $expected['type'] ?? '' ) );
-		$change_type  = sanitize_key( (string) ( $file['change_type'] ?? $file['action'] ?? 'add' ) );
-		$content      = (string) ( $file['content'] ?? '' );
-		$extension    = strtolower( (string) pathinfo( $path, PATHINFO_EXTENSION ) );
-		$issues       = [];
+	/** @param array<string, mixed> $structured @param array<string, mixed> $context */
+	private function change_plan( array $structured, array $context, string $operation ) {
+		$project = $structured['project_structure'] ?? null;
+		$raw     = is_array( $project ) && is_array( $project['files'] ?? null ) ? $project['files'] : [];
+		$target  = is_array( $context['target_metadata'] ?? null ) ? $context['target_metadata'] : [];
+		$kind    = sanitize_key( (string) ( $context['target_kind'] ?? $target['kind'] ?? '' ) );
+		if ( ! in_array( $kind, [ 'plugin', 'theme' ], true ) ) {
+			return new \WP_Error( 'code_target_invalid', __( 'Code changes require an installed plugin or theme target.', 'wp-autoplugin' ) );
+		}
+		$files = [];
+		foreach ( $raw as $file ) {
+			$files[] = [
+				'path'        => is_array( $file ) ? $file['path'] ?? '' : '',
+				'type'        => is_array( $file ) ? $file['type'] ?? '' : '',
+				'description' => is_array( $file ) ? $file['description'] ?? '' : '',
+				'operation'   => is_array( $file ) ? $file['action'] ?? '' : '',
+			];
+		}
+		$target_ref = (string) ( $context['target_ref'] ?? $target['ref'] ?? '' );
+		return $this->manifest(
+			[
+				'scope'         => 'changes',
+				'artifact_kind' => $kind,
+				'operation'     => $operation,
+				'plugin_name'   => (string) ( $context['project_name'] ?? $target['name'] ?? '' ),
+				'main_file'     => 'plugin' === $kind ? basename( wp_normalize_path( $target_ref ) ) : '',
+				'target_ref'    => $target_ref,
+				'files'         => $files,
+			]
+		);
+	}
+
+	/** @param array<string, mixed> $manifest */
+	private function change_manifest( array $manifest ) {
+		$kind      = sanitize_key( (string) ( $manifest['artifact_kind'] ?? '' ) );
+		$operation = sanitize_key( (string) ( $manifest['operation'] ?? '' ) );
+		$raw_files = is_array( $manifest['files'] ?? null ) ? $manifest['files'] : [];
+		if ( ! in_array( $kind, [ 'plugin', 'theme' ], true ) || ! in_array( $operation, [ 'modify', 'fix' ], true ) || ! $raw_files || count( $raw_files ) > self::MAX_FILES ) {
+			return new \WP_Error( 'code_change_manifest_invalid', sprintf( __( 'The change manifest requires between 1 and %d valid plugin or theme file actions.', 'wp-autoplugin' ), self::MAX_FILES ) );
+		}
+
+		$files = [];
+		$seen  = [];
+		foreach ( $raw_files as $file ) {
+			$path        = is_array( $file ) ? $this->path( (string) ( $file['path'] ?? '' ) ) : '';
+			$type        = is_array( $file ) ? sanitize_key( (string) ( $file['type'] ?? '' ) ) : '';
+			$description = is_array( $file ) ? trim( (string) ( $file['description'] ?? '' ) ) : '';
+			$operation   = is_array( $file ) ? sanitize_key( (string) ( $file['operation'] ?? $file['action'] ?? '' ) ) : '';
+			$extension   = strtolower( (string) pathinfo( $path, PATHINFO_EXTENSION ) );
+			if ( '' === $path || isset( $seen[ $path ] ) || ! in_array( $type, self::SUPPORTED_TYPES, true ) || $extension !== $type || '' === $description || ! in_array( $operation, [ 'add', 'update', 'delete' ], true ) ) {
+				return new \WP_Error( 'code_change_manifest_invalid', __( 'The change manifest contains an unsafe, duplicate, unsupported, or undescribed file action.', 'wp-autoplugin' ) );
+			}
+			$seen[ $path ] = true;
+			$files[]       = compact( 'path', 'type', 'description', 'operation' );
+		}
+		usort( $files, static fn( array $left, array $right ): int => ( 'delete' === $left['operation'] ) <=> ( 'delete' === $right['operation'] ) );
+
+		$main_file = 'plugin' === $kind ? $this->path( (string) ( $manifest['main_file'] ?? '' ) ) : '';
+		if ( 'plugin' === $kind && ( '' === $main_file || str_contains( $main_file, '/' ) || 'php' !== strtolower( (string) pathinfo( $main_file, PATHINFO_EXTENSION ) ) ) ) {
+			return new \WP_Error( 'code_change_main_file_invalid', __( 'The target plugin main file could not be identified safely.', 'wp-autoplugin' ) );
+		}
+		foreach ( $files as $file ) {
+			if ( 'plugin' === $kind && $main_file === $file['path'] && 'delete' === $file['operation'] ) {
+				return new \WP_Error( 'code_change_main_file_delete', __( 'A staged change set cannot delete the target plugin main file.', 'wp-autoplugin' ) );
+			}
+		}
+
+		$result = [
+			'scope'         => 'changes',
+			'artifact_kind' => $kind,
+			'operation'     => sanitize_key( (string) ( $manifest['operation'] ?? '' ) ),
+			'plugin_name'   => trim( (string) ( $manifest['plugin_name'] ?? '' ) ),
+			'main_file'     => $main_file,
+			'target_ref'    => (string) ( $manifest['target_ref'] ?? '' ),
+			'files'         => $files,
+		];
+		$fingerprint = (string) ( $manifest['target_fingerprint'] ?? '' );
+		if ( preg_match( '/^[a-f0-9]{64}$/', $fingerprint ) ) {
+			$result['target_fingerprint'] = $fingerprint;
+		}
+		$base_hashes = [];
+		foreach ( (array) ( $manifest['base_hashes'] ?? [] ) as $path => $hash ) {
+			if ( isset( $seen[ $path ] ) && is_string( $hash ) && preg_match( '/^[a-f0-9]{64}$/', $hash ) ) {
+				$base_hashes[ $path ] = $hash;
+			}
+		}
+		if ( $base_hashes ) {
+			$result['base_hashes'] = $base_hashes;
+		}
+		return $result;
+	}
+
+	/** @param array<string, mixed> $file @param array<string, mixed> $expected @param array<string, mixed> $manifest */
+	private function file_issues( array $file, array $expected, array $manifest ): array {
+		$path        = $this->path( (string) ( $file['path'] ?? '' ) );
+		$type        = sanitize_key( (string) ( $file['type'] ?? $expected['type'] ?? '' ) );
+		$change_type = sanitize_key( (string) ( $file['change_type'] ?? $file['action'] ?? 'add' ) );
+		$operation   = sanitize_key( (string) ( $expected['operation'] ?? 'add' ) );
+		$content     = (string) ( $file['content'] ?? '' );
+		$extension   = strtolower( (string) pathinfo( $path, PATHINFO_EXTENSION ) );
+		$issues      = [];
 
 		if ( '' === $path || $path !== (string) $expected['path'] ) {
 			$issues[] = $this->issue( (string) ( $expected['path'] ?? $path ), 0, 'wrong_path', __( 'The file path does not match the Plan.', 'wp-autoplugin' ) );
@@ -198,8 +328,14 @@ final class Code_Validator {
 		if ( $type !== (string) $expected['type'] || $extension !== $type || ! in_array( $type, self::SUPPORTED_TYPES, true ) ) {
 			$issues[] = $this->issue( $path, 0, 'wrong_type', __( 'The file type does not match the planned extension.', 'wp-autoplugin' ) );
 		}
-		if ( 'add' !== $change_type ) {
-			$issues[] = $this->issue( $path, 0, 'wrong_action', __( 'New-plugin revisions may only contain add operations.', 'wp-autoplugin' ) );
+		if ( $operation !== $change_type ) {
+			$issues[] = $this->issue( $path, 0, 'wrong_action', __( 'The staged file action does not match the Plan.', 'wp-autoplugin' ) );
+		}
+		if ( 'delete' === $operation ) {
+			if ( '' !== $content ) {
+				$issues[] = $this->issue( $path, 0, 'delete_content', __( 'A deleted file must not contain replacement content.', 'wp-autoplugin' ) );
+			}
+			return $issues;
 		}
 		if ( '' === trim( $content ) ) {
 			$issues[] = $this->issue( $path, 0, 'empty_content', __( 'File content cannot be empty.', 'wp-autoplugin' ) );
@@ -223,13 +359,15 @@ final class Code_Validator {
 			} catch ( \ParseError $error ) {
 				$issues[] = $this->issue( $path, $error->getLine(), 'php_syntax', $error->getMessage() );
 			}
-			$headers = $this->plugin_headers( $content );
-			if ( $path === $main_file ) {
-				if ( 1 !== count( $headers ) || '' === trim( $headers[0] ?? '' ) ) {
-					$issues[] = $this->issue( $path, 0, 'plugin_header', __( 'The main file must contain exactly one Plugin Name header with a value.', 'wp-autoplugin' ) );
+			if ( 'plugin' === ( $manifest['artifact_kind'] ?? 'plugin' ) ) {
+				$headers = $this->plugin_headers( $content );
+				if ( $path === (string) ( $manifest['main_file'] ?? '' ) ) {
+					if ( 1 !== count( $headers ) || '' === trim( $headers[0] ?? '' ) ) {
+						$issues[] = $this->issue( $path, 0, 'plugin_header', __( 'The main file must contain exactly one Plugin Name header with a value.', 'wp-autoplugin' ) );
+					}
+				} elseif ( $headers ) {
+					$issues[] = $this->issue( $path, 0, 'supporting_plugin_header', __( 'Supporting PHP files must not contain a Plugin Name header.', 'wp-autoplugin' ) );
 				}
-			} elseif ( $headers ) {
-				$issues[] = $this->issue( $path, 0, 'supporting_plugin_header', __( 'Supporting PHP files must not contain a Plugin Name header.', 'wp-autoplugin' ) );
 			}
 		}
 
@@ -251,7 +389,7 @@ final class Code_Validator {
 	}
 
 	private function path( string $path ): string {
-		$path = str_replace( '\\', '/', trim( $path ) );
+		$path     = str_replace( '\\', '/', trim( $path ) );
 		$segments = explode( '/', $path );
 		if ( '' === $path || str_starts_with( $path, '/' ) || preg_match( '/^[A-Za-z]:/', $path ) || preg_match( '/[\x00-\x1F]/', $path ) || array_intersect( [ '', '.', '..' ], $segments ) ) {
 			return '';

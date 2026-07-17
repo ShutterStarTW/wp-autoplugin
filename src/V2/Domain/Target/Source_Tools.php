@@ -138,6 +138,94 @@ final class Source_Tools {
 	}
 
 	/**
+	 * Read and fingerprint only the target files named by an approved Code change set.
+	 *
+	 * Add paths must not exist; update and delete paths must exist, match their declared
+	 * type, and remain within the same bounded source limits as generated revisions.
+	 *
+	 * @param array<int, array<string, mixed>> $files Normalized change-manifest files.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function code_snapshot( array $files ) {
+		$tree       = $this->tree();
+		$by_path    = [];
+		$source     = [];
+		$hashes     = [];
+		$total      = 0;
+		$allowed    = [ 'php', 'js', 'css' ];
+		foreach ( $tree as $file ) {
+			$by_path[ $file['path'] ] = $file;
+		}
+
+		foreach ( $files as $file ) {
+			$relative  = $this->normalize_relative( (string) ( $file['path'] ?? '' ) );
+			$type      = sanitize_key( (string) ( $file['type'] ?? '' ) );
+			$operation = sanitize_key( (string) ( $file['operation'] ?? '' ) );
+			$existing  = $by_path[ $relative ] ?? null;
+			if ( ! in_array( $type, $allowed, true ) || ! in_array( $operation, [ 'add', 'update', 'delete' ], true ) ) {
+				return new \WP_Error( 'code_target_file_invalid', __( 'The approved Code change set contains an unsupported target file.', 'wp-autoplugin' ) );
+			}
+			if ( 'add' === $operation ) {
+				$availability = $this->add_path_availability( $relative );
+				if ( 'exists' === $availability ) {
+					return new \WP_Error( 'code_target_add_exists', sprintf( __( '%s now exists in the target. Regenerate the Plan before generating Code.', 'wp-autoplugin' ), $relative ) );
+				}
+				if ( 'available' !== $availability ) {
+					return new \WP_Error( 'code_target_add_path_invalid', sprintf( __( '%s cannot be added safely within the target. Regenerate the Plan before generating Code.', 'wp-autoplugin' ), $relative ) );
+				}
+				continue;
+			}
+			if ( ! $existing || $type !== (string) $existing['type'] ) {
+				return new \WP_Error( 'code_target_file_missing', sprintf( __( '%s is no longer a readable target file. Regenerate the Plan before generating Code.', 'wp-autoplugin' ), $relative ) );
+			}
+			if ( (int) $existing['size'] > 65536 || $total + (int) $existing['size'] > 262144 ) {
+				return new \WP_Error( 'code_target_context_large', __( 'The planned target files exceed the 64 KiB per-file or 256 KiB aggregate Code limit.', 'wp-autoplugin' ) );
+			}
+			$path    = $this->safe_file( $relative );
+			$content = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Read-only constrained source inspection.
+			if ( false === $content ) {
+				return new \WP_Error( 'code_target_file_unreadable', sprintf( __( '%s could not be read from the target.', 'wp-autoplugin' ), $relative ) );
+			}
+			$total             += strlen( $content );
+			$hashes[ $relative ] = hash( 'sha256', $content );
+			$source[]            = [ 'path' => $relative, 'type' => $type, 'operation' => $operation, 'content' => $content ];
+		}
+
+		return [
+			'target_fingerprint' => $this->fingerprint( $tree ),
+			'base_hashes'        => $hashes,
+			'source_files'       => $source,
+			'source_bytes'       => $total,
+		];
+	}
+
+	private function add_path_availability( string $relative ): string {
+		if ( is_file( $this->root ) ) {
+			return basename( $this->root ) === $relative ? 'exists' : 'invalid';
+		}
+
+		$current = $this->root;
+		$parts   = explode( '/', $relative );
+		foreach ( $parts as $index => $part ) {
+			$current .= '/' . $part;
+			if ( is_link( $current ) ) {
+				return 'invalid';
+			}
+			if ( ! file_exists( $current ) ) {
+				return 'available';
+			}
+			if ( $index === count( $parts ) - 1 ) {
+				return 'exists';
+			}
+			if ( ! is_dir( $current ) ) {
+				return 'invalid';
+			}
+		}
+
+		return 'invalid';
+	}
+
+	/**
 	 * @param array<string, mixed> $arguments Validated by the tool itself.
 	 * @return array{content:string,bytes:int,inspected:array<string,string>,path:string,audit:array<string,mixed>,error:bool}
 	 */

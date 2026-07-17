@@ -103,7 +103,7 @@ type CodeProgress = {
 	files: Array< {
 		path: string;
 		type: string;
-		operation: 'add' | 'update';
+		operation: 'add' | 'update' | 'delete';
 		status: 'pending' | 'generating' | 'completed' | 'failed';
 		error?: string;
 	} >;
@@ -139,9 +139,17 @@ type RevisionFileManifest = {
 type RevisionManifest = RevisionSummary & {
 	files: RevisionFileManifest[];
 	project_manifest: {
+		scope?: 'project' | 'changes';
+		artifact_kind?: 'plugin' | 'theme';
+		operation?: string;
 		plugin_name: string;
 		main_file: string;
-		files: Array< { path: string; type: string; description: string } >;
+		files: Array< {
+			path: string;
+			type: string;
+			description: string;
+			operation?: 'add' | 'update' | 'delete';
+		} >;
 	} | null;
 	plan_structure_matches: boolean;
 	validation: { status: string; issues: CodeIssue[] };
@@ -1759,12 +1767,22 @@ function CodeStage( {
 				( job ) => job.id === activeCodeJob.payload.plan_artifact_job_id
 		  ) ?? plan
 		: plan;
-	const planned = planFiles( displayedPlan );
-	const currentPlanFiles = planFiles( plan );
-	const selectedMainFile = planMainFile( plan, currentPlanFiles );
+	const normalizesProjectRoot = [ 'create', 'hook_extension' ].includes(
+		workspace.operation
+	);
+	const planned = planFiles( displayedPlan, normalizesProjectRoot );
+	const currentPlanFiles = planFiles( plan, normalizesProjectRoot );
+	const selectedMainFile = planMainFile(
+		plan,
+		currentPlanFiles,
+		normalizesProjectRoot
+	);
+	const requiresMainFile = normalizesProjectRoot;
 	const planValid =
 		!! plan &&
-		!! selectedMainFile &&
+		( ! requiresMainFile || !! selectedMainFile ) &&
+		( ! requiresMainFile ||
+			currentPlanFiles.every( ( file ) => file.action === 'add' ) ) &&
 		currentPlanFiles.length > 0 &&
 		currentPlanFiles.length <= 20;
 	const failedLatestCode =
@@ -2080,10 +2098,15 @@ function CodeStage( {
 		if ( regenerate ) {
 			// eslint-disable-next-line no-alert -- Regeneration starts explicit billable work.
 			confirmed = window.confirm(
-				__(
-					'Regenerate every file using the latest Plan? This starts new billable model requests and preserves the current revision in history.',
-					'wp-autoplugin'
-				)
+				requiresMainFile
+					? __(
+							'Regenerate every file using the latest Plan? This starts new billable model requests and preserves the current revision in history.',
+							'wp-autoplugin'
+					  )
+					: __(
+							'Regenerate every planned target change using the latest Plan? This starts new billable model requests and preserves the current revision in history.',
+							'wp-autoplugin'
+					  )
 			);
 		}
 		if ( ! confirmed ) {
@@ -2119,10 +2142,16 @@ function CodeStage( {
 			id: index,
 			path: file.path,
 			type: file.type as 'php' | 'js' | 'css',
-			change_type: 'add' as const,
+			change_type: file.action as 'add' | 'update' | 'delete',
 			content_hash: '',
 			size: 0,
 		} ) );
+	let regenerateLabel = failedLatestCode
+		? __( 'Generate again', 'wp-autoplugin' )
+		: __( 'Regenerate all code', 'wp-autoplugin' );
+	if ( ! failedLatestCode && ! requiresMainFile ) {
+		regenerateLabel = __( 'Regenerate planned changes', 'wp-autoplugin' );
+	}
 	let toolbarActions = null;
 	if ( editing ) {
 		toolbarActions = (
@@ -2165,9 +2194,7 @@ function CodeStage( {
 					}
 					onClick={ () => generate( true ) }
 				>
-					{ failedLatestCode
-						? __( 'Generate again', 'wp-autoplugin' )
-						: __( 'Regenerate all code', 'wp-autoplugin' ) }
+					{ regenerateLabel }
 				</Button>
 			</>
 		);
@@ -2188,7 +2215,20 @@ function CodeStage( {
 			<Spinner /> { __( 'Loading file…', 'wp-autoplugin' ) }
 		</div>
 	);
-	if ( selectedFile && 'changes' === mode ) {
+	if (
+		selectedFile &&
+		selectedManifestFile?.change_type === 'delete' &&
+		'code' === mode
+	) {
+		filePanel = (
+			<Notice status="info" isDismissible={ false }>
+				{ __(
+					'This staged action deletes the target file. Open Changes to review the removed source.',
+					'wp-autoplugin'
+				) }
+			</Notice>
+		);
+	} else if ( selectedFile && 'changes' === mode ) {
 		filePanel = <DiffView html={ selectedFile.diff_html } />;
 	} else if ( selectedFile ) {
 		filePanel = (
@@ -2237,10 +2277,15 @@ function CodeStage( {
 			) }
 			{ manifest && ! manifest.plan_structure_matches && (
 				<Notice status="warning" isDismissible={ false }>
-					{ __(
-						'This revision’s file structure differs from its Plan. Regenerate all code to return to the latest Plan structure.',
-						'wp-autoplugin'
-					) }
+					{ requiresMainFile
+						? __(
+								'This revision’s file structure differs from its Plan. Regenerate all code to return to the latest Plan structure.',
+								'wp-autoplugin'
+						  )
+						: __(
+								'This revision’s change set differs from its Plan. Regenerate the planned changes to return to the latest Plan structure.',
+								'wp-autoplugin'
+						  ) }
 				</Notice>
 			) }
 			{ manifest && failedLatestCode && (
@@ -2320,11 +2365,13 @@ function CodeStage( {
 				<section className="code-stage__editor">
 					{ ! manifest ? (
 						<CodeGenerationPanel
+							workspace={ workspace }
 							plan={ displayedPlan }
 							planned={ planned }
 							job={ activeCodeJob ?? latestCodeJob }
 							capability={ capability }
 							planValid={ planValid }
+							requiresMainFile={ requiresMainFile }
 							disabled={
 								actionBusy ||
 								structureActive ||
@@ -2432,20 +2479,23 @@ function CodeStage( {
 					</Button>
 				</div>
 			) }
-			{ manifest && latestRevisionId && (
-				<CodeConversation
-					jobs={ conversationJobs }
-					revisions={ revisions }
-					latestRevisionId={ latestRevisionId }
-					selectedRevisionId={ selectedRevisionId }
-					editing={ editing }
-					dirty={ dirtyPaths.size > 0 }
-					capability={ capability }
-					activeCodeWork={ activeCodeWork }
-					onCancel={ onCancel }
-					onFollowUp={ onFollowUp }
-				/>
-			) }
+			{ manifest &&
+				latestRevisionId &&
+				workspace.target_kind === 'new_plugin' &&
+				workspace.operation === 'create' && (
+					<CodeConversation
+						jobs={ conversationJobs }
+						revisions={ revisions }
+						latestRevisionId={ latestRevisionId }
+						selectedRevisionId={ selectedRevisionId }
+						editing={ editing }
+						dirty={ dirtyPaths.size > 0 }
+						capability={ capability }
+						activeCodeWork={ activeCodeWork }
+						onCancel={ onCancel }
+						onFollowUp={ onFollowUp }
+					/>
+				) }
 		</div>
 	);
 }
@@ -2779,15 +2829,18 @@ function CodeChangePaths( {
 }
 
 function CodeGenerationPanel( {
+	workspace,
 	plan,
 	planned,
 	job,
 	capability,
 	planValid,
+	requiresMainFile,
 	disabled,
 	onGenerate,
 	onCancel,
 }: {
+	workspace: Workspace;
 	plan: Job | null;
 	planned: Array< {
 		path: string;
@@ -2798,6 +2851,7 @@ function CodeGenerationPanel( {
 	job: Job | null;
 	capability: AgentCapability | null;
 	planValid: boolean;
+	requiresMainFile: boolean;
 	disabled: boolean;
 	onGenerate: () => void;
 	onCancel: ( job: Job ) => void;
@@ -2811,7 +2865,7 @@ function CodeGenerationPanel( {
 				<p className="eyebrow">
 					{ __( 'Ready to generate', 'wp-autoplugin' ) }
 				</p>
-				<h3>{ planPluginName( plan ) }</h3>
+				<h3>{ planPluginName( plan, workspace.project_name ) }</h3>
 				<p>
 					{ plan
 						? sprintf(
@@ -2846,10 +2900,15 @@ function CodeGenerationPanel( {
 			) }
 			{ plan && ! planValid && (
 				<Notice status="warning" isDismissible={ false }>
-					{ __(
-						'This Plan needs a valid main_file and 1–20 PHP, JavaScript, or CSS files. Regenerate the Plan structure before generating Code.',
-						'wp-autoplugin'
-					) }
+					{ requiresMainFile
+						? __(
+								'This Plan needs a valid main plugin file and 1–20 added PHP, JavaScript, or CSS files. Regenerate the Plan structure before generating Code.',
+								'wp-autoplugin'
+						  )
+						: __(
+								'This Plan needs 1–20 valid Add, Update, or Delete actions for PHP, JavaScript, or CSS files. Regenerate the Plan structure before generating Code.',
+								'wp-autoplugin'
+						  ) }
 				</Notice>
 			) }
 			{ job && [ 'failed', 'cancelled' ].includes( job.status ) && (
@@ -3308,17 +3367,22 @@ function ProblemsPanel( {
 	);
 }
 
-function planFiles( plan: Job | null ): Array< {
+type PlannedFile = {
 	path: string;
 	type: string;
 	action: string;
 	description: string;
-} > {
+};
+
+function planFiles(
+	plan: Job | null,
+	normalizeProjectRoot = false
+): PlannedFile[] {
 	const structure = plan ? planArtifactStructure( plan ) : null;
 	const project = structure?.project_structure as
 		| Record< string, unknown >
 		| undefined;
-	return Array.isArray( project?.files )
+	const files = Array.isArray( project?.files )
 		? project.files
 				.filter(
 					( file ): file is Record< string, unknown > =>
@@ -3334,38 +3398,105 @@ function planFiles( plan: Job | null ): Array< {
 					( file ) =>
 						!! file.path &&
 						[ 'php', 'js', 'css' ].includes( file.type ) &&
-						'add' === file.action
+						[ 'add', 'update', 'delete' ].includes( file.action )
 				)
 		: [];
+	if ( ! normalizeProjectRoot || ! files.length ) {
+		return files;
+	}
+
+	const parts = files.map( ( file ) => file.path.split( '/' ) );
+	const prefix = parts[ 0 ][ 0 ];
+	if (
+		! prefix ||
+		parts.some(
+			( pathParts ) => pathParts.length < 2 || pathParts[ 0 ] !== prefix
+		)
+	) {
+		return files;
+	}
+	const unwrapped = files.map( ( file, index ) => ( {
+		...file,
+		path: parts[ index ].slice( 1 ).join( '/' ),
+	} ) );
+	const explicitMain =
+		'string' === typeof structure?.main_file ? structure.main_file : '';
+	const normalizedMain = explicitMain.startsWith( `${ prefix }/` )
+		? explicitMain.slice( prefix.length + 1 )
+		: explicitMain;
+	const rootPhp = unwrapped.filter(
+		( file ) => 'php' === file.type && ! file.path.includes( '/' )
+	);
+	const inferredMain = rootPhp.find(
+		( file ) => file.path === `${ prefix }.php`
+	)?.path;
+	const mainValid = normalizedMain
+		? unwrapped.some(
+				( file ) =>
+					file.path === normalizedMain &&
+					'php' === file.type &&
+					! file.path.includes( '/' )
+		  )
+		: 1 === rootPhp.length || !! inferredMain;
+	return mainValid ? unwrapped : files;
 }
 
 function planMainFile(
 	plan: Job | null,
-	files: ReturnType< typeof planFiles >
+	files: PlannedFile[],
+	normalizeProjectRoot = false
 ): string {
 	const structure = plan ? planArtifactStructure( plan ) : null;
-	if (
-		'string' === typeof structure?.main_file &&
-		files.some(
-			( file ) =>
-				file.path === structure.main_file &&
-				'php' === file.type &&
-				! file.path.includes( '/' )
-		)
-	) {
-		return structure.main_file;
+	const explicitMain =
+		'string' === typeof structure?.main_file ? structure.main_file : '';
+	const candidates = [ explicitMain ];
+	if ( normalizeProjectRoot && explicitMain.includes( '/' ) ) {
+		candidates.push( explicitMain.split( '/' ).slice( 1 ).join( '/' ) );
+	}
+	const selected = candidates.find(
+		( candidate ) =>
+			!! candidate &&
+			files.some(
+				( file ) =>
+					file.path === candidate &&
+					'php' === file.type &&
+					! file.path.includes( '/' )
+			)
+	);
+	if ( selected ) {
+		return selected;
 	}
 	const rootPhp = files.filter(
 		( file ) => 'php' === file.type && ! file.path.includes( '/' )
 	);
-	return 1 === rootPhp.length ? rootPhp[ 0 ].path : '';
+	if ( 1 === rootPhp.length ) {
+		return rootPhp[ 0 ].path;
+	}
+	const project = structure?.project_structure as
+		| Record< string, unknown >
+		| undefined;
+	const firstRawPath =
+		Array.isArray( project?.files ) &&
+		project.files[ 0 ] &&
+		'object' === typeof project.files[ 0 ] &&
+		'string' ===
+			typeof ( project.files[ 0 ] as Record< string, unknown > ).path
+			? String( ( project.files[ 0 ] as Record< string, unknown > ).path )
+			: '';
+	const prefix = firstRawPath.includes( '/' )
+		? firstRawPath.split( '/' )[ 0 ]
+		: '';
+	const inferred = rootPhp.find(
+		( file ) => !! prefix && file.path === `${ prefix }.php`
+	);
+	return inferred?.path ?? '';
 }
 
-function planPluginName( plan: Job | null ): string {
+function planPluginName( plan: Job | null, fallback = '' ): string {
 	const structure = plan ? planArtifactStructure( plan ) : null;
 	return 'string' === typeof structure?.plugin_name
 		? structure.plugin_name
-		: __( 'New plugin', 'wp-autoplugin' );
+		: fallback || __( 'Staged changes', 'wp-autoplugin' );
 }
 
 function revisionOrigin( origin: RevisionSummary[ 'origin' ] ): string {

@@ -170,7 +170,40 @@ final class PlanResponseTest extends WP_UnitTestCase {
 		$this->assertFalse( is_wp_error( $result ) );
 		$this->assertTrue( $result['structured']['technically_feasible'] );
 		$this->assertSame( 'Fixture Companion', $result['structured']['plugin_name'] );
+		$this->assertSame( 'fixture-companion.php', $result['structured']['main_file'] );
 		$this->assertSame( 'add', $result['structured']['project_structure']['files'][0]['action'] );
+	}
+
+	public function test_unwraps_redundant_extension_plugin_root_and_identifies_main_file(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => '# Wrapped extension Plan',
+				'structured' => [
+					'technically_feasible' => true,
+					'plugin_name'           => 'Fixture Companion',
+					'hooks'                 => [ 'init' ],
+					'project_structure'     => [
+						'directories' => [ 'fixture-companion', 'fixture-companion/includes' ],
+						'files'       => [
+							[ 'path' => 'fixture-companion/fixture-companion.php', 'type' => 'php', 'description' => 'Bootstrap the extension.', 'action' => 'add' ],
+							[ 'path' => 'fixture-companion/uninstall.php', 'type' => 'php', 'description' => 'Clean up data.', 'action' => 'add' ],
+							[ 'path' => 'fixture-companion/includes/class-feature.php', 'type' => 'php', 'description' => 'Implement the feature.', 'action' => 'add' ],
+						],
+					],
+				],
+			]
+		);
+
+		$result = ( new Plan_Response() )->parse( (string) $response, false, 0, 'hook_extension' );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( 'fixture-companion.php', $result['structured']['main_file'] );
+		$this->assertSame( [ 'includes/' ], $result['structured']['project_structure']['directories'] );
+		$this->assertSame(
+			[ 'fixture-companion.php', 'uninstall.php', 'includes/class-feature.php' ],
+			array_column( $result['structured']['project_structure']['files'], 'path' )
+		);
 	}
 
 	public function test_parses_infeasible_hook_extension_with_empty_file_map(): void {

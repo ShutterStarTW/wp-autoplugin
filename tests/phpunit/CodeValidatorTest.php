@@ -116,4 +116,117 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$this->assertWPError( $duplicate );
 		$this->assertWPError( $nested_main );
 	}
+
+	public function test_existing_theme_plan_preserves_add_update_and_delete_actions(): void {
+		$plan = $this->validator->plan(
+			[
+				'project_structure' => [
+					'files' => [
+						[ 'path' => 'functions.php', 'type' => 'php', 'action' => 'update', 'description' => 'Update behavior.' ],
+						[ 'path' => 'assets/new.css', 'type' => 'css', 'action' => 'add', 'description' => 'Add styles.' ],
+						[ 'path' => 'assets/old.js', 'type' => 'js', 'action' => 'delete', 'description' => 'Remove obsolete script.' ],
+					],
+				],
+			],
+			[
+				'operation'       => 'modify',
+				'target_kind'     => 'theme',
+				'target_ref'      => 'fixture-theme',
+				'project_name'    => 'Fixture Theme',
+				'target_metadata' => [ 'kind' => 'theme', 'ref' => 'fixture-theme', 'name' => 'Fixture Theme' ],
+			]
+		);
+
+		$this->assertFalse( is_wp_error( $plan ) );
+		$this->assertSame( 'changes', $plan['scope'] );
+		$this->assertSame( 'theme', $plan['artifact_kind'] );
+		$this->assertSame( [ 'update', 'add', 'delete' ], array_column( $plan['files'], 'operation' ) );
+		$this->assertSame( '', $plan['main_file'] );
+	}
+
+	public function test_change_set_validates_update_and_delete_without_plugin_headers_for_theme(): void {
+		$manifest = [
+			'scope'         => 'changes',
+			'artifact_kind' => 'theme',
+			'operation'     => 'fix',
+			'main_file'     => '',
+			'files'         => [
+				[ 'path' => 'functions.php', 'type' => 'php', 'description' => 'Fix behavior.', 'operation' => 'update' ],
+				[ 'path' => 'assets/old.css', 'type' => 'css', 'description' => 'Remove styles.', 'operation' => 'delete' ],
+			],
+		];
+		$issues = $this->validator->project_issues(
+			[
+				[ 'path' => 'functions.php', 'type' => 'php', 'change_type' => 'update', 'content' => "<?php\n/* Plugin Name: text in a theme is not treated as a plugin entry point */" ],
+				[ 'path' => 'assets/old.css', 'type' => 'css', 'change_type' => 'delete', 'content' => '' ],
+			],
+			$manifest
+		);
+
+		$this->assertSame( [], $issues );
+	}
+
+	public function test_hook_extension_plan_infers_main_plugin_file(): void {
+		$plan = $this->validator->plan(
+			[
+				'technically_feasible' => true,
+				'plugin_name'           => 'Fixture Companion',
+				'project_structure'     => [
+					'files' => [
+						[ 'path' => 'fixture-companion.php', 'type' => 'php', 'action' => 'add', 'description' => 'Bootstrap.' ],
+					],
+				],
+			],
+			[ 'operation' => 'hook_extension', 'target_kind' => 'plugin' ]
+		);
+
+		$this->assertFalse( is_wp_error( $plan ) );
+		$this->assertSame( 'fixture-companion.php', $plan['main_file'] );
+		$this->assertSame( 'hook_extension', $plan['operation'] );
+	}
+
+	public function test_hook_extension_plan_unwraps_redundant_plugin_root(): void {
+		$plan = $this->validator->plan(
+			[
+				'technically_feasible' => true,
+				'plugin_name'           => 'Fixture Companion',
+				'project_structure'     => [
+					'files' => [
+						[ 'path' => 'fixture-companion/fixture-companion.php', 'type' => 'php', 'action' => 'add', 'description' => 'Bootstrap.' ],
+						[ 'path' => 'fixture-companion/uninstall.php', 'type' => 'php', 'action' => 'add', 'description' => 'Cleanup.' ],
+						[ 'path' => 'fixture-companion/includes/class-feature.php', 'type' => 'php', 'action' => 'add', 'description' => 'Feature.' ],
+					],
+				],
+			],
+			[ 'operation' => 'hook_extension', 'target_kind' => 'plugin' ]
+		);
+
+		$this->assertFalse( is_wp_error( $plan ) );
+		$this->assertSame( 'fixture-companion.php', $plan['main_file'] );
+		$this->assertSame(
+			[ 'uninstall.php', 'includes/class-feature.php', 'fixture-companion.php' ],
+			array_column( $plan['files'], 'path' )
+		);
+	}
+
+	public function test_existing_plugin_plan_cannot_delete_main_file(): void {
+		$plan = $this->validator->plan(
+			[
+				'project_structure' => [
+					'files' => [
+						[ 'path' => 'fixture.php', 'type' => 'php', 'action' => 'delete', 'description' => 'Remove entry point.' ],
+					],
+				],
+			],
+			[
+				'operation'       => 'modify',
+				'target_kind'     => 'plugin',
+				'target_ref'      => 'fixture/fixture.php',
+				'target_metadata' => [ 'kind' => 'plugin', 'ref' => 'fixture/fixture.php', 'name' => 'Fixture' ],
+			]
+		);
+
+		$this->assertWPError( $plan );
+		$this->assertSame( 'code_change_main_file_delete', $plan->get_error_code() );
+	}
 }

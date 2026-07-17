@@ -98,4 +98,31 @@ final class SourceToolsTest extends WP_UnitTestCase {
 			$this->assertSame( [], $result['inspected'] );
 		}
 	}
+
+	public function test_code_snapshot_reads_existing_actions_and_rejects_add_collisions(): void {
+		$snapshot = $this->tools->code_snapshot(
+			[
+				[ 'path' => 'plugin.php', 'type' => 'php', 'operation' => 'update' ],
+				[ 'path' => 'includes/class-fixture.php', 'type' => 'php', 'operation' => 'delete' ],
+				[ 'path' => 'assets/new.css', 'type' => 'css', 'operation' => 'add' ],
+			]
+		);
+
+		$this->assertFalse( is_wp_error( $snapshot ) );
+		$this->assertCount( 2, $snapshot['source_files'] );
+		$this->assertArrayHasKey( 'plugin.php', $snapshot['base_hashes'] );
+		$this->assertArrayNotHasKey( 'assets/new.css', $snapshot['base_hashes'] );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $snapshot['target_fingerprint'] );
+
+		$collision = $this->tools->code_snapshot( [ [ 'path' => 'plugin.php', 'type' => 'php', 'operation' => 'add' ] ] );
+		$this->assertWPError( $collision );
+		$this->assertSame( 'code_target_add_exists', $collision->get_error_code() );
+
+		$large_path = $this->root . '/oversized.css';
+		file_put_contents( $large_path, str_repeat( 'a', 65537 ) );
+		$large_collision = $this->tools->code_snapshot( [ [ 'path' => 'oversized.css', 'type' => 'css', 'operation' => 'add' ] ] );
+		unlink( $large_path );
+		$this->assertWPError( $large_collision );
+		$this->assertSame( 'code_target_add_exists', $large_collision->get_error_code() );
+	}
 }

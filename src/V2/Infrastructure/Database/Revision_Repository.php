@@ -21,15 +21,25 @@ final class Revision_Repository extends Repository {
 	}
 
 	/** Atomically stage a completed Code run and scrub its temporary source. */
-	public function stage_code_run( array $run, array $manifest, int $workspace_id, int $user_id, ?int $expected_latest_revision_id ) {
+	public function stage_code_run( array $run, array $manifest, int $workspace_id, int $user_id, ?int $expected_latest_revision_id, array $source_files = [] ) {
 		$run_files = ( new Code_Run_Repository( $this->wpdb ) )->files( (int) $run['id'] );
-		$files     = array_map(
-			static fn( array $file ): array => [
-				'path'        => $file['path'],
-				'type'        => $file['type'],
-				'change_type' => 'add',
-				'content'     => (string) $file['content'],
-			],
+		$source     = [];
+		foreach ( $source_files as $file ) {
+			$source[ (string) ( $file['path'] ?? '' ) ] = (string) ( $file['content'] ?? '' );
+		}
+		$files = array_map(
+			static function ( array $file ) use ( $source ): array {
+				$operation = (string) ( $file['operation'] ?? 'add' );
+				$base      = in_array( $operation, [ 'update', 'delete' ], true ) ? (string) ( $source[ $file['path'] ] ?? '' ) : null;
+				return [
+					'path'              => $file['path'],
+					'type'              => $file['type'],
+					'change_type'       => $operation,
+					'content'           => 'delete' === $operation ? '' : (string) $file['content'],
+					'base_content'      => $base,
+					'base_content_hash' => null === $base ? null : hash( 'sha256', $base ),
+				];
+			},
 			$run_files
 		);
 		$issues = ( new Code_Validator() )->project_issues( $files, $manifest );
@@ -44,10 +54,13 @@ final class Revision_Repository extends Repository {
 				$this->wpdb->query( 'ROLLBACK' );
 				return $this->conflict();
 			}
+			$summary = 'changes' === ( $manifest['scope'] ?? '' )
+				? __( 'AI-generated target changes.', 'wp-autoplugin' )
+				: ( 'hook_extension' === ( $manifest['operation'] ?? '' ) ? __( 'AI-generated extension plugin code.', 'wp-autoplugin' ) : __( 'AI-generated plugin code.', 'wp-autoplugin' ) );
 			$revision = $this->insert_complete(
 				$workspace_id,
 				$files,
-				__( 'AI-generated plugin code.', 'wp-autoplugin' ),
+				$summary,
 				$user_id,
 				[
 					'origin'             => 'ai',
@@ -205,14 +218,14 @@ final class Revision_Repository extends Repository {
 			return null;
 		}
 		$file = $this->wpdb->get_row(
-			$this->wpdb->prepare( 'SELECT id, revision_id, path, change_type, content, content_hash FROM ' . Installer::table( 'revision_files' ) . ' WHERE id = %d AND revision_id = %d', $file_id, $revision_id ),
+			$this->wpdb->prepare( 'SELECT id, revision_id, path, change_type, content, content_hash, base_content FROM ' . Installer::table( 'revision_files' ) . ' WHERE id = %d AND revision_id = %d', $file_id, $revision_id ),
 			ARRAY_A
 		);
 		if ( ! $file ) {
 			return null;
 		}
-		$before = '';
-		if ( $revision['parent_revision_id'] ) {
+		$before = 'changes' === ( $revision['project_manifest']['scope'] ?? '' ) ? (string) $file['base_content'] : '';
+		if ( 'changes' !== ( $revision['project_manifest']['scope'] ?? '' ) && $revision['parent_revision_id'] ) {
 			$before = (string) $this->wpdb->get_var(
 				$this->wpdb->prepare( 'SELECT content FROM ' . Installer::table( 'revision_files' ) . ' WHERE revision_id = %d AND path = %s', $revision['parent_revision_id'], $file['path'] )
 			);
@@ -221,6 +234,7 @@ final class Revision_Repository extends Repository {
 		$file['revision_id'] = (int) $file['revision_id'];
 		$file['size']        = strlen( (string) $file['content'] );
 		$file['diff_html']   = $this->diff_html( $before, (string) $file['content'] );
+		unset( $file['base_content'] );
 		return $file;
 	}
 
@@ -250,7 +264,14 @@ final class Revision_Repository extends Repository {
 		foreach ( $base['files'] as $file ) {
 			$content = array_key_exists( $file['path'], $changed ) ? $changed[ $file['path'] ] : (string) $file['content'];
 			unset( $changed[ $file['path'] ] );
-			$files[] = [ 'path' => $file['path'], 'type' => strtolower( (string) pathinfo( $file['path'], PATHINFO_EXTENSION ) ), 'change_type' => 'add', 'content' => $content ];
+			$files[] = [
+				'path'              => $file['path'],
+				'type'              => strtolower( (string) pathinfo( $file['path'], PATHINFO_EXTENSION ) ),
+				'change_type'       => $file['change_type'],
+				'content'           => $content,
+				'base_content'      => $file['base_content'] ?? null,
+				'base_content_hash' => $file['base_content_hash'] ?? null,
+			];
 		}
 		if ( $changed ) {
 			return new \WP_Error( 'revision_topology_change', __( 'This Code slice does not allow files to be added, removed, renamed, or moved.', 'wp-autoplugin' ), [ 'status' => 422 ] );
@@ -287,7 +308,8 @@ final class Revision_Repository extends Repository {
 		}
 		$files = array_map(
 			static fn( array $file ): array => [
-				'path' => $file['path'], 'type' => strtolower( (string) pathinfo( $file['path'], PATHINFO_EXTENSION ) ), 'change_type' => 'add', 'content' => (string) $file['content'],
+				'path' => $file['path'], 'type' => strtolower( (string) pathinfo( $file['path'], PATHINFO_EXTENSION ) ), 'change_type' => $file['change_type'], 'content' => (string) $file['content'],
+				'base_content' => $file['base_content'] ?? null, 'base_content_hash' => $file['base_content_hash'] ?? null,
 			],
 			$selected['files']
 		);
@@ -381,12 +403,14 @@ final class Revision_Repository extends Repository {
 			$inserted = $this->wpdb->insert(
 				Installer::table( 'revision_files' ),
 				[
-					'revision_id' => $revision_id,
-					'path'        => $file['path'],
-					'change_type' => $file['change_type'],
-					'content'     => $file['content'],
-					'patch'       => null,
-					'content_hash'=> hash( 'sha256', $file['content'] ),
+					'revision_id'      => $revision_id,
+					'path'             => $file['path'],
+					'change_type'      => $file['change_type'],
+					'content'          => $file['content'],
+					'patch'            => null,
+					'content_hash'     => hash( 'sha256', $file['content'] ),
+					'base_content'     => $file['base_content'],
+					'base_content_hash' => $file['base_content_hash'],
 				]
 			);
 			if ( false === $inserted ) {
@@ -410,7 +434,7 @@ final class Revision_Repository extends Repository {
 	/** @return array<int, array<string, mixed>> */
 	private function files_with_content( int $revision_id ): array {
 		$rows = $this->wpdb->get_results(
-			$this->wpdb->prepare( 'SELECT id, revision_id, path, change_type, content, content_hash FROM ' . Installer::table( 'revision_files' ) . ' WHERE revision_id = %d ORDER BY id ASC', $revision_id ),
+			$this->wpdb->prepare( 'SELECT id, revision_id, path, change_type, content, content_hash, base_content, base_content_hash FROM ' . Installer::table( 'revision_files' ) . ' WHERE revision_id = %d ORDER BY id ASC', $revision_id ),
 			ARRAY_A
 		);
 		return array_map(
@@ -426,7 +450,8 @@ final class Revision_Repository extends Repository {
 		if ( ! $plan || !( new Job_Repository( $this->wpdb ) )->is_plan_artifact( $plan ) ) {
 			return new \WP_Error( 'revision_plan_missing', __( 'The revision Plan artifact is unavailable.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
-		$manifest = ( new Code_Validator() )->plan( (array) ( $plan['result']['structured'] ?? [] ) );
+		$workspace = ( new Workspace_Repository( $this->wpdb ) )->find( (int) $plan['workspace_id'] );
+		$manifest  = ( new Code_Validator() )->plan( (array) ( $plan['result']['structured'] ?? [] ), $workspace ?: [] );
 		if ( is_wp_error( $manifest ) ) {
 			$manifest->add_data( [ 'status' => 409 ] );
 		}
@@ -452,11 +477,20 @@ final class Revision_Repository extends Repository {
 	private function same_structure( array $left, array $right ): bool {
 		$shape = static function ( array $manifest ): array {
 			$files = array_map(
-				static fn( array $file ): array => [ 'path' => (string) $file['path'], 'type' => (string) $file['type'] ],
+				static fn( array $file ): array => [
+					'path'      => (string) $file['path'],
+					'type'      => (string) $file['type'],
+					'operation' => (string) ( $file['operation'] ?? 'add' ),
+				],
 				(array) ( $manifest['files'] ?? [] )
 			);
 			usort( $files, static fn( array $a, array $b ): int => strcmp( $a['path'], $b['path'] ) );
-			return [ 'main_file' => (string) ( $manifest['main_file'] ?? '' ), 'files' => $files ];
+			return [
+				'scope'         => (string) ( $manifest['scope'] ?? 'project' ),
+				'artifact_kind' => (string) ( $manifest['artifact_kind'] ?? 'plugin' ),
+				'main_file'     => (string) ( $manifest['main_file'] ?? '' ),
+				'files'         => $files,
+			];
 		};
 		return $shape( $left ) === $shape( $right );
 	}
@@ -472,7 +506,18 @@ final class Revision_Repository extends Repository {
 		if ( ! in_array( $change_type, [ 'add', 'update', 'delete' ], true ) ) {
 			throw new \InvalidArgumentException( __( 'Unsupported revision change type.', 'wp-autoplugin' ) );
 		}
-		return [ 'path' => $path, 'change_type' => $change_type, 'content' => (string) ( $file['content'] ?? '' ) ];
+		$base_content = array_key_exists( 'base_content', $file ) && null !== $file['base_content'] ? (string) $file['base_content'] : null;
+		$base_hash    = null === $base_content ? null : hash( 'sha256', $base_content );
+		if ( is_string( $file['base_content_hash'] ?? null ) && preg_match( '/^[a-f0-9]{64}$/', $file['base_content_hash'] ) ) {
+			$base_hash = $file['base_content_hash'];
+		}
+		return [
+			'path'              => $path,
+			'change_type'       => $change_type,
+			'content'           => (string) ( $file['content'] ?? '' ),
+			'base_content'      => $base_content,
+			'base_content_hash' => $base_hash,
+		];
 	}
 
 	/** @param array<string, mixed> $row */

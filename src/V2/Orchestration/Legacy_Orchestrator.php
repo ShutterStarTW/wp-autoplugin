@@ -201,9 +201,9 @@ $source_context
 """
 
 Return only a valid JSON object in this exact shape:
-{"technically_feasible":true,"plugin_name":"Name of the new extension plugin","hooks":["verified_target_hook_or_wordpress_core_hook"],"project_structure":{"directories":["relative/directory/"],"files":[{"path":"extension-plugin.php","type":"php","description":"brief purpose","action":"add"}]}}
+{"technically_feasible":true,"plugin_name":"Name of the new extension plugin","main_file":"extension-plugin.php","hooks":["verified_target_hook_or_wordpress_core_hook"],"project_structure":{"directories":["relative/directory/"],"files":[{"path":"extension-plugin.php","type":"php","description":"brief purpose","action":"add"}]}}
 
-If the edited Plan is feasible without changing the target, use technically_feasible true, list every target or WordPress core hook needed, and include a minimal non-empty file map containing only add actions. Paths are relative to the new extension plugin root. If it is infeasible, use technically_feasible false and return empty hooks, directories, and files. `type` must be `php`, `js`, or `css`. Do not include code or Markdown.
+If the edited Plan is feasible without changing the target, use technically_feasible true, list every target or WordPress core hook needed, include a root-level PHP main_file naming an exact file in the map, and include a minimal non-empty file map containing only add actions. The extension plugin root is implicit: paths must start directly at that root and must not include a plugin slug or wrapping root directory. If it is infeasible, use technically_feasible false, use an empty main_file, and return empty hooks, directories, and files. `type` must be `php`, `js`, or `css`. Do not include code or Markdown.
 PROMPT;
 		} else {
 			$prompt = <<<PROMPT

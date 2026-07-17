@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
  * Creates and upgrades v2 operational tables.
  */
 final class Installer {
-	public const SCHEMA_VERSION = '8';
+	public const SCHEMA_VERSION = '9';
 	private const OPTION_NAME   = 'wp_autoplugin_v2_schema_version';
 
 	/**
@@ -141,6 +141,8 @@ final class Installer {
 			content longtext NULL,
 			patch longtext NULL,
 			content_hash char(64) NULL,
+			base_content longtext NULL,
+			base_content_hash char(64) NULL,
 			PRIMARY KEY  (id),
 			UNIQUE KEY revision_path (revision_id,path(191))
 		) $charset;";
@@ -348,6 +350,18 @@ final class Installer {
 			array_keys( $revision_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $revisions, $column )
 		);
+		$revision_files = self::table( 'revision_files' );
+		$revision_file_columns = [
+			'base_content'      => "ALTER TABLE $revision_files ADD base_content longtext NULL AFTER content_hash",
+			'base_content_hash' => "ALTER TABLE $revision_files ADD base_content_hash char(64) NULL AFTER base_content",
+		];
+		foreach ( $revision_file_columns as $column => $alter ) {
+			maybe_add_column( $revision_files, $column, $alter );
+		}
+		$revision_file_ready = ! array_filter(
+			array_keys( $revision_file_columns ),
+			static fn( string $column ): bool => ! self::column_exists( $revision_files, $column )
+		);
 		$code_runs = self::table( 'code_runs' );
 		maybe_add_column(
 			$code_runs,
@@ -383,7 +397,7 @@ final class Installer {
 			array_keys( $code_run_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $code_runs, $column )
 		);
-		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) ) {
+		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && $revision_file_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) ) {
 			update_option( self::OPTION_NAME, self::SCHEMA_VERSION, false );
 		}
 	}

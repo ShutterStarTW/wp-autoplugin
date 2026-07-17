@@ -2,6 +2,8 @@
 
 namespace WP_Autoplugin\V2\Domain\AI;
 
+use WP_Autoplugin\V2\Domain\Revision\Project_Root_Normalizer;
+
 /** Validates a native Plan agent's terminal response. */
 final class Plan_Response {
 	/**
@@ -23,16 +25,28 @@ final class Plan_Response {
 		if ( is_wp_error( $structure ) ) {
 			return $structure;
 		}
+		$raw_structured = is_array( $decoded['structured'] ?? null ) ? $decoded['structured'] : [];
+		if ( in_array( $operation, [ 'create', 'hook_extension' ], true ) ) {
+			$has_explicit_main = is_string( $raw_structured['main_file'] ?? null ) && '' !== trim( $raw_structured['main_file'] );
+			$root      = ( new Project_Root_Normalizer() )->normalize(
+				$structure,
+				$has_explicit_main ? $raw_structured['main_file'] : ''
+			);
+			$structure = $root['structure'];
+			if ( 'hook_extension' === $operation || $has_explicit_main ) {
+				$raw_structured['main_file'] = $root['main_file'];
+			}
+		}
 
 		$structured = [ 'project_structure' => $structure ];
 		if ( 'create' === $operation ) {
-			$creation = $this->creation( $decoded['structured'] ?? null, $structure );
+			$creation = $this->creation( $raw_structured, $structure );
 			if ( is_wp_error( $creation ) ) {
 				return $creation;
 			}
 			$structured = array_merge( $creation, $structured );
 		} elseif ( 'hook_extension' === $operation ) {
-			$extension = $this->extension( $decoded['structured'] ?? null, $structure );
+			$extension = $this->extension( $raw_structured, $structure );
 			if ( is_wp_error( $extension ) ) {
 				return $extension;
 			}
@@ -99,6 +113,7 @@ final class Plan_Response {
 
 		$feasible   = $value['technically_feasible'];
 		$plugin_name = is_string( $value['plugin_name'] ?? null ) ? trim( $value['plugin_name'] ) : '';
+		$main_file   = is_string( $value['main_file'] ?? null ) ? $this->relative_path( $value['main_file'] ) : '';
 		$hooks       = [];
 		if ( is_array( $value['hooks'] ?? null ) ) {
 			foreach ( $value['hooks'] as $hook ) {
@@ -112,21 +127,27 @@ final class Plan_Response {
 		}
 
 		if ( $feasible ) {
-			if ( '' === $plugin_name || ! $hooks || ! $structure['files'] ) {
+			if ( '' === $plugin_name || ! $hooks || ! $structure['files'] || '' === $main_file || str_contains( $main_file, '/' ) || 'php' !== strtolower( (string) pathinfo( $main_file, PATHINFO_EXTENSION ) ) ) {
 				return $this->extension_error();
 			}
+			$main_found = false;
 			foreach ( $structure['files'] as $file ) {
 				if ( 'add' !== $file['action'] ) {
 					return $this->extension_error();
 				}
+				$main_found = $main_found || ( $main_file === $file['path'] && 'php' === $file['type'] );
 			}
-		} elseif ( $structure['directories'] || $structure['files'] ) {
+			if ( ! $main_found ) {
+				return $this->extension_error();
+			}
+		} elseif ( $structure['directories'] || $structure['files'] || '' !== $main_file ) {
 			return $this->extension_error();
 		}
 
 		return [
 			'technically_feasible' => $feasible,
 			'plugin_name'           => $plugin_name,
+			'main_file'             => $main_file,
 			'hooks'                 => array_values( array_unique( $hooks ) ),
 		];
 	}

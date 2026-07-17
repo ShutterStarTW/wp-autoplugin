@@ -95,4 +95,19 @@ final class SchemaUpgradeTest extends WP_UnitTestCase {
 		$this->assertSame( 'mode_status', $wpdb->get_var( "SHOW INDEX FROM $code_runs WHERE Key_name = 'mode_status'", 2 ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
 		$wpdb->delete( $revisions, [ 'id' => $revision_id ] );
 	}
+
+	public function test_version_eight_upgrade_adds_immutable_target_baselines(): void {
+		global $wpdb;
+
+		Installer::activate();
+		$files = Installer::table( 'revision_files' );
+		$wpdb->query( "ALTER TABLE $files DROP COLUMN base_content_hash, DROP COLUMN base_content" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		update_option( 'wp_autoplugin_v2_schema_version', '8', false );
+
+		Installer::maybe_upgrade();
+
+		$this->assertSame( Installer::SCHEMA_VERSION, get_option( 'wp_autoplugin_v2_schema_version' ) );
+		$this->assertSame( 'base_content', $wpdb->get_var( "SHOW COLUMNS FROM $files LIKE 'base_content'" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		$this->assertSame( 'base_content_hash', $wpdb->get_var( "SHOW COLUMNS FROM $files LIKE 'base_content_hash'" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+	}
 }

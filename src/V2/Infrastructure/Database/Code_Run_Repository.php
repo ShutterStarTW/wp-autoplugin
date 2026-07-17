@@ -2,7 +2,7 @@
 
 namespace WP_Autoplugin\V2\Infrastructure\Database;
 
-/** Persists resumable, source-private new-plugin Code generation state. */
+/** Persists resumable, source-private Code generation state. */
 final class Code_Run_Repository extends Repository {
 	/**
 	 * @param array<int, array<string, mixed>> $files Ordered normalized manifest.
@@ -36,7 +36,8 @@ final class Code_Run_Repository extends Repository {
 				throw new \RuntimeException( __( 'Could not initialize Code generation.', 'wp-autoplugin' ) );
 			}
 			foreach ( array_values( $files ) as $sequence => $file ) {
-				$inserted = $this->wpdb->insert(
+				$operation = sanitize_key( (string) ( $file['operation'] ?? 'add' ) );
+				$inserted  = $this->wpdb->insert(
 					Installer::table( 'code_run_files' ),
 					[
 						'run_id'          => $run_id,
@@ -44,8 +45,8 @@ final class Code_Run_Repository extends Repository {
 						'path'            => $file['path'],
 						'type'            => $file['type'],
 						'description'     => $file['description'],
-						'operation'       => sanitize_key( (string) ( $file['operation'] ?? 'add' ) ),
-						'status'          => 'pending',
+						'operation'       => $operation,
+						'status'          => 'delete' === $operation ? 'completed' : 'pending',
 						'error_metadata'  => $this->json( [] ),
 						'created_at'      => $now,
 						'updated_at'      => $now,

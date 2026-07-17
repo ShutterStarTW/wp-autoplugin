@@ -539,8 +539,13 @@ final class Routes {
 
 	/** Validate and normalize explicit Code generation and regeneration payloads. */
 	private function code_payload( array $payload, array $workspace, Job_Repository $jobs ) {
-		if ( 'create' !== ( $workspace['operation'] ?? '' ) || 'new_plugin' !== ( $workspace['target_kind'] ?? '' ) ) {
-			return new \WP_Error( 'wp_autoplugin_code_workspace_invalid', __( 'Code generation is currently available only for new-plugin workspaces.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		$operation = (string) ( $workspace['operation'] ?? '' );
+		$kind      = (string) ( $workspace['target_kind'] ?? '' );
+		$supported = ( 'create' === $operation && 'new_plugin' === $kind )
+			|| ( 'hook_extension' === $operation && in_array( $kind, [ 'plugin', 'theme' ], true ) )
+			|| ( in_array( $operation, [ 'modify', 'fix' ], true ) && in_array( $kind, [ 'plugin', 'theme' ], true ) );
+		if ( ! $supported ) {
+			return new \WP_Error( 'wp_autoplugin_code_workspace_invalid', __( 'Code generation is not available for this workspace operation.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		if ( $jobs->has_active_code( (int) $workspace['id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_code_active', __( 'Another Code job is already active in this workspace.', 'wp-autoplugin' ), [ 'status' => 409 ] );
@@ -554,7 +559,7 @@ final class Routes {
 		if ( ! $plan || (int) $plan['workspace_id'] !== (int) $workspace['id'] || ! $jobs->is_plan_artifact( $plan ) ) {
 			return new \WP_Error( 'wp_autoplugin_code_plan_invalid', __( 'Select a completed Plan artifact from this workspace.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
-		$manifest = ( new Code_Validator() )->plan( (array) ( $plan['result']['structured'] ?? [] ) );
+		$manifest = ( new Code_Validator() )->plan( (array) ( $plan['result']['structured'] ?? [] ), $workspace );
 		if ( is_wp_error( $manifest ) ) {
 			$manifest->add_data( [ 'status' => 409 ] );
 			return $manifest;
@@ -564,7 +569,7 @@ final class Routes {
 		$expected  = array_key_exists( 'expected_latest_revision_id', $payload ) && null !== $payload['expected_latest_revision_id'] ? absint( $payload['expected_latest_revision_id'] ) : null;
 		if ( 'generate' === $mode ) {
 			if ( null !== $latest || null !== $expected ) {
-				return new \WP_Error( 'wp_autoplugin_code_generate_conflict', __( 'Code already exists. Use Regenerate all code from the latest revision.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+				return new \WP_Error( 'wp_autoplugin_code_generate_conflict', __( 'A staged revision already exists. Regenerate from the latest revision instead.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 			return [ 'mode' => 'generate', 'plan_artifact_job_id' => $plan_id, 'expected_latest_revision_id' => null ];
 		}
