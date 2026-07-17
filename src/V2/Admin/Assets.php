@@ -59,7 +59,7 @@ final class Assets {
 		wp_enqueue_style(
 			self::HANDLE,
 			WP_AUTOPLUGIN_URL . 'assets/v2/build/style-index.tsx.css',
-			[ 'wp-components' ],
+			[ 'wp-components', 'dashicons' ],
 			$asset['version']
 		);
 		wp_style_add_data( self::HANDLE, 'rtl', 'replace' );

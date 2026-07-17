@@ -279,6 +279,8 @@ type Workspace = {
 
 const ACTIVE_WORKSPACE_KEY = 'wp-autoplugin-v2-active-workspace';
 const ACTIVE_STAGE_KEY_PREFIX = 'wp-autoplugin-v2-active-stage:';
+const DISTRACTION_FREE_KEY = 'wp-autoplugin-v2-distraction-free';
+const DISTRACTION_FREE_CLASS = 'wp-autoplugin-v2-distraction-free';
 
 function workspaceStages( operation?: string ): string[] {
 	return operation === 'explain'
@@ -302,6 +304,25 @@ function App() {
 	const [ activeTab, setActiveTab ] = useState( 'plan' );
 	const [ error, setError ] = useState( '' );
 	const [ busy, setBusy ] = useState( true );
+	const [ distractionFree, setDistractionFree ] = useState(
+		() => 'true' === window.localStorage.getItem( DISTRACTION_FREE_KEY )
+	);
+
+	useEffect( () => {
+		const documentRoots = [ document.documentElement, document.body ];
+		documentRoots.forEach( ( element ) =>
+			element.classList.toggle( DISTRACTION_FREE_CLASS, distractionFree )
+		);
+		window.localStorage.setItem(
+			DISTRACTION_FREE_KEY,
+			String( distractionFree )
+		);
+
+		return () =>
+			documentRoots.forEach( ( element ) =>
+				element.classList.remove( DISTRACTION_FREE_CLASS )
+			);
+	}, [ distractionFree ] );
 
 	useEffect( () => {
 		Promise.all( [
@@ -739,9 +760,13 @@ function App() {
 			<WorkspaceTabBar
 				workspaces={ workspaces }
 				activeWorkspaceId={ activeWorkspaceId }
+				distractionFree={ distractionFree }
 				onSelect={ setActiveWorkspaceId }
 				onClose={ closeWorkspace }
 				onNew={ () => setActiveWorkspaceId( 'new' ) }
+				onDistractionFreeToggle={ () =>
+					setDistractionFree( ( current ) => ! current )
+				}
 			/>
 			{ workspaceContent }
 		</main>
@@ -751,16 +776,24 @@ function App() {
 function WorkspaceTabBar( {
 	workspaces,
 	activeWorkspaceId,
+	distractionFree,
 	onSelect,
 	onClose,
 	onNew,
+	onDistractionFreeToggle,
 }: {
 	workspaces: Workspace[];
 	activeWorkspaceId: number | 'new';
+	distractionFree: boolean;
 	onSelect: ( id: number ) => void;
 	onClose: ( id: number ) => void;
 	onNew: () => void;
+	onDistractionFreeToggle: () => void;
 } ) {
+	const distractionFreeLabel = distractionFree
+		? __( 'Exit distraction-free mode', 'wp-autoplugin' )
+		: __( 'Enter distraction-free mode', 'wp-autoplugin' );
+
 	return (
 		<div className="workspace-tab-shell">
 			<div
@@ -841,6 +874,23 @@ function WorkspaceTabBar( {
 					+
 				</button>
 			</div>
+			<button
+				type="button"
+				className="workspace-distraction-toggle"
+				onClick={ onDistractionFreeToggle }
+				aria-label={ distractionFreeLabel }
+				aria-pressed={ distractionFree }
+				title={ distractionFreeLabel }
+			>
+				<span
+					className={ `dashicons ${
+						distractionFree
+							? 'dashicons-fullscreen-exit-alt'
+							: 'dashicons-fullscreen-alt'
+					}` }
+					aria-hidden="true"
+				/>
+			</button>
 		</div>
 	);
 }
