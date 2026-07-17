@@ -64,18 +64,21 @@ final class Plan_Response {
 	 */
 	private function creation( $value, array $structure ) {
 		$plugin_name = is_array( $value ) && is_string( $value['plugin_name'] ?? null ) ? trim( $value['plugin_name'] ) : '';
+		$main_file   = is_array( $value ) && is_string( $value['main_file'] ?? null ) ? $this->relative_path( $value['main_file'] ) : '';
 		$has_php     = false;
-		if ( '' === $plugin_name || ! $structure['files'] ) {
+		if ( '' === $plugin_name || '' === $main_file || str_contains( $main_file, '/' ) || 'php' !== strtolower( (string) pathinfo( $main_file, PATHINFO_EXTENSION ) ) || ! $structure['files'] ) {
 			return $this->creation_error();
 		}
+		$main_found = false;
 		foreach ( $structure['files'] as $file ) {
 			if ( 'add' !== $file['action'] ) {
 				return $this->creation_error();
 			}
 			$has_php = $has_php || 'php' === $file['type'];
+			$main_found = $main_found || ( $main_file === $file['path'] && 'php' === $file['type'] );
 		}
 
-		return $has_php ? [ 'plugin_name' => $plugin_name ] : $this->creation_error();
+		return $has_php && $main_found ? [ 'plugin_name' => $plugin_name, 'main_file' => $main_file ] : $this->creation_error();
 	}
 
 	private function creation_error(): \WP_Error {

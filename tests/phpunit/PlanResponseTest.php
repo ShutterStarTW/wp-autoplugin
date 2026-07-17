@@ -67,6 +67,7 @@ final class PlanResponseTest extends WP_UnitTestCase {
 				'content'    => "# Example Plugin\n\nCreate the requested behavior.",
 				'structured' => [
 					'plugin_name'       => 'Example Plugin',
+					'main_file'         => 'example-plugin.php',
 					'project_structure' => [
 						'directories' => [ 'includes' ],
 						'files'       => [
@@ -80,6 +81,7 @@ final class PlanResponseTest extends WP_UnitTestCase {
 		$result = ( new Plan_Response() )->parse( (string) $response, false, 0, 'create' );
 		$this->assertFalse( is_wp_error( $result ) );
 		$this->assertSame( 'Example Plugin', $result['structured']['plugin_name'] );
+		$this->assertSame( 'example-plugin.php', $result['structured']['main_file'] );
 		$this->assertSame( 'add', $result['structured']['project_structure']['files'][0]['action'] );
 	}
 
@@ -90,6 +92,7 @@ final class PlanResponseTest extends WP_UnitTestCase {
 				'content'    => '# Invalid new plugin',
 				'structured' => [
 					'plugin_name'       => 'Invalid Plugin',
+					'main_file'         => 'existing.php',
 					'project_structure' => [
 						'directories' => [],
 						'files'       => [
@@ -110,10 +113,31 @@ final class PlanResponseTest extends WP_UnitTestCase {
 				'content'    => '# Invalid new plugin',
 				'structured' => [
 					'plugin_name'       => 'Invalid Plugin',
+					'main_file'         => 'plugin.php',
 					'project_structure' => [
 						'directories' => [],
 						'files'       => [
 							[ 'path' => 'assets/style.css', 'type' => 'css', 'description' => 'Styles only.', 'action' => 'add' ],
+						],
+					],
+				],
+			]
+		);
+
+		$this->assertWPError( ( new Plan_Response() )->parse( (string) $response, false, 0, 'create' ) );
+	}
+
+	public function test_rejects_new_plugin_plan_without_explicit_main_file(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => '# Missing main file',
+				'structured' => [
+					'plugin_name'       => 'Missing Main File',
+					'project_structure' => [
+						'directories' => [],
+						'files'       => [
+							[ 'path' => 'missing-main.php', 'type' => 'php', 'description' => 'Bootstrap.', 'action' => 'add' ],
 						],
 					],
 				],

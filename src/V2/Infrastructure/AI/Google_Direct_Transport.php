@@ -11,7 +11,7 @@ final class Google_Direct_Transport implements Direct_Transport {
 	public function model(): string { return $this->selected_model; }
 	public function effort(): string { return ''; }
 
-	public function complete( string $instructions, string $input ) {
+	public function complete( string $instructions, string $input, array $options = [] ) {
 		$url      = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $this->selected_model ) . ':generateContent?key=' . rawurlencode( $this->api_key );
 		$response = wp_remote_post(
 			$url,
@@ -22,21 +22,23 @@ final class Google_Direct_Transport implements Direct_Transport {
 					[
 						'systemInstruction' => [ 'parts' => [ [ 'text' => $instructions ] ] ],
 						'contents'          => [ [ 'role' => 'user', 'parts' => [ [ 'text' => $input ] ] ] ],
-						'generationConfig'  => [ 'temperature' => 0.2, 'maxOutputTokens' => 8192, 'responseMimeType' => 'application/json' ],
+						'generationConfig'  => [ 'temperature' => 0.2, 'maxOutputTokens' => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 8192 ) ) ), 'responseMimeType' => 'application/json' ],
 						'safetySettings'    => [ [ 'category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_ONLY_HIGH' ] ],
 					]
 				),
 			]
 		);
 		if ( is_wp_error( $response ) ) {
-			return $response;
+			$message   = $response->get_error_message();
+			$ambiguous = false !== stripos( $message, 'timed out' ) || false !== stripos( $message, 'timeout' );
+			return new \WP_Error( 'direct_provider_network', $message, [ 'retryable' => ! $ambiguous, 'ambiguous' => $ambiguous ] );
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
 		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 || ! is_array( $data ) ) {
 			$message = is_array( $data ) ? (string) ( $data['error']['message'] ?? __( 'The Google Gemini request failed.', 'wp-autoplugin' ) ) : __( 'The Google Gemini request failed.', 'wp-autoplugin' );
-			return new \WP_Error( 'direct_provider_http', $message, [ 'status' => $status ] );
+			return new \WP_Error( 'direct_provider_http', $message, [ 'status' => $status, 'retryable' => 429 === $status || $status >= 500, 'ambiguous' => false ] );
 		}
 
 		$content = '';
@@ -46,7 +48,7 @@ final class Google_Direct_Transport implements Direct_Transport {
 			}
 		}
 		if ( '' === trim( $content ) ) {
-			return new \WP_Error( 'direct_provider_empty', __( 'Google Gemini returned an empty Plan response.', 'wp-autoplugin' ) );
+			return new \WP_Error( 'direct_provider_empty', __( 'Google Gemini returned an empty response.', 'wp-autoplugin' ), [ 'retryable' => true, 'ambiguous' => false ] );
 		}
 
 		return [

@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
  * Creates and upgrades v2 operational tables.
  */
 final class Installer {
-	public const SCHEMA_VERSION = '5';
+	public const SCHEMA_VERSION = '8';
 	private const OPTION_NAME   = 'wp_autoplugin_v2_schema_version';
 
 	/**
@@ -48,6 +48,8 @@ final class Installer {
 			'prompt_templates',
 			'agent_runs',
 			'agent_steps',
+			'code_runs',
+			'code_run_files',
 		];
 
 		if ( ! in_array( $suffix, $allowed, true ) ) {
@@ -116,11 +118,19 @@ final class Installer {
 			revision_number int(10) unsigned NOT NULL,
 			status varchar(20) NOT NULL DEFAULT 'staged',
 			summary text NULL,
+			origin varchar(20) NOT NULL DEFAULT 'ai',
+			plan_job_id bigint(20) unsigned NULL,
+			source_job_id bigint(20) unsigned NULL,
+			parent_revision_id bigint(20) unsigned NULL,
+			restored_from_revision_id bigint(20) unsigned NULL,
+			project_manifest longtext NULL,
 			created_by bigint(20) unsigned NOT NULL,
 			created_at datetime NOT NULL,
 			PRIMARY KEY  (id),
 			UNIQUE KEY workspace_revision (workspace_id,revision_number),
-			KEY status (status)
+			KEY status (status),
+			KEY parent_revision_id (parent_revision_id),
+			KEY plan_job_id (plan_job_id)
 		) $charset;";
 
 		$sql[] = 'CREATE TABLE ' . self::table( 'revision_files' ) . " (
@@ -251,6 +261,62 @@ final class Installer {
 			KEY run_kind (run_id,kind)
 		) $charset;";
 
+		$sql[] = 'CREATE TABLE ' . self::table( 'code_runs' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			job_id bigint(20) unsigned NOT NULL,
+			plan_job_id bigint(20) unsigned NOT NULL,
+			revision_id bigint(20) unsigned NULL,
+			parent_revision_id bigint(20) unsigned NULL,
+			status varchar(20) NOT NULL DEFAULT 'active',
+			mode varchar(20) NOT NULL DEFAULT 'generate',
+			phase varchar(20) NOT NULL DEFAULT 'files',
+			outcome varchar(20) NULL,
+			generation int(10) unsigned NOT NULL DEFAULT 0,
+			next_file_index smallint(5) unsigned NOT NULL DEFAULT 0,
+			provider varchar(50) NOT NULL,
+			model varchar(100) NOT NULL,
+			effort varchar(20) NOT NULL DEFAULT '',
+			prompt_slug varchar(100) NOT NULL,
+			prompt_version int(10) unsigned NOT NULL,
+			lease_token varchar(64) NULL,
+			lease_expires_at datetime NULL,
+			retry_count smallint(5) unsigned NOT NULL DEFAULT 0,
+			input_tokens bigint(20) unsigned NOT NULL DEFAULT 0,
+			output_tokens bigint(20) unsigned NOT NULL DEFAULT 0,
+			target_manifest longtext NULL,
+			change_instructions longtext NULL,
+			answer_content longtext NULL,
+			change_summary longtext NULL,
+			last_error text NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY job_id (job_id),
+			KEY revision_id (revision_id),
+			KEY mode_status (mode,status),
+			KEY status_lease (status,lease_expires_at)
+		) $charset;";
+
+		$sql[] = 'CREATE TABLE ' . self::table( 'code_run_files' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			run_id bigint(20) unsigned NOT NULL,
+			sequence smallint(5) unsigned NOT NULL,
+			path varchar(500) NOT NULL,
+			type varchar(10) NOT NULL,
+			description text NULL,
+			operation varchar(10) NOT NULL DEFAULT 'add',
+			status varchar(20) NOT NULL DEFAULT 'pending',
+			content longtext NULL,
+			content_hash char(64) NULL,
+			error_metadata longtext NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY run_path (run_id,path(191)),
+			UNIQUE KEY run_sequence (run_id,sequence),
+			KEY run_status (run_id,status)
+		) $charset;";
+
 		dbDelta( $sql );
 
 		/*
@@ -265,7 +331,59 @@ final class Installer {
 			"ALTER TABLE $agent_runs ADD effort varchar(20) NOT NULL DEFAULT '' AFTER model"
 		);
 
-		if ( self::column_exists( $agent_runs, 'effort' ) ) {
+		$revisions = self::table( 'revisions' );
+		$revision_columns = [
+			'origin'                    => "ALTER TABLE $revisions ADD origin varchar(20) NOT NULL DEFAULT 'ai' AFTER summary",
+			'plan_job_id'               => "ALTER TABLE $revisions ADD plan_job_id bigint(20) unsigned NULL AFTER origin",
+			'source_job_id'             => "ALTER TABLE $revisions ADD source_job_id bigint(20) unsigned NULL AFTER plan_job_id",
+			'parent_revision_id'        => "ALTER TABLE $revisions ADD parent_revision_id bigint(20) unsigned NULL AFTER source_job_id",
+			'restored_from_revision_id' => "ALTER TABLE $revisions ADD restored_from_revision_id bigint(20) unsigned NULL AFTER parent_revision_id",
+			'project_manifest'          => "ALTER TABLE $revisions ADD project_manifest longtext NULL AFTER restored_from_revision_id",
+		];
+		foreach ( $revision_columns as $column => $alter ) {
+			maybe_add_column( $revisions, $column, $alter );
+		}
+
+		$revision_ready = ! array_filter(
+			array_keys( $revision_columns ),
+			static fn( string $column ): bool => ! self::column_exists( $revisions, $column )
+		);
+		$code_runs = self::table( 'code_runs' );
+		maybe_add_column(
+			$code_runs,
+			'revision_id',
+			"ALTER TABLE $code_runs ADD revision_id bigint(20) unsigned NULL AFTER plan_job_id"
+		);
+		$code_run_columns = [
+			'mode'                => "ALTER TABLE $code_runs ADD mode varchar(20) NOT NULL DEFAULT 'generate' AFTER status",
+			'phase'               => "ALTER TABLE $code_runs ADD phase varchar(20) NOT NULL DEFAULT 'files' AFTER mode",
+			'outcome'             => "ALTER TABLE $code_runs ADD outcome varchar(20) NULL AFTER phase",
+			'target_manifest'     => "ALTER TABLE $code_runs ADD target_manifest longtext NULL AFTER output_tokens",
+			'change_instructions' => "ALTER TABLE $code_runs ADD change_instructions longtext NULL AFTER target_manifest",
+			'answer_content'      => "ALTER TABLE $code_runs ADD answer_content longtext NULL AFTER change_instructions",
+			'change_summary'      => "ALTER TABLE $code_runs ADD change_summary longtext NULL AFTER answer_content",
+		];
+		foreach ( $code_run_columns as $column => $alter ) {
+			maybe_add_column( $code_runs, $column, $alter );
+		}
+		if ( self::column_exists( $code_runs, 'revision_id' ) && ! self::index_exists( $code_runs, 'revision_id' ) ) {
+			$wpdb->query( "ALTER TABLE $code_runs ADD KEY revision_id (revision_id)" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
+		}
+		if ( self::column_exists( $code_runs, 'mode' ) && self::column_exists( $code_runs, 'status' ) && ! self::index_exists( $code_runs, 'mode_status' ) ) {
+			$wpdb->query( "ALTER TABLE $code_runs ADD KEY mode_status (mode,status)" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
+		}
+
+		$code_run_files = self::table( 'code_run_files' );
+		maybe_add_column(
+			$code_run_files,
+			'operation',
+			"ALTER TABLE $code_run_files ADD operation varchar(10) NOT NULL DEFAULT 'add' AFTER description"
+		);
+		$code_run_ready = ! array_filter(
+			array_keys( $code_run_columns ),
+			static fn( string $column ): bool => ! self::column_exists( $code_runs, $column )
+		);
+		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) ) {
 			update_option( self::OPTION_NAME, self::SCHEMA_VERSION, false );
 		}
 	}
@@ -278,6 +396,19 @@ final class Installer {
 
 		$query = $wpdb->prepare( "SHOW COLUMNS FROM $table LIKE %s", $column ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
 		return null !== $wpdb->get_var( $query ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
+	}
+
+	private static function table_exists( string $table ): bool {
+		global $wpdb;
+
+		return $table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+	}
+
+	private static function index_exists( string $table, string $index ): bool {
+		global $wpdb;
+
+		$query = $wpdb->prepare( "SHOW INDEX FROM $table WHERE Key_name = %s", $index ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
+		return $index === $wpdb->get_var( $query, 2 ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
 	}
 
 	/**

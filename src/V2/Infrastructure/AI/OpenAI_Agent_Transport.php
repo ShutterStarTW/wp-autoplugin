@@ -12,11 +12,14 @@ final class OpenAI_Agent_Transport implements Agent_Transport, Direct_Transport 
 	public function model(): string { return $this->selected_model; }
 	public function effort(): string { return $this->selected_effort; }
 
-	public function complete( string $instructions, string $input ) {
-		return $this->send( $instructions, [ [ 'role' => 'user', 'content' => $input ] ], [] );
+	public function complete( string $instructions, string $input, array $options = [] ) {
+		if ( ! empty( $options['json'] ) ) {
+			$input = "Return exactly one valid JSON object.\n\n" . $input;
+		}
+		return $this->send( $instructions, [ [ 'role' => 'user', 'content' => $input ] ], [], $options );
 	}
 
-	public function send( string $instructions, array $transcript, array $tools ) {
+	public function send( string $instructions, array $transcript, array $tools, array $options = [] ) {
 		$input = [];
 		foreach ( $transcript as $item ) {
 			if ( 'user' === ( $item['role'] ?? '' ) ) {
@@ -36,7 +39,10 @@ final class OpenAI_Agent_Transport implements Agent_Transport, Direct_Transport 
 			static fn( array $tool ): array => [ 'type' => 'function', 'name' => $tool['name'], 'description' => $tool['description'], 'parameters' => $tool['parameters'], 'strict' => false ],
 			$tools
 		);
-		$body = [ 'model' => $this->selected_model, 'instructions' => $instructions, 'input' => $input, 'max_output_tokens' => 4096, 'store' => false ];
+		$body = [ 'model' => $this->selected_model, 'instructions' => $instructions, 'input' => $input, 'max_output_tokens' => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 4096 ) ) ), 'store' => false ];
+		if ( ! empty( $options['json'] ) ) {
+			$body['text'] = [ 'format' => [ 'type' => 'json_object' ] ];
+		}
 		if ( $native_tools ) {
 			$body['tools']               = $native_tools;
 			$body['tool_choice']          = 'auto';

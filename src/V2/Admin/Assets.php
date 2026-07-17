@@ -19,6 +19,13 @@ final class Assets {
 
 		wp_enqueue_script( 'wp-autoplugin-marked', WP_AUTOPLUGIN_URL . 'assets/admin/js/marked.min.js', [], WP_AUTOPLUGIN_VERSION, true );
 		wp_enqueue_script( 'wp-autoplugin-purify', WP_AUTOPLUGIN_URL . 'assets/admin/js/purify.min.js', [], WP_AUTOPLUGIN_VERSION, true );
+		$editor_settings = [
+			'php' => wp_enqueue_code_editor( [ 'type' => 'text/x-php' ] ),
+			'js'  => wp_enqueue_code_editor( [ 'type' => 'text/javascript' ] ),
+			'css' => wp_enqueue_code_editor( [ 'type' => 'text/css' ] ),
+		];
+		$editor_settings = array_filter( $editor_settings, 'is_array' );
+		$editor_dependencies = $editor_settings ? [ 'code-editor' ] : [];
 
 		$asset_file = WP_AUTOPLUGIN_DIR . 'assets/v2/build/index.tsx.asset.php';
 		$asset      = file_exists( $asset_file ) ? include $asset_file : [
@@ -29,7 +36,7 @@ final class Assets {
 		wp_enqueue_script(
 			self::HANDLE,
 			WP_AUTOPLUGIN_URL . 'assets/v2/build/index.tsx.js',
-			array_merge( $asset['dependencies'], [ 'wp-autoplugin-marked', 'wp-autoplugin-purify' ] ),
+			array_merge( $asset['dependencies'], [ 'wp-autoplugin-marked', 'wp-autoplugin-purify' ], $editor_dependencies ),
 			$asset['version'],
 			true
 		);
@@ -47,6 +54,7 @@ final class Assets {
 				[
 					'restPath'    => '/wp-autoplugin/v2',
 					'settingsUrl' => admin_url( 'admin.php?page=wp-autoplugin-settings' ),
+					'codeEditorSettings' => $editor_settings,
 				]
 			) . ';',
 			'before'

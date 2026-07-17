@@ -9,6 +9,8 @@ use WP_Autoplugin\V2\Infrastructure\Queue\Job_Runner;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 use WP_Autoplugin\V2\Orchestration\Legacy_Orchestrator;
 use WP_Autoplugin\V2\Orchestration\Direct_Planner;
+use WP_Autoplugin\V2\Orchestration\Code_Orchestrator;
+use WP_Autoplugin\V2\Orchestration\Code_Follow_Up_Orchestrator;
 use WP_Autoplugin\V2\Orchestration\Source_Agent;
 use WP_Autoplugin\V2\Rest\Routes;
 
@@ -26,6 +28,8 @@ final class Application {
 		( new Model_Settings() )->register();
 		( new Routes() )->register();
 		( new Source_Agent() )->register();
+		( new Code_Orchestrator() )->register();
+		( new Code_Follow_Up_Orchestrator() )->register();
 		( new Direct_Planner() )->register();
 		( new Legacy_Orchestrator() )->register();
 		( new Queue() )->register();

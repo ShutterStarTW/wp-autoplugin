@@ -13,33 +13,55 @@ final class Job_Repository extends Repository {
 	 * @return array<string, mixed>
 	 */
 	public function create( int $workspace_id, string $task, array $payload, int $user_id ): array {
-		$now = $this->now();
-		$this->wpdb->insert(
-			Installer::table( 'jobs' ),
-			[
-				'workspace_id' => $workspace_id,
-				'task'         => $task,
-				'status'       => 'queued',
-				'progress'     => 0,
-				'payload'      => $this->json( $payload ),
-				'created_by'   => $user_id,
-				'created_at'   => $now,
-				'updated_at'   => $now,
-			],
-			[ '%d', '%s', '%s', '%d', '%s', '%d', '%s', '%s' ]
-		);
-
-		$id = (int) $this->wpdb->insert_id;
-		if ( ! $id ) {
-			throw new \RuntimeException( 'Could not create job.' );
+		$now       = $this->now();
+		$code_lock = self::is_code_work( [ 'task' => $task, 'payload' => $payload ] );
+		if ( $code_lock ) {
+			$this->wpdb->query( 'START TRANSACTION' );
 		}
-		$this->wpdb->update(
-			Installer::table( 'workspaces' ),
-			[ 'updated_at' => $now ],
-			[ 'id' => $workspace_id ],
-			[ '%s' ],
-			[ '%d' ]
-		);
+		try {
+			if ( $code_lock ) {
+				$this->wpdb->get_var(
+					$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'workspaces' ) . ' WHERE id = %d FOR UPDATE', $workspace_id )
+				);
+				if ( $this->has_active_code( $workspace_id ) ) {
+					throw new \RuntimeException( __( 'Another Code job is already active in this workspace.', 'wp-autoplugin' ), 409 );
+				}
+			}
+			$this->wpdb->insert(
+				Installer::table( 'jobs' ),
+				[
+					'workspace_id' => $workspace_id,
+					'task'         => $task,
+					'status'       => 'queued',
+					'progress'     => 0,
+					'payload'      => $this->json( $payload ),
+					'created_by'   => $user_id,
+					'created_at'   => $now,
+					'updated_at'   => $now,
+				],
+				[ '%d', '%s', '%s', '%d', '%s', '%d', '%s', '%s' ]
+			);
+
+			$id = (int) $this->wpdb->insert_id;
+			if ( ! $id ) {
+				throw new \RuntimeException( __( 'Could not create job.', 'wp-autoplugin' ) );
+			}
+			$this->wpdb->update(
+				Installer::table( 'workspaces' ),
+				[ 'updated_at' => $now ],
+				[ 'id' => $workspace_id ],
+				[ '%s' ],
+				[ '%d' ]
+			);
+			if ( $code_lock ) {
+				$this->wpdb->query( 'COMMIT' );
+			}
+		} catch ( \Throwable $error ) {
+			if ( $code_lock ) {
+				$this->wpdb->query( 'ROLLBACK' );
+			}
+			throw $error;
+		}
 
 		$this->event( $id, 'queued', __( 'Job queued.', 'wp-autoplugin' ) );
 
@@ -77,6 +99,44 @@ final class Job_Repository extends Repository {
 		);
 
 		return array_map( [ $this, 'hydrate' ], $rows );
+	}
+
+	/** Return the newest completed Plan artifact for a workspace. */
+	public function latest_plan_artifact( int $workspace_id ): ?array {
+		foreach ( array_reverse( $this->list_for_workspace( $workspace_id ) ) as $job ) {
+			if ( $this->is_plan_artifact( $job ) ) {
+				return $job;
+			}
+		}
+		return null;
+	}
+
+	/** Whether billable Code work is already active in the workspace. */
+	public function has_active_code( int $workspace_id ): bool {
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE workspace_id = %d AND task IN (%s,%s) AND status IN (%s,%s,%s)',
+				$workspace_id,
+				'code',
+				'conversation',
+				'queued',
+				'running',
+				'retrying'
+			),
+			ARRAY_A
+		);
+		foreach ( $rows as $row ) {
+			if ( self::is_code_work( $this->hydrate( $row ) ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Whether a job participates in the mutually exclusive Code-work lock. */
+	public static function is_code_work( array $job ): bool {
+		return 'code' === ( $job['task'] ?? '' )
+			|| ( 'conversation' === ( $job['task'] ?? '' ) && 'code' === ( $job['payload']['stage'] ?? '' ) );
 	}
 
 	/**

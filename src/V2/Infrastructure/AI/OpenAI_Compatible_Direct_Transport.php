@@ -19,7 +19,7 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 	public function model(): string { return $this->selected_model; }
 	public function effort(): string { return ''; }
 
-	public function complete( string $instructions, string $input ) {
+	public function complete( string $instructions, string $input, array $options = [] ) {
 		$response = wp_remote_post(
 			$this->endpoint,
 			[
@@ -29,32 +29,38 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 					$this->extra_headers
 				),
 				'body'    => wp_json_encode(
-					[
-						'model'       => $this->selected_model,
-						'messages'    => [
-							[ 'role' => 'system', 'content' => $instructions ],
-							[ 'role' => 'user', 'content' => $input ],
+					array_filter(
+						[
+							'model'       => $this->selected_model,
+							'messages'    => [
+								[ 'role' => 'system', 'content' => $instructions ],
+								[ 'role' => 'user', 'content' => $input ],
+							],
+							'temperature' => 0.2,
+							'max_tokens'  => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 8192 ) ) ),
+							'response_format' => ! empty( $options['json'] ) ? [ 'type' => 'json_object' ] : null,
 						],
-						'temperature' => 0.2,
-						'max_tokens'  => 8192,
-					]
+						static fn( $value ): bool => null !== $value
+					)
 				),
 			]
 		);
 		if ( is_wp_error( $response ) ) {
-			return $response;
+			$message   = $response->get_error_message();
+			$ambiguous = false !== stripos( $message, 'timed out' ) || false !== stripos( $message, 'timeout' );
+			return new \WP_Error( 'direct_provider_network', $message, [ 'retryable' => ! $ambiguous, 'ambiguous' => $ambiguous ] );
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
 		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 || ! is_array( $data ) ) {
 			$message = is_array( $data ) ? (string) ( $data['error']['message'] ?? __( 'The direct provider request failed.', 'wp-autoplugin' ) ) : __( 'The direct provider request failed.', 'wp-autoplugin' );
-			return new \WP_Error( 'direct_provider_http', $message, [ 'status' => $status ] );
+			return new \WP_Error( 'direct_provider_http', $message, [ 'status' => $status, 'retryable' => 429 === $status || $status >= 500, 'ambiguous' => false ] );
 		}
 
 		$content = $data['choices'][0]['message']['content'] ?? '';
 		if ( ! is_string( $content ) || '' === trim( $content ) ) {
-			return new \WP_Error( 'direct_provider_empty', __( 'The provider returned an empty Plan response.', 'wp-autoplugin' ) );
+			return new \WP_Error( 'direct_provider_empty', __( 'The provider returned an empty response.', 'wp-autoplugin' ), [ 'retryable' => true, 'ambiguous' => false ] );
 		}
 
 		return [

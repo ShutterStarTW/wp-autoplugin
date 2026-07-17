@@ -13,6 +13,7 @@ import {
 	useCallback,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from '@wordpress/element';
 import { __, _n, sprintf } from '@wordpress/i18n';
@@ -43,17 +44,32 @@ type Job = {
 		message?: string;
 		stage?: string;
 		artifact_job_id?: number;
+		mode?: 'generate' | 'regenerate';
+		plan_artifact_job_id?: number;
+		parent_revision_id?: number;
+		revision_id?: number;
+		expected_latest_revision_id?: number | null;
 	};
 	result?: {
 		content?: string;
 		structured?: Record< string, unknown >;
-		outcome?: 'answer' | 'artifact';
+		outcome?: 'answer' | 'artifact' | 'revision';
 		artifact?: {
 			type?: string;
 			content?: string;
 			parent_job_id?: number;
 		};
 		model?: string;
+		provider?: string;
+		effort?: string;
+		revision_id?: number;
+		base_revision_id?: number;
+		added_paths?: string[];
+		updated_paths?: string[];
+		deleted_paths?: string[];
+		plan_artifact_job_id?: number;
+		parent_revision_id?: number | null;
+		files_count?: number;
 		usage?: { input_tokens: number; output_tokens: number };
 		agent?: {
 			model_turns: number;
@@ -68,7 +84,76 @@ type Job = {
 		level: string;
 		sequence: number;
 	} | null;
+	code_progress?: CodeProgress | null;
 };
+
+type CodeProgress = {
+	mode?: 'generate' | 'regenerate' | 'follow_up';
+	phase?: 'analysis' | 'files' | 'completed' | 'failed' | 'cancelled';
+	outcome?: 'answer' | 'revision' | null;
+	total: number;
+	completed: number;
+	current: number;
+	provider: string;
+	model: string;
+	effort: string;
+	input_tokens: number;
+	output_tokens: number;
+	deleted_paths?: string[];
+	files: Array< {
+		path: string;
+		type: string;
+		operation: 'add' | 'update';
+		status: 'pending' | 'generating' | 'completed' | 'failed';
+		error?: string;
+	} >;
+};
+
+type RevisionSummary = {
+	id: number;
+	workspace_id: number;
+	revision_number: number;
+	status: string;
+	origin: 'ai' | 'manual' | 'restore';
+	plan_job_id: number | null;
+	source_job_id: number | null;
+	parent_revision_id: number | null;
+	restored_from_revision_id: number | null;
+	files_count: number;
+	aggregate_size: number;
+	adds: number;
+	updates: number;
+	deletes: number;
+	created_at: string;
+};
+
+type RevisionFileManifest = {
+	id: number;
+	path: string;
+	type: 'php' | 'js' | 'css';
+	change_type: 'add' | 'update' | 'delete';
+	content_hash: string;
+	size: number;
+};
+
+type RevisionManifest = RevisionSummary & {
+	files: RevisionFileManifest[];
+	project_manifest: {
+		plugin_name: string;
+		main_file: string;
+		files: Array< { path: string; type: string; description: string } >;
+	} | null;
+	plan_structure_matches: boolean;
+	validation: { status: string; issues: CodeIssue[] };
+};
+
+type RevisionFile = RevisionFileManifest & {
+	revision_id: number;
+	content: string;
+	diff_html: string;
+};
+
+type CodeIssue = { path: string; line: number; code: string; message: string };
 
 type JobEvent = {
 	id: number;
@@ -90,6 +175,7 @@ type Bootstrap = {
 	explain_agent: AgentCapability;
 	plan_agent: AgentCapability;
 	direct_plan: AgentCapability;
+	direct_code: AgentCapability;
 };
 
 type AgentCapability = {
@@ -101,7 +187,19 @@ type AgentCapability = {
 
 declare global {
 	interface Window {
-		wpAutopluginV2: { restPath: string; settingsUrl: string };
+		wpAutopluginV2: {
+			restPath: string;
+			settingsUrl: string;
+			codeEditorSettings?: Record< string, Record< string, unknown > >;
+		};
+		wp?: {
+			codeEditor?: {
+				initialize: (
+					element: HTMLTextAreaElement,
+					settings: Record< string, unknown >
+				) => { codemirror?: any };
+			};
+		};
 	}
 }
 
@@ -156,6 +254,13 @@ type Workspace = {
 };
 
 const ACTIVE_WORKSPACE_KEY = 'wp-autoplugin-v2-active-workspace';
+const ACTIVE_STAGE_KEY_PREFIX = 'wp-autoplugin-v2-active-stage:';
+
+function workspaceStages( operation?: string ): string[] {
+	return operation === 'explain'
+		? [ 'explain' ]
+		: [ 'plan', 'code', 'review' ];
+}
 
 function App() {
 	const [ bootstrap, setBootstrap ] = useState< Bootstrap | null >( null );
@@ -225,8 +330,17 @@ function App() {
 			ACTIVE_WORKSPACE_KEY,
 			String( activeWorkspaceId )
 		);
+		const availableStages = workspaceStages( activeWorkspace?.operation );
+		const activeProjectId = activeWorkspace?.project_id;
+		const savedStage = activeProjectId
+			? window.localStorage.getItem(
+					`${ ACTIVE_STAGE_KEY_PREFIX }${ activeProjectId }`
+			  )
+			: null;
 		setActiveTab(
-			'explain' === activeWorkspace?.operation ? 'explain' : 'plan'
+			savedStage && availableStages.includes( savedStage )
+				? savedStage
+				: availableStages[ 0 ]
 		);
 
 		let current = true;
@@ -253,7 +367,26 @@ function App() {
 		return () => {
 			current = false;
 		};
-	}, [ activeWorkspaceId, activeWorkspace?.operation ] );
+	}, [
+		activeWorkspaceId,
+		activeWorkspace?.operation,
+		activeWorkspace?.project_id,
+	] );
+
+	function selectWorkspaceStage( stage: string ) {
+		if (
+			! workspaceStages( activeWorkspace?.operation ).includes( stage )
+		) {
+			return;
+		}
+		setActiveTab( stage );
+		if ( activeWorkspace ) {
+			window.localStorage.setItem(
+				`${ ACTIVE_STAGE_KEY_PREFIX }${ activeWorkspace.project_id }`,
+				stage
+			);
+		}
+	}
 
 	useEffect( () => {
 		const activeJobs = jobs.filter( ( item ) =>
@@ -418,11 +551,11 @@ function App() {
 	}
 
 	async function createJob(
-		task: 'plan' | 'explain' | 'conversation',
+		task: 'plan' | 'code' | 'explain' | 'conversation',
 		payload = {}
 	) {
 		if ( ! activeWorkspace ) {
-			return;
+			return null;
 		}
 		setError( '' );
 		try {
@@ -443,8 +576,10 @@ function App() {
 						: item
 				)
 			);
+			return created;
 		} catch ( reason: any ) {
 			setError( reason.message );
+			return null;
 		}
 	}
 
@@ -519,8 +654,9 @@ function App() {
 				workspace={ activeWorkspace }
 				jobs={ jobs }
 				jobsLoading={ jobsLoading }
+				codeCapability={ bootstrap?.direct_code ?? null }
 				activeTab={ activeTab }
-				onTabSelect={ setActiveTab }
+				onTabSelect={ selectWorkspaceStage }
 				onCancel={ cancel }
 				onCreateJob={ createJob }
 				onSavePlan={ savePlan }
@@ -790,6 +926,7 @@ function WorkspaceView( {
 	workspace,
 	jobs,
 	jobsLoading,
+	codeCapability,
 	activeTab,
 	onTabSelect,
 	onCancel,
@@ -799,13 +936,14 @@ function WorkspaceView( {
 	workspace: Workspace;
 	jobs: Job[];
 	jobsLoading: boolean;
+	codeCapability: AgentCapability | null;
 	activeTab: string;
 	onTabSelect: ( tab: string ) => void;
 	onCancel: ( job: Job ) => void;
 	onCreateJob: (
-		task: 'plan' | 'explain' | 'conversation',
+		task: 'plan' | 'code' | 'explain' | 'conversation',
 		payload?: object
-	) => void;
+	) => Promise< Job | null >;
 	onSavePlan: ( job: Job, content: string ) => Promise< boolean >;
 } ) {
 	const target = workspace.target_metadata;
@@ -823,6 +961,9 @@ function WorkspaceView( {
 		( job ) =>
 			job.task === 'explain' ||
 			( job.task === 'conversation' && job.payload.stage === 'explain' )
+	);
+	const codeConversationJobs = jobs.filter(
+		( job ) => job.task === 'conversation' && job.payload.stage === 'code'
 	);
 	return (
 		<section className="workspace-editor">
@@ -884,6 +1025,7 @@ function WorkspaceView( {
 							onCancel={ onCancel }
 							onCreate={ () => onCreateJob( 'plan' ) }
 							onSave={ onSavePlan }
+							onContinue={ () => onTabSelect( 'code' ) }
 							onFollowUp={ ( message, artifactJobId ) =>
 								onCreateJob( 'conversation', {
 									stage: 'plan',
@@ -894,7 +1036,25 @@ function WorkspaceView( {
 						/>
 					) }
 					{ ! jobsLoading && activeTab === 'code' && (
-						<CodeStage plan={ latestPlan } />
+						<CodeStage
+							workspace={ workspace }
+							plan={ latestPlan }
+							jobs={ jobs }
+							capability={ codeCapability }
+							onCancel={ onCancel }
+							conversationJobs={ codeConversationJobs }
+							onCreateCode={ ( payload ) =>
+								onCreateJob( 'code', payload )
+							}
+							onFollowUp={ ( message, revisionId ) =>
+								onCreateJob( 'conversation', {
+									stage: 'code',
+									message,
+									revision_id: revisionId,
+									expected_latest_revision_id: revisionId,
+								} )
+							}
+						/>
 					) }
 					{ ! jobsLoading && activeTab === 'review' && (
 						<ReviewStage plan={ latestPlan } />
@@ -1196,6 +1356,7 @@ function PlanStage( {
 	onCancel,
 	onCreate,
 	onSave,
+	onContinue,
 	onFollowUp,
 }: {
 	job: Job | null;
@@ -1205,6 +1366,7 @@ function PlanStage( {
 	onCancel: ( job: Job ) => void;
 	onCreate: () => void;
 	onSave: ( job: Job, content: string ) => Promise< boolean >;
+	onContinue: () => void;
 	onFollowUp: ( message: string, artifactJobId: number ) => void;
 } ) {
 	if ( ! job ) {
@@ -1253,6 +1415,7 @@ function PlanStage( {
 			onCancel={ onCancel }
 			onSave={ onSave }
 			onRetry={ onCreate }
+			onContinue={ onContinue }
 			onFollowUp={ onFollowUp }
 		/>
 	);
@@ -1265,6 +1428,7 @@ function PlanEditor( {
 	onCancel,
 	onSave,
 	onRetry,
+	onContinue,
 	onFollowUp,
 }: {
 	job: Job;
@@ -1273,6 +1437,7 @@ function PlanEditor( {
 	onCancel: ( job: Job ) => void;
 	onSave: ( job: Job, content: string ) => Promise< boolean >;
 	onRetry: () => void;
+	onContinue: () => void;
 	onFollowUp: ( message: string, artifactJobId: number ) => void;
 } ) {
 	const structure = planArtifactStructure( job );
@@ -1305,6 +1470,12 @@ function PlanEditor( {
 		document.addEventListener( 'keydown', onKeyDown );
 		return () => document.removeEventListener( 'keydown', onKeyDown );
 	}, [ editing, saving, cancelEditing ] );
+	const structureRegenerating = Boolean(
+		regenerationJob &&
+			[ 'queued', 'running', 'retrying' ].includes(
+				regenerationJob.status
+			)
+	);
 	return (
 		<div className="plan-stage">
 			<div className="stage-toolbar">
@@ -1386,11 +1557,15 @@ function PlanEditor( {
 			<div className="stage-next">
 				<span>
 					{ __(
-						'Code generation will be available once the staged-revision worker is connected.',
+						'Open Code to explicitly generate a validated staged revision from this Plan.',
 						'wp-autoplugin'
 					) }
 				</span>
-				<Button variant="primary" disabled>
+				<Button
+					variant="primary"
+					disabled={ structureRegenerating }
+					onClick={ onContinue }
+				>
 					{ __( 'Continue to Code', 'wp-autoplugin' ) }
 				</Button>
 			</div>
@@ -1480,48 +1655,747 @@ function ProjectStructure( {
 	);
 }
 
-function CodeStage( { plan }: { plan: Job | null } ) {
-	return (
-		<div className="code-stage">
-			<div className="code-stage__tree">
-				<strong>{ __( 'STAGED FILES', 'wp-autoplugin' ) }</strong>
-				<p>{ __( 'No staged revision yet.', 'wp-autoplugin' ) }</p>
+function CodeStage( {
+	workspace,
+	plan,
+	jobs,
+	capability,
+	onCancel,
+	conversationJobs,
+	onCreateCode,
+	onFollowUp,
+}: {
+	workspace: Workspace;
+	plan: Job | null;
+	jobs: Job[];
+	capability: AgentCapability | null;
+	onCancel: ( job: Job ) => void;
+	conversationJobs: Job[];
+	onCreateCode: ( payload: object ) => Promise< Job | null >;
+	onFollowUp: (
+		message: string,
+		revisionId: number
+	) => Promise< Job | null >;
+} ) {
+	const [ revisions, setRevisions ] = useState< RevisionSummary[] >( [] );
+	const [ latestRevisionId, setLatestRevisionId ] = useState< number | null >(
+		null
+	);
+	const [ selectedRevisionId, setSelectedRevisionId ] = useState<
+		number | null
+	>( null );
+	const [ manifest, setManifest ] = useState< RevisionManifest | null >(
+		null
+	);
+	const [ selectedFileId, setSelectedFileId ] = useState< number | null >(
+		null
+	);
+	const selectedFilePath = useRef( '' );
+	const [ fileBodies, setFileBodies ] = useState<
+		Record< string, RevisionFile >
+	>( {} );
+	const [ mode, setMode ] = useState< 'code' | 'changes' >( 'code' );
+	const [ editing, setEditing ] = useState( false );
+	const [ buffers, setBuffers ] = useState< Record< string, string > >( {} );
+	const [ problems, setProblems ] = useState< CodeIssue[] >( [] );
+	const [ focusIssue, setFocusIssue ] = useState< CodeIssue | null >( null );
+	const [ loading, setLoading ] = useState( true );
+	const [ actionBusy, setActionBusy ] = useState( false );
+	const [ localError, setLocalError ] = useState( '' );
+
+	const codeJobs = jobs.filter( ( job ) => 'code' === job.task );
+	const latestCodeJob = codeJobs[ codeJobs.length - 1 ] ?? null;
+	const activeCodeJob =
+		[ ...codeJobs ]
+			.reverse()
+			.find( ( job ) =>
+				[ 'queued', 'running', 'retrying' ].includes( job.status )
+			) ?? null;
+	const codeWorkJobs = [ ...codeJobs, ...conversationJobs ].sort(
+		( left, right ) => left.id - right.id
+	);
+	const activeCodeWork =
+		[ ...codeWorkJobs ]
+			.reverse()
+			.find( ( job ) =>
+				[ 'queued', 'running', 'retrying' ].includes( job.status )
+			) ?? null;
+	const latestCodeConversation =
+		conversationJobs[ conversationJobs.length - 1 ] ?? null;
+	const structureRun = latestJobForTask( jobs, 'plan_structure' );
+	const structureActive =
+		!! structureRun &&
+		[ 'queued', 'running', 'retrying' ].includes( structureRun.status );
+	const displayedPlan = activeCodeJob
+		? jobs.find(
+				( job ) => job.id === activeCodeJob.payload.plan_artifact_job_id
+		  ) ?? plan
+		: plan;
+	const planned = planFiles( displayedPlan );
+	const currentPlanFiles = planFiles( plan );
+	const selectedMainFile = planMainFile( plan, currentPlanFiles );
+	const planValid =
+		!! plan &&
+		!! selectedMainFile &&
+		currentPlanFiles.length > 0 &&
+		currentPlanFiles.length <= 20;
+	const failedLatestCode =
+		!! latestCodeJob &&
+		[ 'failed', 'cancelled' ].includes( latestCodeJob.status ) &&
+		! latestCodeJob.result?.revision_id;
+
+	const loadRevisions = useCallback(
+		async ( preferredId?: number ) => {
+			const response = await apiFetch< {
+				items: RevisionSummary[];
+				latest_revision_id: number | null;
+			} >( { path: `${ rest }/workspaces/${ workspace.id }/revisions` } );
+			setRevisions( response.items );
+			setLatestRevisionId( response.latest_revision_id );
+			setSelectedRevisionId( ( current ) => {
+				if (
+					preferredId &&
+					preferredId === response.latest_revision_id
+				) {
+					return preferredId;
+				}
+				if (
+					current &&
+					response.items.some( ( item ) => item.id === current )
+				) {
+					return current;
+				}
+				return response.latest_revision_id;
+			} );
+		},
+		[ workspace.id ]
+	);
+
+	useEffect( () => {
+		setLoading( true );
+		loadRevisions()
+			.catch( ( reason ) => setLocalError( reason.message ) )
+			.finally( () => setLoading( false ) );
+	}, [ loadRevisions ] );
+
+	useEffect( () => {
+		const revisionId = latestCodeJob?.result?.revision_id;
+		if ( latestCodeJob?.status === 'completed' && revisionId ) {
+			loadRevisions( revisionId ).catch( ( reason ) =>
+				setLocalError( reason.message )
+			);
+		}
+	}, [
+		latestCodeJob?.status,
+		latestCodeJob?.result?.revision_id,
+		loadRevisions,
+	] );
+
+	useEffect( () => {
+		const revisionId = latestCodeConversation?.result?.revision_id;
+		if (
+			latestCodeConversation?.status === 'completed' &&
+			latestCodeConversation.result?.outcome === 'revision' &&
+			revisionId
+		) {
+			setFileBodies( {} );
+			loadRevisions( revisionId ).catch( ( reason ) =>
+				setLocalError( reason.message )
+			);
+		}
+	}, [
+		latestCodeConversation?.status,
+		latestCodeConversation?.result?.outcome,
+		latestCodeConversation?.result?.revision_id,
+		loadRevisions,
+	] );
+
+	useEffect( () => {
+		if ( ! selectedRevisionId ) {
+			setManifest( null );
+			setSelectedFileId( null );
+			selectedFilePath.current = '';
+			return;
+		}
+		let current = true;
+		apiFetch< RevisionManifest >( {
+			path: `${ rest }/revisions/${ selectedRevisionId }`,
+		} )
+			.then( ( response ) => {
+				if ( ! current ) {
+					return;
+				}
+				const selectedFile =
+					response.files.find(
+						( file ) => file.path === selectedFilePath.current
+					) ?? response.files[ 0 ];
+				setManifest( response );
+				setSelectedFileId( selectedFile?.id ?? null );
+				selectedFilePath.current = selectedFile?.path ?? '';
+				setMode( 'code' );
+				setProblems( [] );
+			} )
+			.catch( ( reason ) => current && setLocalError( reason.message ) );
+		return () => {
+			current = false;
+		};
+	}, [ selectedRevisionId ] );
+
+	const loadFile = useCallback(
+		async ( revisionId: number, fileId: number ) => {
+			const key = `${ revisionId }:${ fileId }`;
+			if ( fileBodies[ key ] ) {
+				return fileBodies[ key ];
+			}
+			const response = await apiFetch< RevisionFile >( {
+				path: `${ rest }/revisions/${ revisionId }/files/${ fileId }`,
+			} );
+			setFileBodies( ( current ) => ( {
+				...current,
+				[ key ]: response,
+			} ) );
+			return response;
+		},
+		[ fileBodies ]
+	);
+
+	useEffect( () => {
+		if (
+			selectedRevisionId &&
+			selectedFileId &&
+			manifest?.id === selectedRevisionId &&
+			manifest.files.some( ( file ) => file.id === selectedFileId )
+		) {
+			loadFile( selectedRevisionId, selectedFileId ).catch( ( reason ) =>
+				setLocalError( reason.message )
+			);
+		}
+	}, [ selectedRevisionId, selectedFileId, manifest, loadFile ] );
+
+	const selectFile = useCallback(
+		( fileId: number ) => {
+			const file = manifest?.files.find( ( item ) => item.id === fileId );
+			selectedFilePath.current = file?.path ?? '';
+			setSelectedFileId( fileId );
+		},
+		[ manifest ]
+	);
+
+	const baseContents = useMemo( () => {
+		const values: Record< string, string > = {};
+		manifest?.files.forEach( ( file ) => {
+			const loaded = fileBodies[ `${ manifest.id }:${ file.id }` ];
+			if ( loaded ) {
+				values[ file.path ] = loaded.content;
+			}
+		} );
+		return values;
+	}, [ manifest, fileBodies ] );
+	const dirtyPaths = useMemo(
+		() =>
+			new Set(
+				Object.keys( buffers ).filter(
+					( path ) => buffers[ path ] !== baseContents[ path ]
+				)
+			),
+		[ buffers, baseContents ]
+	);
+
+	useEffect( () => {
+		if ( ! dirtyPaths.size ) {
+			return;
+		}
+		const warn = ( event: BeforeUnloadEvent ) => {
+			event.preventDefault();
+			event.returnValue = '';
+		};
+		window.addEventListener( 'beforeunload', warn );
+		return () => window.removeEventListener( 'beforeunload', warn );
+	}, [ dirtyPaths.size ] );
+
+	const selectedManifestFile =
+		manifest?.files.find( ( file ) => file.id === selectedFileId ) ?? null;
+	const selectedFile =
+		manifest && selectedFileId
+			? fileBodies[ `${ manifest.id }:${ selectedFileId }` ] ?? null
+			: null;
+	const displayedContent = selectedManifestFile
+		? buffers[ selectedManifestFile.path ] ?? selectedFile?.content ?? ''
+		: '';
+
+	async function beginEdit() {
+		if ( ! manifest || manifest.id !== latestRevisionId ) {
+			return;
+		}
+		setActionBusy( true );
+		try {
+			const loaded = await Promise.all(
+				manifest.files.map( ( file ) =>
+					loadFile( manifest.id, file.id )
+				)
+			);
+			setBuffers(
+				Object.fromEntries(
+					loaded.map( ( file ) => [ file.path, file.content ] )
+				)
+			);
+			setEditing( true );
+			setMode( 'code' );
+			setProblems( [] );
+		} catch ( reason: any ) {
+			setLocalError( reason.message );
+		} finally {
+			setActionBusy( false );
+		}
+	}
+
+	function cancelEdits() {
+		let confirmed = true;
+		if ( dirtyPaths.size ) {
+			// eslint-disable-next-line no-alert -- Explicit confirmation protects a multi-file edit session.
+			confirmed = window.confirm(
+				__(
+					'Discard all unsaved changes in this edit session?',
+					'wp-autoplugin'
+				)
+			);
+		}
+		if ( ! confirmed ) {
+			return;
+		}
+		setEditing( false );
+		setBuffers( {} );
+		setProblems( [] );
+		setFocusIssue( null );
+	}
+
+	async function saveRevision() {
+		if ( ! manifest || ! latestRevisionId || ! dirtyPaths.size ) {
+			return;
+		}
+		setActionBusy( true );
+		setProblems( [] );
+		setLocalError( '' );
+		try {
+			const created = await apiFetch< { id: number } >( {
+				path: `${ rest }/revisions/${ manifest.id }/successors`,
+				method: 'POST',
+				data: {
+					expected_latest_revision_id: latestRevisionId,
+					changes: [ ...dirtyPaths ].map( ( path ) => ( {
+						path,
+						content: buffers[ path ],
+					} ) ),
+				},
+			} );
+			setEditing( false );
+			setBuffers( {} );
+			setFileBodies( {} );
+			await loadRevisions( created.id );
+		} catch ( reason: any ) {
+			const issues = reason?.data?.issues;
+			if ( Array.isArray( issues ) ) {
+				setProblems( issues );
+			}
+			setLocalError(
+				reason?.data?.status === 409
+					? __(
+							'A newer revision exists. Your buffers are preserved; reload the latest revision before retrying.',
+							'wp-autoplugin'
+					  )
+					: reason.message
+			);
+		} finally {
+			setActionBusy( false );
+		}
+	}
+
+	async function restoreSelected() {
+		if (
+			! manifest ||
+			! latestRevisionId ||
+			manifest.id === latestRevisionId
+		) {
+			return;
+		}
+		// eslint-disable-next-line no-alert -- Restore is an explicit immutable-history operation.
+		const confirmed = window.confirm(
+			__(
+				'Restore this revision as a new latest revision?',
+				'wp-autoplugin'
+			)
+		);
+		if ( ! confirmed ) {
+			return;
+		}
+		setActionBusy( true );
+		try {
+			const created = await apiFetch< { id: number } >( {
+				path: `${ rest }/revisions/${ manifest.id }/restore`,
+				method: 'POST',
+				data: { expected_latest_revision_id: latestRevisionId },
+			} );
+			setFileBodies( {} );
+			await loadRevisions( created.id );
+		} catch ( reason: any ) {
+			setLocalError( reason.message );
+		} finally {
+			setActionBusy( false );
+		}
+	}
+
+	async function generate( regenerate = false ) {
+		if ( ! plan ) {
+			return;
+		}
+		let confirmed = true;
+		if ( regenerate ) {
+			// eslint-disable-next-line no-alert -- Regeneration starts explicit billable work.
+			confirmed = window.confirm(
+				__(
+					'Regenerate every file using the latest Plan? This starts new billable model requests and preserves the current revision in history.',
+					'wp-autoplugin'
+				)
+			);
+		}
+		if ( ! confirmed ) {
+			return;
+		}
+		setActionBusy( true );
+		setLocalError( '' );
+		await onCreateCode(
+			regenerate
+				? {
+						mode: 'regenerate',
+						plan_artifact_job_id: plan.id,
+						parent_revision_id: latestRevisionId,
+						expected_latest_revision_id: latestRevisionId,
+				  }
+				: {
+						mode: 'generate',
+						plan_artifact_job_id: plan.id,
+						expected_latest_revision_id: null,
+				  }
+		);
+		setActionBusy( false );
+	}
+
+	const progressFiles =
+		( activeCodeJob ?? latestCodeJob )?.code_progress?.files ?? [];
+	const progressMap = Object.fromEntries(
+		progressFiles.map( ( file ) => [ file.path, file.status ] )
+	);
+	const treeFiles =
+		manifest?.files ??
+		planned.map( ( file, index ) => ( {
+			id: index,
+			path: file.path,
+			type: file.type as 'php' | 'js' | 'css',
+			change_type: 'add' as const,
+			content_hash: '',
+			size: 0,
+		} ) );
+	let toolbarActions = null;
+	if ( editing ) {
+		toolbarActions = (
+			<>
+				<Button
+					variant="secondary"
+					disabled={ actionBusy }
+					onClick={ cancelEdits }
+				>
+					{ __( 'Cancel edits', 'wp-autoplugin' ) }
+				</Button>
+				<Button
+					variant="primary"
+					isBusy={ actionBusy }
+					disabled={ actionBusy || ! dirtyPaths.size }
+					onClick={ saveRevision }
+				>
+					{ __( 'Save revision', 'wp-autoplugin' ) }
+				</Button>
+			</>
+		);
+	} else if ( manifest?.id === latestRevisionId ) {
+		toolbarActions = (
+			<>
+				<Button
+					variant="secondary"
+					disabled={ actionBusy || !! activeCodeWork }
+					onClick={ beginEdit }
+				>
+					{ __( 'Edit revision', 'wp-autoplugin' ) }
+				</Button>
+				<Button
+					variant="primary"
+					disabled={
+						actionBusy ||
+						!! activeCodeWork ||
+						! planValid ||
+						structureActive ||
+						! capability?.available
+					}
+					onClick={ () => generate( true ) }
+				>
+					{ failedLatestCode
+						? __( 'Generate again', 'wp-autoplugin' )
+						: __( 'Regenerate all code', 'wp-autoplugin' ) }
+				</Button>
+			</>
+		);
+	} else {
+		toolbarActions = (
+			<Button
+				variant="primary"
+				isBusy={ actionBusy }
+				disabled={ actionBusy || !! activeCodeWork }
+				onClick={ restoreSelected }
+			>
+				{ __( 'Restore as latest', 'wp-autoplugin' ) }
+			</Button>
+		);
+	}
+	let filePanel = (
+		<div className="code-editor-loading">
+			<Spinner /> { __( 'Loading file…', 'wp-autoplugin' ) }
+		</div>
+	);
+	if ( selectedFile && 'changes' === mode ) {
+		filePanel = <DiffView html={ selectedFile.diff_html } />;
+	} else if ( selectedFile ) {
+		filePanel = (
+			<CodeBufferEditor
+				key={ `${ manifest?.id }:${ selectedFile.id }:${ editing }` }
+				value={ displayedContent }
+				type={ selectedManifestFile?.type ?? 'php' }
+				readOnly={ ! editing }
+				focusLine={
+					focusIssue?.path === selectedFile.path ? focusIssue.line : 0
+				}
+				onChange={ ( content ) => {
+					if ( selectedManifestFile ) {
+						setBuffers( ( current ) => ( {
+							...current,
+							[ selectedManifestFile.path ]: content,
+						} ) );
+					}
+				} }
+			/>
+		);
+	}
+
+	if ( loading ) {
+		return (
+			<div className="workspace-job-loading">
+				<Spinner /> { __( 'Loading Code workspace…', 'wp-autoplugin' ) }
 			</div>
-			<div className="code-stage__editor">
-				<div className="stage-toolbar">
-					<div>
-						<strong>
-							{ __( 'Code editor', 'wp-autoplugin' ) }
-						</strong>
-						<small>
-							{ __(
-								'Files and change markers will appear here.',
-								'wp-autoplugin'
-							) }
-						</small>
-					</div>
-				</div>
-				<Notice status="info" isDismissible={ false }>
-					{ plan?.status === 'completed'
-						? __(
-								'The plan is ready. Code generation needs the v2 staged-revision worker, which is not available yet.',
-								'wp-autoplugin'
-						  )
-						: __(
-								'Complete the plan before generating a staged revision.',
-								'wp-autoplugin'
-						  ) }
+		);
+	}
+
+	return (
+		<div className="code-workspace">
+			{ localError && (
+				<Notice status="error" onRemove={ () => setLocalError( '' ) }>
+					{ localError }
 				</Notice>
-				<pre className="code-stage__placeholder">
+			) }
+			{ manifest && plan && manifest.plan_job_id !== plan.id && (
+				<Notice status="warning" isDismissible={ false }>
 					{ __(
-						'// Generated files will be editable here with add, modify, and delete markers.',
+						'The Plan has changed since this revision.',
 						'wp-autoplugin'
 					) }
-				</pre>
-				<div className="stage-next">
+				</Notice>
+			) }
+			{ manifest && ! manifest.plan_structure_matches && (
+				<Notice status="warning" isDismissible={ false }>
+					{ __(
+						'This revision’s file structure differs from its Plan. Regenerate all code to return to the latest Plan structure.',
+						'wp-autoplugin'
+					) }
+				</Notice>
+			) }
+			{ manifest && failedLatestCode && (
+				<Notice status="error" isDismissible={ false }>
+					{ latestCodeJob?.error_message ||
+						__(
+							'Code generation ended without creating a revision. The existing revision remains unchanged.',
+							'wp-autoplugin'
+						) }
+				</Notice>
+			) }
+			{ manifest && (
+				<div className="code-workspace__toolbar">
+					<label htmlFor="code-revision-select">
+						<span>{ __( 'Revision', 'wp-autoplugin' ) }</span>
+						<select
+							id="code-revision-select"
+							value={ selectedRevisionId ?? '' }
+							disabled={ editing }
+							onChange={ ( event ) =>
+								setSelectedRevisionId(
+									Number( event.target.value )
+								)
+							}
+						>
+							{ revisions.map( ( revision ) => (
+								<option
+									value={ revision.id }
+									key={ revision.id }
+								>
+									{ sprintf(
+										/* translators: %d: immutable revision number. */
+										__( 'Revision %d', 'wp-autoplugin' ),
+										revision.revision_number
+									) }{ ' ' }
+									· { revisionOrigin( revision.origin ) }
+								</option>
+							) ) }
+						</select>
+					</label>
+					<div className="code-workspace__provenance">
+						<strong>{ revisionOrigin( manifest.origin ) }</strong>
+						<span>
+							{ sprintf(
+								/* translators: %d: Plan job ID. */
+								__( 'Plan job #%d', 'wp-autoplugin' ),
+								manifest.plan_job_id ?? 0
+							) }
+						</span>
+						<span className="is-valid">
+							{ __( 'Valid', 'wp-autoplugin' ) }
+						</span>
+					</div>
+					<div className="code-workspace__actions">
+						{ toolbarActions }
+					</div>
+				</div>
+			) }
+			<div className="code-stage">
+				<aside className="code-stage__tree">
+					<strong>
+						{ manifest
+							? __( 'STAGED FILES', 'wp-autoplugin' )
+							: __( 'PLANNED FILES', 'wp-autoplugin' ) }
+					</strong>
+					<FileTree
+						files={ treeFiles }
+						selectedId={ selectedFileId }
+						dirtyPaths={ dirtyPaths }
+						problemPaths={
+							new Set( problems.map( ( issue ) => issue.path ) )
+						}
+						progress={ progressMap }
+						onSelect={ manifest ? selectFile : () => undefined }
+					/>
+				</aside>
+				<section className="code-stage__editor">
+					{ ! manifest ? (
+						<CodeGenerationPanel
+							plan={ displayedPlan }
+							planned={ planned }
+							job={ activeCodeJob ?? latestCodeJob }
+							capability={ capability }
+							planValid={ planValid }
+							disabled={
+								actionBusy ||
+								structureActive ||
+								!! activeCodeWork
+							}
+							onGenerate={ () => generate( false ) }
+							onCancel={ onCancel }
+						/>
+					) : (
+						<>
+							{ activeCodeJob && (
+								<CodeProgress
+									job={ activeCodeJob }
+									onCancel={ onCancel }
+									compact
+								/>
+							) }
+							<div className="code-file-header">
+								<div>
+									<strong>
+										{ selectedManifestFile?.path ??
+											__(
+												'Select a file',
+												'wp-autoplugin'
+											) }
+									</strong>
+									{ selectedManifestFile && (
+										<small>
+											{ selectedManifestFile.type } ·{ ' ' }
+											<OperationBadge
+												operation={
+													selectedManifestFile.change_type
+												}
+											/>
+										</small>
+									) }
+								</div>
+								<div className="code-file-header__modes">
+									<Button
+										variant={
+											mode === 'code'
+												? 'primary'
+												: 'secondary'
+										}
+										onClick={ () => setMode( 'code' ) }
+									>
+										{ __( 'Code', 'wp-autoplugin' ) }
+									</Button>
+									<Button
+										variant={
+											mode === 'changes'
+												? 'primary'
+												: 'secondary'
+										}
+										disabled={ dirtyPaths.size > 0 }
+										onClick={ () => setMode( 'changes' ) }
+									>
+										{ __( 'Changes', 'wp-autoplugin' ) }
+									</Button>
+								</div>
+							</div>
+							{ filePanel }
+							{ problems.length > 0 && (
+								<ProblemsPanel
+									issues={ problems }
+									onSelect={ ( issue ) => {
+										const file = manifest.files.find(
+											( item ) => item.path === issue.path
+										);
+										if ( file ) {
+											selectFile( file.id );
+											setMode( 'code' );
+											setFocusIssue( issue );
+										}
+									} }
+								/>
+							) }
+						</>
+					) }
+				</section>
+			</div>
+			{ manifest && (
+				<div className="code-statusbar">
 					<span>
+						{ sprintf(
+							/* translators: %d: number of files. */
+							__( '%d files', 'wp-autoplugin' ),
+							manifest.files_count
+						) }
+					</span>
+					<span>{ formatBytes( manifest.aggregate_size ) }</span>
+					<span>{ __( 'Validation: valid', 'wp-autoplugin' ) }</span>
+					<span>
+						A { manifest.adds ?? manifest.files_count } · M{ ' ' }
+						{ manifest.updates ?? 0 } · D { manifest.deletes ?? 0 }
+					</span>
+					<span className="code-statusbar__next">
 						{ __(
-							'Code remains read-only until a staged revision exists.',
+							'Review is the next unimplemented stage.',
 							'wp-autoplugin'
 						) }
 					</span>
@@ -1529,9 +2403,951 @@ function CodeStage( { plan }: { plan: Job | null } ) {
 						{ __( 'Continue to Review', 'wp-autoplugin' ) }
 					</Button>
 				</div>
-			</div>
+			) }
+			{ manifest && latestRevisionId && (
+				<CodeConversation
+					jobs={ conversationJobs }
+					revisions={ revisions }
+					latestRevisionId={ latestRevisionId }
+					selectedRevisionId={ selectedRevisionId }
+					editing={ editing }
+					dirty={ dirtyPaths.size > 0 }
+					capability={ capability }
+					activeCodeWork={ activeCodeWork }
+					onCancel={ onCancel }
+					onFollowUp={ onFollowUp }
+				/>
+			) }
 		</div>
 	);
+}
+
+function CodeConversation( {
+	jobs,
+	revisions,
+	latestRevisionId,
+	selectedRevisionId,
+	editing,
+	dirty,
+	capability,
+	activeCodeWork,
+	onCancel,
+	onFollowUp,
+}: {
+	jobs: Job[];
+	revisions: RevisionSummary[];
+	latestRevisionId: number;
+	selectedRevisionId: number | null;
+	editing: boolean;
+	dirty: boolean;
+	capability: AgentCapability | null;
+	activeCodeWork: Job | null;
+	onCancel: ( job: Job ) => void;
+	onFollowUp: (
+		message: string,
+		revisionId: number
+	) => Promise< Job | null >;
+} ) {
+	const [ message, setMessage ] = useState( '' );
+	const [ submitting, setSubmitting ] = useState( false );
+	const historical = selectedRevisionId !== latestRevisionId;
+	const disabled =
+		historical ||
+		editing ||
+		dirty ||
+		!! activeCodeWork ||
+		! capability?.available ||
+		submitting;
+	let disabledCopy = '';
+	if ( historical ) {
+		disabledCopy = __(
+			'Select the latest revision to send a message.',
+			'wp-autoplugin'
+		);
+	} else if ( editing || dirty ) {
+		disabledCopy = __(
+			'Save or cancel the edit session before sending a message.',
+			'wp-autoplugin'
+		);
+	} else if ( activeCodeWork ) {
+		disabledCopy = __(
+			'Wait for the active Code work to finish.',
+			'wp-autoplugin'
+		);
+	} else if ( ! capability?.available ) {
+		disabledCopy =
+			capability?.message ||
+			__( 'Configure a coder model to send a message.', 'wp-autoplugin' );
+	}
+
+	const revisionLabel = ( id: number ) => {
+		const revision = revisions.find( ( item ) => item.id === id );
+		return revision
+			? sprintf(
+					/* translators: %d: immutable revision number. */
+					__( 'Revision %d', 'wp-autoplugin' ),
+					revision.revision_number
+			  )
+			: sprintf(
+					/* translators: %d: revision record ID. */
+					__( 'Revision ID %d', 'wp-autoplugin' ),
+					id
+			  );
+	};
+
+	const send = async ( value = message ) => {
+		if ( disabled || ! value.trim() ) {
+			return;
+		}
+		setSubmitting( true );
+		const created = await onFollowUp( value.trim(), latestRevisionId );
+		setSubmitting( false );
+		if ( created && value === message ) {
+			setMessage( '' );
+		}
+	};
+
+	return (
+		<section className="code-conversation">
+			<header className="code-conversation__header">
+				<div>
+					<h3>
+						{ __(
+							'Ask about or change the code',
+							'wp-autoplugin'
+						) }
+					</h3>
+					<p>
+						{ __(
+							'Questions use the configured coder. Change requests may use multiple billable calls and create a staged revision immediately.',
+							'wp-autoplugin'
+						) }
+					</p>
+				</div>
+				{ capability?.available && (
+					<small>
+						{ capability.provider } · { capability.model }
+					</small>
+				) }
+			</header>
+			{ jobs.length > 0 && (
+				<div className="code-conversation__messages">
+					{ jobs.map( ( job ) => {
+						const anchor =
+							job.result?.base_revision_id ??
+							job.payload.revision_id ??
+							0;
+						const active = [
+							'queued',
+							'running',
+							'retrying',
+						].includes( job.status );
+						return (
+							<div
+								className="code-conversation__message"
+								key={ job.id }
+							>
+								<div className="code-conversation__question">
+									<div>
+										<strong>
+											{ __( 'You', 'wp-autoplugin' ) }
+										</strong>
+										{ anchor > 0 && (
+											<small>
+												{ revisionLabel( anchor ) }
+											</small>
+										) }
+									</div>
+									<p>{ job.payload.message }</p>
+								</div>
+								<div className="code-conversation__answer">
+									<strong>
+										{ __(
+											'Code assistant',
+											'wp-autoplugin'
+										) }
+									</strong>
+									{ active && (
+										<CodeProgress
+											job={ job }
+											onCancel={ onCancel }
+											compact
+										/>
+									) }
+									{ job.status === 'completed' &&
+										job.result?.outcome === 'answer' && (
+											<>
+												<Markdown
+													content={
+														job.result.content || ''
+													}
+												/>
+												<Button
+													variant="secondary"
+													disabled={ disabled }
+													onClick={ () =>
+														send(
+															job.payload
+																.message || ''
+														)
+													}
+												>
+													{ __(
+														'Retry answer',
+														'wp-autoplugin'
+													) }
+												</Button>
+											</>
+										) }
+									{ job.status === 'completed' &&
+										job.result?.outcome === 'revision' && (
+											<>
+												<Notice
+													status="success"
+													isDismissible={ false }
+												>
+													{ sprintf(
+														/* translators: %s: immutable revision label. */
+														__(
+															'Created %s.',
+															'wp-autoplugin'
+														),
+														revisionLabel(
+															job.result
+																.revision_id ||
+																0
+														)
+													) }
+												</Notice>
+												<Markdown
+													content={
+														job.result.content || ''
+													}
+												/>
+												<CodeChangePaths
+													added={
+														job.result
+															.added_paths || []
+													}
+													updated={
+														job.result
+															.updated_paths || []
+													}
+													deleted={
+														job.result
+															.deleted_paths || []
+													}
+												/>
+											</>
+										) }
+									{ [ 'failed', 'cancelled' ].includes(
+										job.status
+									) && (
+										<>
+											<Notice
+												status={
+													job.status === 'failed'
+														? 'error'
+														: 'warning'
+												}
+												isDismissible={ false }
+											>
+												{ job.error_message ||
+													__(
+														'The Code follow-up was cancelled.',
+														'wp-autoplugin'
+													) }
+											</Notice>
+											<Button
+												variant="secondary"
+												disabled={ disabled }
+												onClick={ () =>
+													send(
+														job.payload.message ||
+															''
+													)
+												}
+											>
+												{ __(
+													'Retry',
+													'wp-autoplugin'
+												) }
+											</Button>
+										</>
+									) }
+								</div>
+							</div>
+						);
+					} ) }
+				</div>
+			) }
+			<div className="code-conversation__composer">
+				<TextareaControl
+					label={ __( 'Message', 'wp-autoplugin' ) }
+					value={ message }
+					disabled={ disabled }
+					help={
+						disabledCopy ||
+						__(
+							'Ask a question or describe the exact change you want.',
+							'wp-autoplugin'
+						)
+					}
+					onChange={ setMessage }
+					onKeyDown={ ( event ) => {
+						if (
+							'Enter' === event.key &&
+							! event.shiftKey &&
+							! event.nativeEvent.isComposing
+						) {
+							event.preventDefault();
+							send();
+						}
+					} }
+				/>
+				<Button
+					variant="primary"
+					isBusy={ submitting }
+					disabled={ disabled || ! message.trim() }
+					onClick={ () => send() }
+				>
+					{ __( 'Send', 'wp-autoplugin' ) }
+				</Button>
+			</div>
+		</section>
+	);
+}
+
+function CodeChangePaths( {
+	added,
+	updated,
+	deleted,
+}: {
+	added: string[];
+	updated: string[];
+	deleted: string[];
+} ) {
+	const groups = [
+		{ operation: 'add' as const, paths: added },
+		{ operation: 'update' as const, paths: updated },
+		{ operation: 'delete' as const, paths: deleted },
+	].filter( ( group ) => group.paths.length > 0 );
+	return (
+		<div className="code-change-paths">
+			{ groups.map( ( group ) => (
+				<div key={ group.operation }>
+					<OperationBadge operation={ group.operation } />
+					<ul>
+						{ group.paths.map( ( path ) => (
+							<li key={ path }>
+								<code>{ path }</code>
+							</li>
+						) ) }
+					</ul>
+				</div>
+			) ) }
+		</div>
+	);
+}
+
+function CodeGenerationPanel( {
+	plan,
+	planned,
+	job,
+	capability,
+	planValid,
+	disabled,
+	onGenerate,
+	onCancel,
+}: {
+	plan: Job | null;
+	planned: Array< {
+		path: string;
+		type: string;
+		action: string;
+		description: string;
+	} >;
+	job: Job | null;
+	capability: AgentCapability | null;
+	planValid: boolean;
+	disabled: boolean;
+	onGenerate: () => void;
+	onCancel: ( job: Job ) => void;
+} ) {
+	if ( job && [ 'queued', 'running', 'retrying' ].includes( job.status ) ) {
+		return <CodeProgress job={ job } onCancel={ onCancel } />;
+	}
+	return (
+		<div className="code-generation">
+			<div>
+				<p className="eyebrow">
+					{ __( 'Ready to generate', 'wp-autoplugin' ) }
+				</p>
+				<h3>{ planPluginName( plan ) }</h3>
+				<p>
+					{ plan
+						? sprintf(
+								/* translators: 1: Plan job ID, 2: planned file count. */
+								__(
+									'Plan job #%1$d · %2$d planned files',
+									'wp-autoplugin'
+								),
+								plan.id,
+								planned.length
+						  )
+						: __(
+								'Complete the Plan before generating Code.',
+								'wp-autoplugin'
+						  ) }
+				</p>
+				{ capability && (
+					<p>
+						{ sprintf(
+							/* translators: 1: provider name, 2: coder model name. */
+							__( 'Coder: %1$s · %2$s', 'wp-autoplugin' ),
+							capability.provider,
+							capability.model
+						) }
+					</p>
+				) }
+			</div>
+			{ capability && ! capability.available && (
+				<Notice status="warning" isDismissible={ false }>
+					{ capability.message }
+				</Notice>
+			) }
+			{ plan && ! planValid && (
+				<Notice status="warning" isDismissible={ false }>
+					{ __(
+						'This Plan needs a valid main_file and 1–20 PHP, JavaScript, or CSS files. Regenerate the Plan structure before generating Code.',
+						'wp-autoplugin'
+					) }
+				</Notice>
+			) }
+			{ job && [ 'failed', 'cancelled' ].includes( job.status ) && (
+				<Notice status="error" isDismissible={ false }>
+					{ job.error_message ||
+						__(
+							'Code generation ended without a revision. The Plan is unchanged and you can generate again.',
+							'wp-autoplugin'
+						) }
+				</Notice>
+			) }
+			<Button
+				variant="primary"
+				disabled={ disabled || ! planValid || ! capability?.available }
+				onClick={ onGenerate }
+			>
+				{ job
+					? __( 'Generate again', 'wp-autoplugin' )
+					: __( 'Generate Code', 'wp-autoplugin' ) }
+			</Button>
+		</div>
+	);
+}
+
+function CodeProgress( {
+	job,
+	onCancel,
+	compact = false,
+}: {
+	job: Job;
+	onCancel: ( job: Job ) => void;
+	compact?: boolean;
+} ) {
+	const progress = job.code_progress;
+	const analyzing = progress?.phase === 'analysis';
+	let heading = __( 'Generating staged revision', 'wp-autoplugin' );
+	if ( analyzing ) {
+		heading = __( 'Analyzing Code follow-up', 'wp-autoplugin' );
+	} else if ( progress?.mode === 'follow_up' ) {
+		heading = __( 'Generating Code changes', 'wp-autoplugin' );
+	}
+	return (
+		<div className={ `code-progress ${ compact ? 'is-compact' : '' }` }>
+			<div className="code-progress__heading">
+				<div>
+					<strong>{ heading }</strong>
+					<small>
+						{ job.latest_event?.message ||
+							__( 'Preparing generation…', 'wp-autoplugin' ) }
+					</small>
+				</div>
+				<Button variant="secondary" onClick={ () => onCancel( job ) }>
+					{ __( 'Cancel', 'wp-autoplugin' ) }
+				</Button>
+			</div>
+			<progress
+				value={
+					progress && progress.total > 0
+						? progress.completed
+						: job.progress
+				}
+				max={ progress && progress.total > 0 ? progress.total : 100 }
+			/>
+			{ progress && (
+				<div className="code-progress__meta">
+					<span>
+						{ analyzing
+							? __( 'Analysis', 'wp-autoplugin' )
+							: sprintf(
+									/* translators: 1: completed file count, 2: total file count. */
+									__( '%1$d of %2$d files', 'wp-autoplugin' ),
+									progress.completed,
+									progress.total
+							  ) }
+					</span>
+					<span>
+						{ progress.provider } · { progress.model }
+					</span>
+					<span>
+						{ sprintf(
+							/* translators: %d: cumulative token count. */
+							__( '%d tokens', 'wp-autoplugin' ),
+							progress.input_tokens + progress.output_tokens
+						) }
+					</span>
+				</div>
+			) }
+			{ progress && progress.files.length > 0 && (
+				<ul className="code-progress__files">
+					{ progress.files.map( ( file ) => (
+						<li key={ file.path }>
+							<OperationBadge operation={ file.operation } />
+							<code>{ file.path }</code>
+							<span>{ file.status }</span>
+						</li>
+					) ) }
+				</ul>
+			) }
+		</div>
+	);
+}
+
+function OperationBadge( {
+	operation,
+}: {
+	operation: 'add' | 'update' | 'delete';
+} ) {
+	let label = 'D';
+	if ( 'add' === operation ) {
+		label = 'A';
+	} else if ( 'update' === operation ) {
+		label = 'M';
+	}
+	return (
+		<span
+			className={ `operation-badge operation-badge--${ operation }` }
+			title={ operation }
+		>
+			{ label }
+		</span>
+	);
+}
+
+type FileTreeItem = RevisionFileManifest;
+type TreeNode = { directories: Map< string, TreeNode >; files: FileTreeItem[] };
+
+function FileTree( {
+	files,
+	selectedId,
+	dirtyPaths,
+	problemPaths,
+	progress,
+	onSelect,
+}: {
+	files: FileTreeItem[];
+	selectedId: number | null;
+	dirtyPaths: Set< string >;
+	problemPaths: Set< string >;
+	progress: Record< string, string >;
+	onSelect: ( id: number ) => void;
+} ) {
+	const root = useMemo( () => {
+		const node: TreeNode = { directories: new Map(), files: [] };
+		files.forEach( ( file ) => {
+			const parts = file.path.split( '/' );
+			const name = parts.pop() || file.path;
+			let cursor = node;
+			parts.forEach( ( directory ) => {
+				if ( ! cursor.directories.has( directory ) ) {
+					cursor.directories.set( directory, {
+						directories: new Map(),
+						files: [],
+					} );
+				}
+				cursor = cursor.directories.get( directory ) as TreeNode;
+			} );
+			cursor.files.push( {
+				...file,
+				path: [ ...parts, name ].join( '/' ),
+			} );
+		} );
+		return node;
+	}, [ files ] );
+	return (
+		<div
+			className="file-tree"
+			role="tree"
+			tabIndex={ 0 }
+			onKeyDown={ treeKeyboardNavigation }
+		>
+			<FileTreeBranch
+				node={ root }
+				depth={ 0 }
+				selectedId={ selectedId }
+				dirtyPaths={ dirtyPaths }
+				problemPaths={ problemPaths }
+				progress={ progress }
+				onSelect={ onSelect }
+			/>
+		</div>
+	);
+}
+
+function FileTreeBranch( {
+	node,
+	depth,
+	selectedId,
+	dirtyPaths,
+	problemPaths,
+	progress,
+	onSelect,
+}: {
+	node: TreeNode;
+	depth: number;
+	selectedId: number | null;
+	dirtyPaths: Set< string >;
+	problemPaths: Set< string >;
+	progress: Record< string, string >;
+	onSelect: ( id: number ) => void;
+} ) {
+	return (
+		<>
+			{ [ ...node.directories.entries() ].map( ( [ name, child ] ) => (
+				<FileTreeDirectory
+					key={ name }
+					name={ name }
+					node={ child }
+					depth={ depth }
+					selectedId={ selectedId }
+					dirtyPaths={ dirtyPaths }
+					problemPaths={ problemPaths }
+					progress={ progress }
+					onSelect={ onSelect }
+				/>
+			) ) }
+			{ node.files.map( ( file ) => {
+				const status = progress[ file.path ];
+				return (
+					<button
+						type="button"
+						role="treeitem"
+						className={ `file-tree__file ${
+							selectedId === file.id ? 'is-selected' : ''
+						}` }
+						style={ {
+							paddingInlineStart: `${ 10 + depth * 14 }px`,
+						} }
+						onClick={ () => onSelect( file.id ) }
+						key={ file.id }
+					>
+						<OperationBadge operation={ file.change_type } />
+						<span>{ file.path.split( '/' ).pop() }</span>
+						{ dirtyPaths.has( file.path ) && (
+							<b
+								title={ __(
+									'Unsaved changes',
+									'wp-autoplugin'
+								) }
+							>
+								●
+							</b>
+						) }
+						{ problemPaths.has( file.path ) && (
+							<b
+								className="has-problem"
+								title={ __(
+									'Validation problem',
+									'wp-autoplugin'
+								) }
+							>
+								!
+							</b>
+						) }
+						{ status && (
+							<i
+								className={ `file-status file-status--${ status }` }
+							>
+								{ fileStatusContent( status ) }
+							</i>
+						) }
+					</button>
+				);
+			} ) }
+		</>
+	);
+}
+
+function FileTreeDirectory( props: {
+	name: string;
+	node: TreeNode;
+	depth: number;
+	selectedId: number | null;
+	dirtyPaths: Set< string >;
+	problemPaths: Set< string >;
+	progress: Record< string, string >;
+	onSelect: ( id: number ) => void;
+} ) {
+	const [ open, setOpen ] = useState( true );
+	return (
+		<div role="group">
+			<button
+				type="button"
+				className="file-tree__directory"
+				aria-expanded={ open }
+				style={ { paddingInlineStart: `${ 6 + props.depth * 14 }px` } }
+				onClick={ () => setOpen( ! open ) }
+			>
+				<span aria-hidden="true">{ open ? '⌄' : '›' }</span>
+				{ props.name }
+			</button>
+			{ open && (
+				<FileTreeBranch { ...props } depth={ props.depth + 1 } />
+			) }
+		</div>
+	);
+}
+
+function treeKeyboardNavigation( event: any ) {
+	if ( ! [ 'ArrowDown', 'ArrowUp' ].includes( event.key ) ) {
+		return;
+	}
+	const buttons = [
+		...event.currentTarget.querySelectorAll< HTMLButtonElement >(
+			'button:not([disabled])'
+		),
+	];
+	const index = buttons.indexOf(
+		event.currentTarget.ownerDocument.activeElement as HTMLButtonElement
+	);
+	const next =
+		'ArrowDown' === event.key
+			? Math.min( buttons.length - 1, index + 1 )
+			: Math.max( 0, index - 1 );
+	if ( index >= 0 && buttons[ next ] ) {
+		event.preventDefault();
+		buttons[ next ].focus();
+	}
+}
+
+function fileStatusContent( status: string ) {
+	if ( 'generating' === status ) {
+		return <Spinner />;
+	}
+	if ( 'completed' === status ) {
+		return '✓';
+	}
+	return 'failed' === status ? '!' : '○';
+}
+
+function CodeBufferEditor( {
+	value,
+	type,
+	readOnly,
+	focusLine,
+	onChange,
+}: {
+	value: string;
+	type: string;
+	readOnly: boolean;
+	focusLine: number;
+	onChange: ( value: string ) => void;
+} ) {
+	const textarea = useRef< HTMLTextAreaElement >( null );
+	const editor = useRef< any >( null );
+	const onChangeRef = useRef( onChange );
+	const initialValue = useRef( value );
+	onChangeRef.current = onChange;
+	useEffect( () => {
+		if ( ! textarea.current || ! window.wp?.codeEditor ) {
+			return;
+		}
+		const base = window.wpAutopluginV2.codeEditorSettings?.[ type ] ?? {};
+		let lineSeparator = '\n';
+		if ( initialValue.current.includes( '\r\n' ) ) {
+			lineSeparator = '\r\n';
+		} else if ( initialValue.current.includes( '\r' ) ) {
+			lineSeparator = '\r';
+		}
+		const settings = {
+			...base,
+			codemirror: {
+				...( ( base.codemirror as object ) ?? {} ),
+				readOnly: readOnly ? 'nocursor' : false,
+				lineSeparator,
+			},
+		};
+		const initialized = window.wp.codeEditor.initialize(
+			textarea.current,
+			settings
+		);
+		editor.current = initialized.codemirror;
+		if ( editor.current && ! readOnly ) {
+			editor.current.on( 'change', ( instance: any ) =>
+				onChangeRef.current( instance.getValue() )
+			);
+		}
+		return () => {
+			if ( editor.current?.toTextArea ) {
+				editor.current.toTextArea();
+			}
+			editor.current = null;
+		};
+	}, [ readOnly, type ] );
+	useEffect( () => {
+		if ( focusLine > 0 && editor.current ) {
+			editor.current.setCursor( { line: focusLine - 1, ch: 0 } );
+			editor.current.focus();
+		}
+	}, [ focusLine ] );
+	return (
+		<div className="code-buffer">
+			<textarea
+				ref={ textarea }
+				defaultValue={ value }
+				readOnly={ readOnly }
+				spellCheck={ false }
+				onChange={ ( event ) => onChange( event.target.value ) }
+			/>
+		</div>
+	);
+}
+
+function DiffView( { html }: { html: string } ) {
+	const purify = ( window as any ).DOMPurify;
+	const sanitized = purify ? purify.sanitize( html ) : '';
+	return sanitized ? (
+		<div
+			className="code-diff"
+			dangerouslySetInnerHTML={ { __html: sanitized } }
+		/>
+	) : (
+		<pre className="code-diff__fallback">
+			{ __( 'No changes for this file.', 'wp-autoplugin' ) }
+		</pre>
+	);
+}
+
+function ProblemsPanel( {
+	issues,
+	onSelect,
+}: {
+	issues: CodeIssue[];
+	onSelect: ( issue: CodeIssue ) => void;
+} ) {
+	return (
+		<section className="code-problems">
+			<strong>
+				{ sprintf(
+					/* translators: %d: number of validation problems. */
+					_n(
+						'%d problem',
+						'%d problems',
+						issues.length,
+						'wp-autoplugin'
+					),
+					issues.length
+				) }
+			</strong>
+			<ul>
+				{ issues.map( ( issue, index ) => (
+					<li key={ `${ issue.path }:${ issue.line }:${ index }` }>
+						<button
+							type="button"
+							onClick={ () => onSelect( issue ) }
+						>
+							<code>
+								{ issue.path }
+								{ issue.line ? `:${ issue.line }` : '' }
+							</code>
+							<span>{ issue.message }</span>
+						</button>
+					</li>
+				) ) }
+			</ul>
+		</section>
+	);
+}
+
+function planFiles( plan: Job | null ): Array< {
+	path: string;
+	type: string;
+	action: string;
+	description: string;
+} > {
+	const structure = plan ? planArtifactStructure( plan ) : null;
+	const project = structure?.project_structure as
+		| Record< string, unknown >
+		| undefined;
+	return Array.isArray( project?.files )
+		? project.files
+				.filter(
+					( file ): file is Record< string, unknown > =>
+						!! file && 'object' === typeof file
+				)
+				.map( ( file ) => ( {
+					path: String( file.path ?? '' ),
+					type: String( file.type ?? '' ),
+					action: String( file.action ?? '' ),
+					description: String( file.description ?? '' ),
+				} ) )
+				.filter(
+					( file ) =>
+						!! file.path &&
+						[ 'php', 'js', 'css' ].includes( file.type ) &&
+						'add' === file.action
+				)
+		: [];
+}
+
+function planMainFile(
+	plan: Job | null,
+	files: ReturnType< typeof planFiles >
+): string {
+	const structure = plan ? planArtifactStructure( plan ) : null;
+	if (
+		'string' === typeof structure?.main_file &&
+		files.some(
+			( file ) =>
+				file.path === structure.main_file &&
+				'php' === file.type &&
+				! file.path.includes( '/' )
+		)
+	) {
+		return structure.main_file;
+	}
+	const rootPhp = files.filter(
+		( file ) => 'php' === file.type && ! file.path.includes( '/' )
+	);
+	return 1 === rootPhp.length ? rootPhp[ 0 ].path : '';
+}
+
+function planPluginName( plan: Job | null ): string {
+	const structure = plan ? planArtifactStructure( plan ) : null;
+	return 'string' === typeof structure?.plugin_name
+		? structure.plugin_name
+		: __( 'New plugin', 'wp-autoplugin' );
+}
+
+function revisionOrigin( origin: RevisionSummary[ 'origin' ] ): string {
+	if ( 'manual' === origin ) {
+		return __( 'Edited', 'wp-autoplugin' );
+	}
+	if ( 'restore' === origin ) {
+		return __( 'Restored', 'wp-autoplugin' );
+	}
+	return __( 'AI generated', 'wp-autoplugin' );
 }
 
 function ReviewStage( { plan }: { plan: Job | null } ) {
@@ -1552,7 +3368,7 @@ function ReviewStage( { plan }: { plan: Job | null } ) {
 			<Notice status="info" isDismissible={ false }>
 				{ plan?.status === 'completed'
 					? __(
-							'Review generation needs a staged code revision, which is not available yet.',
+							'AI Review is the next stage and is not implemented yet. Staged Code remains available in revision history.',
 							'wp-autoplugin'
 					  )
 					: __(

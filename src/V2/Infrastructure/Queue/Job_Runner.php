@@ -5,6 +5,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Queue;
 use WP_Autoplugin\V2\Domain\AI\Agent_Task;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Agent_Run_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Code_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 
 /**
@@ -20,13 +21,15 @@ final class Job_Runner {
 		$job  = $jobs->find( $job_id );
 		$workspace    = $job ? ( new Workspace_Repository() )->find( (int) $job['workspace_id'] ) : null;
 		$is_agent_job = $job && $workspace && Agent_Task::uses_source_tools( $job, $workspace );
+		$is_resumable = $is_agent_job || ( $job && Job_Repository::is_code_work( $job ) );
 
-		if ( ! $job || ! in_array( $job['status'], $is_agent_job ? [ 'queued', 'running', 'retrying' ] : [ 'queued', 'retrying' ], true ) ) {
+		if ( ! $job || ! in_array( $job['status'], $is_resumable ? [ 'queued', 'running', 'retrying' ] : [ 'queued', 'retrying' ], true ) ) {
 			return;
 		}
 
 		if ( $job['cancel_requested'] ) {
 			( new Agent_Run_Repository() )->terminate_by_job( $job_id, 'cancelled' );
+			( new Code_Run_Repository() )->terminate_by_job( $job_id, 'cancelled' );
 			$jobs->update( $job_id, [ 'status' => 'cancelled', 'finished_at' => current_time( 'mysql', true ) ] );
 			$jobs->event( $job_id, 'cancelled', __( 'Job cancelled before execution.', 'wp-autoplugin' ) );
 			return;
@@ -61,8 +64,9 @@ final class Job_Runner {
 			}
 
 			$latest = $jobs->find( $job_id );
-			if ( $latest && $latest['cancel_requested'] ) {
+			if ( $latest && $latest['cancel_requested'] && empty( $result['revision_id'] ) ) {
 				( new Agent_Run_Repository() )->terminate_by_job( $job_id, 'cancelled' );
+				( new Code_Run_Repository() )->terminate_by_job( $job_id, 'cancelled' );
 				$jobs->update( $job_id, [ 'status' => 'cancelled', 'finished_at' => current_time( 'mysql', true ) ] );
 				$jobs->event( $job_id, 'cancelled', __( 'Job cancelled.', 'wp-autoplugin' ) );
 				return;
@@ -80,6 +84,7 @@ final class Job_Runner {
 			$jobs->event( $job_id, 'completed', __( 'Job completed.', 'wp-autoplugin' ) );
 		} catch ( \Throwable $error ) {
 			( new Agent_Run_Repository() )->terminate_by_job( $job_id, 'failed' );
+			( new Code_Run_Repository() )->terminate_by_job( $job_id, 'failed', $error->getMessage() );
 			$jobs->update(
 				$job_id,
 				[

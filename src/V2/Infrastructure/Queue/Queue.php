@@ -4,6 +4,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Queue;
 
 use WP_Autoplugin\V2\Infrastructure\Database\Agent_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Code_Run_Repository;
 
 /**
  * Enqueues short job-runner callbacks outside the originating request.
@@ -34,6 +35,14 @@ final class Queue {
 			}
 			$this->dispatch( $args[0], $args[1], true );
 			$jobs->event( $args[0], 'agent_recovered', __( 'Recovered a stalled source-agent continuation.', 'wp-autoplugin' ), [ 'generation' => $args[1] ], 'warning' );
+		}
+		foreach ( ( new Code_Run_Repository() )->recoverable() as $run ) {
+			$args = [ (int) $run['job_id'], (int) $run['generation'] ];
+			if ( as_has_scheduled_action( self::HOOK, $args, self::GROUP ) ) {
+				continue;
+			}
+			$this->dispatch( $args[0], $args[1], true );
+			$jobs->event( $args[0], 'code_recovered', __( 'Recovered a stalled Code generation continuation.', 'wp-autoplugin' ), [ 'generation' => $args[1] ], 'warning' );
 		}
 	}
 

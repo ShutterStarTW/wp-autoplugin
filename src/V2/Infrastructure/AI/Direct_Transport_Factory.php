@@ -10,19 +10,20 @@ use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 final class Direct_Transport_Factory {
 	/** @return array{available:bool,provider:string,model:string,effort:string,message:string} */
 	public function capability( string $stage = 'plan' ): array {
-		$role   = 'explain' === $stage ? 'reviewer' : 'planner';
+		$role   = 'code' === $stage ? 'coder' : ( 'explain' === $stage ? 'reviewer' : 'planner' );
 		$model  = Model_Effort::selected_model( $role );
 		$effort = Model_Effort::for_role( $role );
 		$models = Admin::get_models();
 		foreach ( (array) get_option( 'wp_autoplugin_custom_models', [] ) as $custom ) {
 			if ( $model === (string) ( $custom['name'] ?? '' ) ) {
 				$available = '' !== (string) ( $custom['url'] ?? '' ) && '' !== (string) ( $custom['apiKey'] ?? '' );
+				$resolved_model = trim( (string) ( $custom['modelParameter'] ?? '' ) ) ?: $model;
 				return [
 					'available' => $available,
 					'provider'  => 'custom',
-					'model'     => $model,
+					'model'     => $resolved_model,
 					'effort'    => '',
-					'message'   => $available ? __( 'V2 Plan is available.', 'wp-autoplugin' ) : __( 'Complete the selected custom model configuration.', 'wp-autoplugin' ),
+					'message'   => $available ? __( 'Direct v2 generation is available.', 'wp-autoplugin' ) : __( 'Complete the selected custom model configuration.', 'wp-autoplugin' ),
 				];
 			}
 		}
@@ -41,8 +42,8 @@ final class Direct_Transport_Factory {
 					'model'     => $model,
 					'effort'    => in_array( $provider, [ 'openai', 'anthropic' ], true ) ? $effort : '',
 					'message'   => $available
-						? __( 'V2 Plan is available.', 'wp-autoplugin' )
-						: __( 'Configure the API key for the selected planner model.', 'wp-autoplugin' ),
+						? __( 'Direct v2 generation is available.', 'wp-autoplugin' )
+						: __( 'Configure the API key for the selected model role.', 'wp-autoplugin' ),
 				];
 			}
 		}
@@ -51,7 +52,7 @@ final class Direct_Transport_Factory {
 			'provider'  => '',
 			'model'     => $model,
 			'effort'    => '',
-			'message'   => __( 'The selected planner model is not available for direct v2 Plan.', 'wp-autoplugin' ),
+			'message'   => __( 'The selected model is not available for this direct v2 task.', 'wp-autoplugin' ),
 		];
 	}
 
@@ -69,7 +70,7 @@ final class Direct_Transport_Factory {
 	}
 
 	/** @return Direct_Transport|\WP_Error */
-	private function create_for( string $provider, string $model, string $effort ) {
+	public function create_for( string $provider, string $model, string $effort ) {
 		if ( 'openai' === $provider || 'anthropic' === $provider ) {
 			return ( new Agent_Transport_Factory() )->create_for( $provider, $model, $effort );
 		}
@@ -81,14 +82,14 @@ final class Direct_Transport_Factory {
 		}
 		if ( 'custom' === $provider ) {
 			foreach ( (array) get_option( 'wp_autoplugin_custom_models', [] ) as $custom ) {
-				if ( $model !== (string) ( $custom['name'] ?? '' ) ) {
+				if ( $model !== (string) ( $custom['name'] ?? '' ) && $model !== (string) ( $custom['modelParameter'] ?? '' ) ) {
 					continue;
 				}
 				return new OpenAI_Compatible_Direct_Transport(
 					'custom',
 					(string) ( $custom['url'] ?? '' ),
 					(string) ( $custom['apiKey'] ?? '' ),
-					(string) ( $custom['modelParameter'] ?? $model ),
+					trim( (string) ( $custom['modelParameter'] ?? '' ) ) ?: $model,
 					$this->custom_headers( (array) ( $custom['headers'] ?? [] ) )
 				);
 			}

@@ -11,5 +11,6 @@ interface Direct_Transport {
 	public function effort(): string;
 
 	/** @return array<string, mixed>|\WP_Error */
-	public function complete( string $instructions, string $input );
+	/** @param array<string, mixed> $options Request limits and response-format hints. */
+	public function complete( string $instructions, string $input, array $options = [] );
 }

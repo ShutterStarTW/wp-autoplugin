@@ -12,11 +12,11 @@ final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transpo
 	public function model(): string { return $this->selected_model; }
 	public function effort(): string { return $this->selected_effort; }
 
-	public function complete( string $instructions, string $input ) {
-		return $this->send( $instructions, [ [ 'role' => 'user', 'content' => $input ] ], [] );
+	public function complete( string $instructions, string $input, array $options = [] ) {
+		return $this->send( $instructions, [ [ 'role' => 'user', 'content' => $input ] ], [], $options );
 	}
 
-	public function send( string $instructions, array $transcript, array $tools ) {
+	public function send( string $instructions, array $transcript, array $tools, array $options = [] ) {
 		$messages = [];
 		foreach ( $transcript as $item ) {
 			$role = (string) ( $item['role'] ?? '' );
@@ -42,7 +42,7 @@ final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transpo
 			}
 		}
 		$native_tools = array_map( static fn( array $tool ): array => [ 'name' => $tool['name'], 'description' => $tool['description'], 'input_schema' => $tool['parameters'] ], $tools );
-		$body = [ 'model' => $this->selected_model, 'system' => $instructions, 'messages' => $messages, 'max_tokens' => 4096 ];
+		$body = [ 'model' => $this->selected_model, 'system' => $instructions, 'messages' => $messages, 'max_tokens' => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 4096 ) ) ) ];
 		if ( $native_tools ) {
 			$body['tools']       = $native_tools;
 			$body['tool_choice'] = [ 'type' => 'auto' ];
