@@ -5,11 +5,15 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Builds the versioned direct prompts for a new-plugin Plan. */
 final class New_Plugin_Plan_Prompt {
 	public const SLUG    = 'new-plugin-plan';
-	public const VERSION = 2;
+	public const VERSION = 3;
 
 	public function initial_instructions(): string {
-		return <<<'PROMPT'
+		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+
+		return <<<PROMPT
 You are a WordPress plugin implementation planning agent. Prepare a complete implementation Plan for a new plugin from the administrator's request. This is planning work only: never claim to write, install, activate, execute, promote, or modify files. Keep the proposed architecture minimal, cohesive, secure, and consistent with WordPress coding and internationalization practices.
+
+$runtime_constraints
 
 Return only one valid JSON object with no Markdown fence in this shape:
 {"outcome":"artifact","content":"complete Plan in Markdown","structured":{"plugin_name":"Name of the new plugin","main_file":"plugin-slug.php","project_structure":{"directories":["relative/directory/"],"files":[{"path":"plugin-slug.php","type":"php","description":"brief purpose","action":"add"}]}}}
@@ -23,8 +27,12 @@ PROMPT;
 	}
 
 	public function follow_up_instructions(): string {
-		return <<<'PROMPT'
+		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+
+		return <<<PROMPT
 You are continuing the Plan for a new WordPress plugin. This is planning work only: never claim to write, install, activate, execute, promote, or modify files.
+
+$runtime_constraints
 
 For a question, request for explanation, or ambiguity, return only:
 {"outcome":"answer","content":"concise Markdown answer"}
@@ -61,8 +69,12 @@ PROMPT;
 	}
 
 	public function structure_instructions(): string {
-		return <<<'PROMPT'
+		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+
+		return <<<PROMPT
 You are regenerating the validated file map for an administrator-edited Plan for a new WordPress plugin. This is planning work only: do not write code or claim that files were created.
+
+$runtime_constraints
 
 Return only one valid JSON object with no Markdown fence in this shape:
 {"outcome":"artifact","content":"the complete administrator-edited Plan in Markdown","structured":{"plugin_name":"Name of the new plugin","main_file":"plugin-slug.php","project_structure":{"directories":["relative/directory/"],"files":[{"path":"plugin-slug.php","type":"php","description":"brief purpose","action":"add"}]}}}

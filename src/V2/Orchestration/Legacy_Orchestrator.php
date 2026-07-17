@@ -12,6 +12,7 @@ use WP_Autoplugin\Plugin_Fixer;
 use WP_Autoplugin\Plugin_Generator;
 use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 use WP_Autoplugin\V2\Domain\AI\Plan_Response;
+use WP_Autoplugin\V2\Domain\AI\Prompts\WordPress_Runtime_Constraints;
 use WP_Autoplugin\V2\Domain\Target\Source_Reader;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
@@ -172,13 +173,16 @@ final class Legacy_Orchestrator {
 			return new \WP_Error( 'plan_structure_artifact_missing', __( 'A completed Plan artifact is required to regenerate its file structure.', 'wp-autoplugin' ) );
 		}
 
-		$plan           = $this->artifact_content( $artifact );
-		$source_context = empty( $files ) ? __( 'No target source is available for this workspace.', 'wp-autoplugin' ) : AI_Utils::build_code_context( $files );
-		$is_extension   = 'hook_extension' === (string) $workspace['operation'];
+		$plan                = $this->artifact_content( $artifact );
+		$source_context      = empty( $files ) ? __( 'No target source is available for this workspace.', 'wp-autoplugin' ) : AI_Utils::build_code_context( $files );
+		$is_extension        = 'hook_extension' === (string) $workspace['operation'];
+		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
 		if ( $is_extension ) {
 			$prior_structure = (string) wp_json_encode( (array) ( $artifact['result']['structured'] ?? [] ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
 			$prompt = <<<PROMPT
 You are regenerating structured metadata for an administrator-edited Plan for a separate WordPress extension plugin. This is read-only planning work: do not write code or claim to modify files. The extension must not modify, delete, replace, or copy files in the inspected target.
+
+$runtime_constraints
 
 Original workspace request:
 """
@@ -208,6 +212,8 @@ PROMPT;
 		} else {
 			$prompt = <<<PROMPT
 You are preparing the file map for a WordPress development Plan. This is read-only planning work: do not write code or claim to modify files.
+
+$runtime_constraints
 
 Original workspace request:
 """
@@ -311,12 +317,14 @@ PROMPT;
 			return new \WP_Error( 'empty_target', __( 'There is no source to explain for this target.', 'wp-autoplugin' ) );
 		}
 
-		$current_artifact = $this->artifact_content( $artifact );
-		$history          = $this->conversation_history( $jobs->list_for_workspace( (int) $workspace['id'] ), $stage, (int) $job['id'] );
-		$source_context   = empty( $files ) ? __( 'No target source is available for this workspace.', 'wp-autoplugin' ) : AI_Utils::build_code_context( $files );
-		$artifact_label   = 'plan' === $stage ? __( 'current Plan artifact', 'wp-autoplugin' ) : __( 'current Explain context', 'wp-autoplugin' );
-		$prompt           = <<<PROMPT
+		$current_artifact    = $this->artifact_content( $artifact );
+		$history             = $this->conversation_history( $jobs->list_for_workspace( (int) $workspace['id'] ), $stage, (int) $job['id'] );
+		$source_context      = empty( $files ) ? __( 'No target source is available for this workspace.', 'wp-autoplugin' ) : AI_Utils::build_code_context( $files );
+		$artifact_label      = 'plan' === $stage ? __( 'current Plan artifact', 'wp-autoplugin' ) : __( 'current Explain context', 'wp-autoplugin' );
+		$runtime_constraints = 'plan' === $stage ? "\n\n" . WordPress_Runtime_Constraints::instructions() : '';
+		$prompt              = <<<PROMPT
 You are continuing a WordPress development workspace at the $stage stage.
+$runtime_constraints
 
 Original workspace request:
 """

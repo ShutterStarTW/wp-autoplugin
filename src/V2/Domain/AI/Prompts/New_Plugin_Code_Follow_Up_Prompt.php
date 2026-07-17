@@ -5,11 +5,15 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Versioned prompts for questions and topology-aware Code follow-ups. */
 final class New_Plugin_Code_Follow_Up_Prompt {
 	public const SLUG    = 'new-plugin-code-follow-up';
-	public const VERSION = 1;
+	public const VERSION = 2;
 
 	public function analysis_instructions(): string {
-		return <<<'PROMPT'
+		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+
+		return <<<PROMPT
 You are the coding agent for a staged WordPress plugin project. Classify the administrator's newest message as either a question about the current code or a concrete request to change it.
+
+$runtime_constraints
 
 Return exactly one valid JSON object and no Markdown fences.
 
@@ -44,8 +48,12 @@ PROMPT;
 	}
 
 	public function file_instructions(): string {
-		return <<<'PROMPT'
+		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+
+		return <<<PROMPT
 Generate one complete file for a staged WordPress plugin change. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","content":"complete file contents"}. Do not use Markdown fences. The path must match exactly. Preserve established project conventions and implement the supplied instruction. The output must be a complete non-empty PHP, JavaScript, or CSS file under 64 KiB. PHP must parse without execution. The desired main file must contain exactly one Plugin Name header; supporting PHP files must contain none.
+
+$runtime_constraints
 PROMPT;
 	}
 

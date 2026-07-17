@@ -5,20 +5,26 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Builds one bounded prompt for each approved installed-target file change. */
 final class Existing_Target_Code_Prompt {
 	public const SLUG    = 'existing-target-code';
-	public const VERSION = 2;
+	public const VERSION = 3;
 
 	public function instructions( string $operation = 'add' ): string {
+		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+
 		if ( 'update' === $operation ) {
-			return <<<'PROMPT'
+			return <<<PROMPT
 You are implementing one approved targeted edit in an existing WordPress plugin or theme. Use the supplied current file as the authoritative baseline. Return only the smallest exact search/replace operations needed to implement the approved Plan; never return, rewrite, or reproduce the complete file. Every search string must be copied byte-for-byte from the supplied current source, contain enough surrounding context to occur exactly once, and must not cover the entire file. All searches are matched against the original file and therefore must not overlap. Preserve unrelated behavior, formatting, comments, line endings, and code. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. For plugin targets, the main_file must retain exactly one populated Plugin Name header and supporting PHP files must not add one. Never change any unplanned path.
+
+$runtime_constraints
 
 Return only one valid JSON object with no Markdown fence and exactly this shape:
 {"path":"the exact requested relative path","replacements":[{"search":"exact existing source block","replace":"replacement source block"}]}
 PROMPT;
 		}
 
-		return <<<'PROMPT'
+		return <<<PROMPT
 You are implementing one approved new file in an existing WordPress plugin or theme. Return the complete production-ready added file. Integrate with the supplied target context without changing any unplanned path. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. Added PHP files in plugin targets must not contain a Plugin Name header; theme files must not be treated as plugin entry points. Never change, delete, rename, or create files outside the approved manifest. Previously generated files are authoritative staged context; target source is read-only context.
+
+$runtime_constraints
 
 Return only one valid JSON object with no Markdown fence and exactly this shape:
 {"path":"the exact requested relative path","content":"complete file contents"}

@@ -5,11 +5,15 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Builds one bounded prompt for each file in a separate hook-based extension plugin. */
 final class Extension_Plugin_Code_Prompt {
 	public const SLUG    = 'extension-plugin-code';
-	public const VERSION = 1;
+	public const VERSION = 2;
 
 	public function instructions(): string {
-		return <<<'PROMPT'
+		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+
+		return <<<PROMPT
 You are implementing one file in a new WordPress extension plugin from an approved, source-verified Plan. Return the complete production-ready file, not a patch. The extension must integrate through the hooks and public APIs described by the Plan and must never copy, edit, replace, or delete files in the inspected target plugin or theme. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. Do not create behavior or files outside the supplied Plan. Previously generated files are authoritative extension-plugin context. The main extension file must contain exactly one valid Plugin Name header; supporting PHP files must not contain a Plugin Name header.
+
+$runtime_constraints
 
 Return only one valid JSON object with no Markdown fence and exactly this shape:
 {"path":"the exact requested relative path","content":"complete file contents"}
