@@ -23,7 +23,7 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 		$response = wp_remote_post(
 			$this->endpoint,
 			[
-				'timeout' => 25,
+				'timeout' => Direct_Transport::REQUEST_TIMEOUT,
 				'headers' => array_merge(
 					[ 'Authorization' => 'Bearer ' . $this->api_key, 'Content-Type' => 'application/json' ],
 					$this->extra_headers

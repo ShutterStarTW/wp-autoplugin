@@ -176,7 +176,7 @@ final class Code_Run_Repository extends Repository {
 		return array_map( [ $this, 'hydrate' ], $rows );
 	}
 
-	public function acquire( int $run_id, int $generation, string $token, int $seconds = 90 ): bool {
+	public function acquire( int $run_id, int $generation, string $token, int $seconds = 330 ): bool {
 		$now     = $this->now();
 		$expires = gmdate( 'Y-m-d H:i:s', time() + $seconds );
 		$query   = $this->wpdb->prepare(

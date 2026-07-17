@@ -213,6 +213,13 @@ final class Code_Orchestrator {
 	private function retry_or_fail( \WP_Error $error, array $job, array $run, array $current, int $index, string $token, Code_Run_Repository $runs, Job_Repository $jobs ) {
 		$data      = (array) $error->get_error_data();
 		$ambiguous = ! empty( $data['ambiguous'] );
+		if ( $ambiguous ) {
+			$runs->release( (int) $run['id'], $token );
+			return new \WP_Error(
+				'code_provider_timeout',
+				__( 'The provider request timed out before WordPress received a response. It was not retried automatically because its completion and billing state are unknown. Start Code generation again manually.', 'wp-autoplugin' )
+			);
+		}
 		$retryable = ! $ambiguous && ( ! array_key_exists( 'retryable', $data ) || ! empty( $data['retryable'] ) );
 		$issues    = array_slice( (array) ( $data['issues'] ?? [] ), 0, 5 );
 		if ( $retryable && ! $issues ) {

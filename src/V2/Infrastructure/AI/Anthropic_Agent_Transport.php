@@ -53,7 +53,7 @@ final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transpo
 		$response = wp_remote_post(
 			'https://api.anthropic.com/v1/messages',
 			[
-				'timeout' => 25,
+				'timeout' => Direct_Transport::REQUEST_TIMEOUT,
 				'headers' => [ 'x-api-key' => $this->api_key, 'anthropic-version' => '2023-06-01', 'content-type' => 'application/json' ],
 				'body'    => wp_json_encode( $body ),
 			]

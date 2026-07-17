@@ -6,6 +6,7 @@ use WP_Autoplugin\V2\Infrastructure\AI\OpenAI_Agent_Transport;
 final class OpenAIAgentTransportTest extends WP_UnitTestCase {
 	/** @var array<string, mixed> */
 	private array $request_body = [];
+	private int $request_timeout = 0;
 
 	public function tear_down(): void {
 		remove_filter( 'pre_http_request', [ $this, 'capture_request' ], 10 );
@@ -23,6 +24,7 @@ final class OpenAIAgentTransportTest extends WP_UnitTestCase {
 
 		$this->assertFalse( is_wp_error( $result ) );
 		$this->assertSame( [ 'type' => 'json_object' ], $this->request_body['text']['format'] );
+		$this->assertSame( 300, $this->request_timeout );
 		$this->assertStringContainsStringIgnoringCase(
 			'json',
 			$this->request_body['input'][0]['content'][0]['text']
@@ -39,6 +41,7 @@ final class OpenAIAgentTransportTest extends WP_UnitTestCase {
 			return $response;
 		}
 		$this->request_body = (array) json_decode( (string) $args['body'], true );
+		$this->request_timeout = (int) ( $args['timeout'] ?? 0 );
 		return [
 			'headers'  => [],
 			'body'     => wp_json_encode(

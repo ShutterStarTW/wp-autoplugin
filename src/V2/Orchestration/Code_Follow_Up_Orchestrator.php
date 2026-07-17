@@ -343,6 +343,10 @@ final class Code_Follow_Up_Orchestrator {
 
 	private function retry_analysis_or_fail( \WP_Error $error, array $job, array $run, string $token, Job_Repository $jobs, Code_Run_Repository $runs ) {
 		$data      = (array) $error->get_error_data();
+		if ( ! empty( $data['ambiguous'] ) ) {
+			$runs->release( (int) $run['id'], $token );
+			return $this->timeout_error();
+		}
 		$retryable = empty( $data['ambiguous'] ) && ( ! array_key_exists( 'retryable', $data ) || ! empty( $data['retryable'] ) );
 		if ( $retryable && (int) $run['retry_count'] < 2 ) {
 			$runs->retry_analysis( (int) $run['id'], $token, $error->get_error_message() );
@@ -357,6 +361,10 @@ final class Code_Follow_Up_Orchestrator {
 
 	private function retry_file_or_fail( \WP_Error $error, array $job, array $run, array $current, int $index, string $token, Job_Repository $jobs, Code_Run_Repository $runs ) {
 		$data      = (array) $error->get_error_data();
+		if ( ! empty( $data['ambiguous'] ) ) {
+			$runs->release( (int) $run['id'], $token );
+			return $this->timeout_error();
+		}
 		$retryable = empty( $data['ambiguous'] ) && ( ! array_key_exists( 'retryable', $data ) || ! empty( $data['retryable'] ) );
 		$issues    = array_slice( (array) ( $data['issues'] ?? [] ), 0, 5 );
 		if ( $retryable && ! $issues ) {
@@ -446,5 +454,12 @@ final class Code_Follow_Up_Orchestrator {
 
 	private function conflict(): \WP_Error {
 		return new \WP_Error( 'revision_conflict', __( 'A newer revision exists. Reload the latest revision before retrying.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+	}
+
+	private function timeout_error(): \WP_Error {
+		return new \WP_Error(
+			'code_provider_timeout',
+			__( 'The provider request timed out before WordPress received a response. It was not retried automatically because its completion and billing state are unknown. Send the Code message again manually.', 'wp-autoplugin' )
+		);
 	}
 }

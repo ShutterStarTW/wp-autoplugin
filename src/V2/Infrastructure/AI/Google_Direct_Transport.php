@@ -16,7 +16,7 @@ final class Google_Direct_Transport implements Direct_Transport {
 		$response = wp_remote_post(
 			$url,
 			[
-				'timeout' => 25,
+				'timeout' => Direct_Transport::REQUEST_TIMEOUT,
 				'headers' => [ 'Content-Type' => 'application/json' ],
 				'body'    => wp_json_encode(
 					[

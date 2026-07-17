@@ -67,7 +67,7 @@ final class Agent_Run_Repository extends Repository {
 	/**
 	 * Atomically lease the expected continuation generation.
 	 */
-	public function acquire( int $run_id, int $generation, string $token, int $seconds = 90 ): bool {
+	public function acquire( int $run_id, int $generation, string $token, int $seconds = 330 ): bool {
 		$now     = $this->now();
 		$expires = gmdate( 'Y-m-d H:i:s', time() + $seconds );
 		$query   = $this->wpdb->prepare(

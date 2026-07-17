@@ -54,7 +54,7 @@ final class OpenAI_Agent_Transport implements Agent_Transport, Direct_Transport 
 		$response = wp_remote_post(
 			'https://api.openai.com/v1/responses',
 			[
-				'timeout' => 25,
+				'timeout' => Direct_Transport::REQUEST_TIMEOUT,
 				'headers' => [ 'Authorization' => 'Bearer ' . $this->api_key, 'Content-Type' => 'application/json' ],
 				'body'    => wp_json_encode( $body ),
 			]
