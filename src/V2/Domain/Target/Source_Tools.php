@@ -3,7 +3,7 @@
 namespace WP_Autoplugin\V2\Domain\Target;
 
 /**
- * Bounded, read-only source tools for Plan and Explain agents.
+ * Bounded, read-only target source access for agents and revision editing.
  */
 final class Source_Tools {
 	private const EXTENSIONS       = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'md', 'txt', 'xml', 'html' ];
@@ -120,6 +120,65 @@ final class Source_Tools {
 
 	public function tree_fingerprint(): string {
 		return $this->fingerprint( $this->tree() );
+	}
+
+	/**
+	 * Return the complete bounded text-source tree used by the revision editor.
+	 *
+	 * @return array{files:array<int,array<string,mixed>>,directories:array<int,string>,tree_fingerprint:string}
+	 */
+	public function revision_tree(): array {
+		$tree        = $this->tree();
+		$directories = [];
+		foreach ( $tree as $file ) {
+			$parts = explode( '/', (string) $file['path'] );
+			array_pop( $parts );
+			$directory = '';
+			foreach ( $parts as $part ) {
+				$directory .= ( '' === $directory ? '' : '/' ) . $part;
+				$directories[ $directory ] = true;
+			}
+		}
+
+		return [
+			'files'            => array_map(
+				static fn( array $file ): array => [
+					'path' => (string) $file['path'],
+					'type' => (string) $file['type'],
+					'size' => (int) $file['size'],
+				],
+				$tree
+			),
+			'directories'      => array_keys( $directories ),
+			'tree_fingerprint' => $this->fingerprint( $tree ),
+		];
+	}
+
+	/**
+	 * Read one complete bounded text-source file for the revision editor.
+	 *
+	 * @return array{path:string,type:string,size:int,content:string,content_hash:string}|\WP_Error
+	 */
+	public function revision_file( string $relative ) {
+		try {
+			$relative = $this->normalize_relative( $relative );
+			$path     = $this->safe_file( $relative );
+		} catch ( \Throwable $error ) {
+			return new \WP_Error( 'target_file_invalid', __( 'The requested target file is not available for revision editing.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+
+		$content = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Read-only constrained target file.
+		if ( false === $content ) {
+			return new \WP_Error( 'target_file_unreadable', __( 'The requested target file could not be read.', 'wp-autoplugin' ), [ 'status' => 500 ] );
+		}
+
+		return [
+			'path'         => $relative,
+			'type'         => strtolower( (string) pathinfo( $relative, PATHINFO_EXTENSION ) ),
+			'size'         => strlen( $content ),
+			'content'      => $content,
+			'content_hash' => hash( 'sha256', $content ),
+		];
 	}
 
 	/** @param array<string, string> $inspected */

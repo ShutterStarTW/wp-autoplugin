@@ -5,11 +5,20 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Builds one bounded prompt for each approved installed-target file change. */
 final class Existing_Target_Code_Prompt {
 	public const SLUG    = 'existing-target-code';
-	public const VERSION = 1;
+	public const VERSION = 2;
 
-	public function instructions(): string {
+	public function instructions( string $operation = 'add' ): string {
+		if ( 'update' === $operation ) {
+			return <<<'PROMPT'
+You are implementing one approved targeted edit in an existing WordPress plugin or theme. Use the supplied current file as the authoritative baseline. Return only the smallest exact search/replace operations needed to implement the approved Plan; never return, rewrite, or reproduce the complete file. Every search string must be copied byte-for-byte from the supplied current source, contain enough surrounding context to occur exactly once, and must not cover the entire file. All searches are matched against the original file and therefore must not overlap. Preserve unrelated behavior, formatting, comments, line endings, and code. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. For plugin targets, the main_file must retain exactly one populated Plugin Name header and supporting PHP files must not add one. Never change any unplanned path.
+
+Return only one valid JSON object with no Markdown fence and exactly this shape:
+{"path":"the exact requested relative path","replacements":[{"search":"exact existing source block","replace":"replacement source block"}]}
+PROMPT;
+		}
+
 		return <<<'PROMPT'
-You are implementing one approved file action in an existing WordPress plugin or theme. Return the complete production-ready file, not a patch. For an update, preserve unrelated behavior and use the supplied current file as the authoritative baseline. For an add, integrate with the supplied target context without changing any unplanned path. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. For plugin targets, an updated main_file must retain exactly one populated Plugin Name header and supporting PHP files must not add one; theme files must not be treated as plugin entry points. Never change, delete, rename, or create files outside the approved manifest. Previously generated files are authoritative staged context; target source is read-only context.
+You are implementing one approved new file in an existing WordPress plugin or theme. Return the complete production-ready added file. Integrate with the supplied target context without changing any unplanned path. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. Added PHP files in plugin targets must not contain a Plugin Name header; theme files must not be treated as plugin entry points. Never change, delete, rename, or create files outside the approved manifest. Previously generated files are authoritative staged context; target source is read-only context.
 
 Return only one valid JSON object with no Markdown fence and exactly this shape:
 {"path":"the exact requested relative path","content":"complete file contents"}
@@ -35,7 +44,7 @@ PROMPT;
 			'Previously generated staged files' => (string) wp_json_encode( $generated, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
 		];
 		if ( $issues ) {
-			$sections['Validation errors from the previous attempt; correct only these while returning the complete file'] = (string) wp_json_encode( array_slice( $issues, 0, 5 ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+			$sections['Validation errors from the previous attempt; correct only these in the required response format'] = (string) wp_json_encode( array_slice( $issues, 0, 5 ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
 		}
 		$output = [];
 		foreach ( $sections as $heading => $value ) {

@@ -6,10 +6,11 @@ use WP_Autoplugin\V2\Domain\AI\Json_Response;
 
 /** Deterministic validation for complete plugin projects and target-relative change sets. */
 final class Code_Validator {
-	public const MAX_FILES         = 20;
-	public const MAX_FILE_BYTES    = 65536;
-	public const MAX_PROJECT_BYTES = 262144;
-	private const SUPPORTED_TYPES  = [ 'php', 'js', 'css' ];
+	public const MAX_FILES             = 20;
+	public const MAX_FILE_BYTES        = 65536;
+	public const MAX_PROJECT_BYTES     = 262144;
+	public const MAX_MANUAL_FILE_BYTES = 262144;
+	private const SUPPORTED_TYPES  = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'md', 'txt', 'xml', 'html' ];
 
 	/**
 	 * Normalize and validate structured Plan metadata before billable work.
@@ -177,13 +178,116 @@ final class Code_Validator {
 	}
 
 	/**
+	 * Validate and apply bounded, non-overlapping exact replacements to an original target file.
+	 *
+	 * @param array<string, mixed> $expected Expected Update manifest row.
+	 * @param array<string, mixed> $manifest Normalized change manifest.
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function update_response( string $response, array $expected, array $manifest, string $original ) {
+		$path = (string) ( $expected['path'] ?? '' );
+		if ( str_contains( $response, '```' ) ) {
+			return $this->error( $path, 0, 'markdown_fence', __( 'The response must be JSON without Markdown code fences.', 'wp-autoplugin' ) );
+		}
+		$decoded = json_decode( Json_Response::strip_fence( $response ), true );
+		if (
+			! is_array( $decoded )
+			|| [ 'path', 'replacements' ] !== array_values( array_intersect( [ 'path', 'replacements' ], array_keys( $decoded ) ) )
+			|| array_diff( array_keys( $decoded ), [ 'path', 'replacements' ] )
+			|| ! is_string( $decoded['path'] ?? null )
+			|| ! is_array( $decoded['replacements'] ?? null )
+			|| ! $decoded['replacements']
+			|| count( $decoded['replacements'] ) > 20
+		) {
+			return $this->error( $path, 0, 'replacement_shape', __( 'The provider response must contain only the requested path and 1–20 exact search/replace operations.', 'wp-autoplugin' ) );
+		}
+		if ( $path !== $decoded['path'] ) {
+			return $this->error( $path, 0, 'wrong_path', __( 'The provider returned a different file path than requested.', 'wp-autoplugin' ) );
+		}
+
+		$edits   = [];
+		$issues  = [];
+		$payload = 0;
+		$seen    = [];
+		foreach ( $decoded['replacements'] as $replacement ) {
+			if (
+				! is_array( $replacement )
+				|| array_diff( array_keys( $replacement ), [ 'search', 'replace' ] )
+				|| ! array_key_exists( 'search', $replacement )
+				|| ! array_key_exists( 'replace', $replacement )
+				|| ! is_string( $replacement['search'] )
+				|| ! is_string( $replacement['replace'] )
+				|| '' === $replacement['search']
+			) {
+				$issues[] = $this->issue( $path, 0, 'replacement_shape', __( 'Each replacement must contain only a non-empty search string and a replacement string.', 'wp-autoplugin' ) );
+				continue;
+			}
+			$search  = $replacement['search'];
+			$replace = $replacement['replace'];
+			$payload += strlen( $search ) + strlen( $replace );
+			if ( isset( $seen[ $search ] ) ) {
+				$issues[] = $this->issue( $path, 0, 'duplicate_search', __( 'Each search block must be unique within the response.', 'wp-autoplugin' ) );
+				continue;
+			}
+			$seen[ $search ] = true;
+			if ( $search === $replace ) {
+				$issues[] = $this->issue( $path, 0, 'unchanged_replacement', __( 'A replacement must change its matched source block.', 'wp-autoplugin' ) );
+				continue;
+			}
+			if ( $search === $original ) {
+				$issues[] = $this->issue( $path, 0, 'whole_file_replace', __( 'An Update must use targeted replacements and cannot replace the entire file.', 'wp-autoplugin' ) );
+				continue;
+			}
+			$matches = substr_count( $original, $search );
+			if ( 1 !== $matches ) {
+				$issues[] = $this->issue( $path, 0, 'search_match_count', __( 'Each search block must occur exactly once in the original target file.', 'wp-autoplugin' ) );
+				continue;
+			}
+			$start   = (int) strpos( $original, $search );
+			$edits[] = [ 'start' => $start, 'end' => $start + strlen( $search ), 'search' => $search, 'replace' => $replace ];
+		}
+		if ( $payload > self::MAX_PROJECT_BYTES ) {
+			$issues[] = $this->issue( $path, 0, 'replacement_payload_large', __( 'The targeted replacement response exceeds the 256 KiB limit.', 'wp-autoplugin' ) );
+		}
+		usort( $edits, static fn( array $left, array $right ): int => $left['start'] <=> $right['start'] );
+		foreach ( $edits as $index => $edit ) {
+			if ( $index > 0 && $edits[ $index - 1 ]['end'] > $edit['start'] ) {
+				$issues[] = $this->issue( $path, 0, 'overlapping_replacements', __( 'Search blocks must not overlap in the original target file.', 'wp-autoplugin' ) );
+				break;
+			}
+		}
+		if ( $issues ) {
+			return new \WP_Error( 'code_validation_failed', $issues[0]['message'], [ 'issues' => array_slice( $issues, 0, 5 ), 'retryable' => true ] );
+		}
+
+		$content = $original;
+		foreach ( array_reverse( $edits ) as $edit ) {
+			$content = substr_replace( $content, $edit['replace'], $edit['start'], $edit['end'] - $edit['start'] );
+		}
+		$issues = $this->file_issues(
+			[
+				'path'        => $path,
+				'type'        => $expected['type'] ?? '',
+				'change_type' => 'update',
+				'content'     => $content,
+			],
+			$expected,
+			$manifest
+		);
+		if ( $issues ) {
+			return new \WP_Error( 'code_validation_failed', $issues[0]['message'], [ 'issues' => array_slice( $issues, 0, 5 ), 'retryable' => true ] );
+		}
+		return [ 'path' => $path, 'content' => $content, 'replacements' => count( $edits ) ];
+	}
+
+	/**
 	 * Validate the exact complete project or planned change set represented by a manifest.
 	 *
 	 * @param array<int, array<string, mixed>> $files    Complete staged files.
 	 * @param array<string, mixed>             $manifest Normalized manifest.
 	 * @return array<int, array<string, mixed>>
 	 */
-	public function project_issues( array $files, array $manifest ): array {
+	public function project_issues( array $files, array $manifest, int $max_file_bytes = self::MAX_FILE_BYTES ): array {
 		$expected = [];
 		foreach ( (array) ( $manifest['files'] ?? [] ) as $file ) {
 			$expected[ $file['path'] ] = $file;
@@ -206,7 +310,7 @@ final class Code_Validator {
 			}
 			$content = (string) ( $file['content'] ?? '' );
 			$total  += strlen( $content );
-			$issues = array_merge( $issues, $this->file_issues( $file, $expected[ $path ], $manifest ) );
+			$issues = array_merge( $issues, $this->file_issues( $file, $expected[ $path ], $manifest, $max_file_bytes ) );
 		}
 		foreach ( $expected as $path => $file ) {
 			if ( ! isset( $actual[ $path ] ) ) {
@@ -313,7 +417,7 @@ final class Code_Validator {
 	}
 
 	/** @param array<string, mixed> $file @param array<string, mixed> $expected @param array<string, mixed> $manifest */
-	private function file_issues( array $file, array $expected, array $manifest ): array {
+	private function file_issues( array $file, array $expected, array $manifest, int $max_file_bytes = self::MAX_FILE_BYTES ): array {
 		$path        = $this->path( (string) ( $file['path'] ?? '' ) );
 		$type        = sanitize_key( (string) ( $file['type'] ?? $expected['type'] ?? '' ) );
 		$change_type = sanitize_key( (string) ( $file['change_type'] ?? $file['action'] ?? 'add' ) );
@@ -343,10 +447,19 @@ final class Code_Validator {
 		if ( str_contains( $content, "\0" ) ) {
 			$issues[] = $this->issue( $path, 0, 'nul_byte', __( 'File content cannot contain NUL bytes.', 'wp-autoplugin' ) );
 		}
-		if ( strlen( $content ) > self::MAX_FILE_BYTES ) {
-			$issues[] = $this->issue( $path, 0, 'file_too_large', __( 'File content exceeds the 64 KiB limit.', 'wp-autoplugin' ) );
+		if ( strlen( $content ) > $max_file_bytes ) {
+			$issues[] = $this->issue(
+				$path,
+				0,
+				'file_too_large',
+				sprintf(
+					/* translators: %d: maximum file size in KiB. */
+					__( 'File content exceeds the %d KiB limit.', 'wp-autoplugin' ),
+					(int) floor( $max_file_bytes / 1024 )
+				)
+			);
 		}
-		if ( str_contains( $content, '```' ) ) {
+		if ( in_array( $type, [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss' ], true ) && str_contains( $content, '```' ) ) {
 			$issues[] = $this->issue( $path, 0, 'markdown_fence', __( 'File content cannot contain Markdown code fences.', 'wp-autoplugin' ) );
 		}
 		if ( 'php' === $type && '' !== $content ) {

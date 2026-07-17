@@ -3,6 +3,7 @@
 namespace WP_Autoplugin\V2\Infrastructure\Database;
 
 use WP_Autoplugin\V2\Domain\Revision\Code_Validator;
+use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 
 /** Persists and reads immutable validated staged revisions. */
 final class Revision_Repository extends Repository {
@@ -254,15 +255,22 @@ final class Revision_Repository extends Repository {
 			if ( '' === $path || ! array_key_exists( 'content', $change ) || isset( $changed[ $path ] ) ) {
 				return new \WP_Error( 'revision_changes_invalid', __( 'The edit session contains invalid or duplicate file changes.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 			}
-			$changed[ $path ] = (string) $change['content'];
+			$changed[ $path ] = [
+				'content'           => (string) $change['content'],
+				'base_content_hash' => is_string( $change['base_content_hash'] ?? null ) ? $change['base_content_hash'] : '',
+			];
 		}
 		if ( ! $changed ) {
 			return new \WP_Error( 'revision_changes_empty', __( 'No changed file contents were submitted.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
+		$manifest = $base['project_manifest'] ?? $this->revision_manifest( $base );
+		if ( is_wp_error( $manifest ) ) {
+			return $manifest;
+		}
 
 		$files = [];
 		foreach ( $base['files'] as $file ) {
-			$content = array_key_exists( $file['path'], $changed ) ? $changed[ $file['path'] ] : (string) $file['content'];
+			$content = array_key_exists( $file['path'], $changed ) ? $changed[ $file['path'] ]['content'] : (string) $file['content'];
 			unset( $changed[ $file['path'] ] );
 			$files[] = [
 				'path'              => $file['path'],
@@ -274,13 +282,49 @@ final class Revision_Repository extends Repository {
 			];
 		}
 		if ( $changed ) {
-			return new \WP_Error( 'revision_topology_change', __( 'This Code slice does not allow files to be added, removed, renamed, or moved.', 'wp-autoplugin' ), [ 'status' => 422 ] );
+			if ( 'changes' !== ( $manifest['scope'] ?? '' ) || count( $manifest['files'] ) + count( $changed ) > Code_Validator::MAX_FILES ) {
+				return new \WP_Error( 'revision_topology_change', __( 'This Code slice does not allow files to be added, removed, renamed, or moved.', 'wp-autoplugin' ), [ 'status' => 422 ] );
+			}
+			$workspace = ( new Workspace_Repository( $this->wpdb ) )->find( (int) $base['workspace_id'] );
+			try {
+				$tools = new Source_Tools( (array) ( $workspace['target_metadata'] ?? [] ) );
+			} catch ( \Throwable $error ) {
+				return new \WP_Error( 'revision_target_unavailable', __( 'The installed target is no longer available for revision editing.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+			}
+			if ( (string) ( $manifest['target_fingerprint'] ?? '' ) !== $tools->tree_fingerprint() ) {
+				return new \WP_Error( 'revision_target_changed', __( 'The installed target changed after this revision was staged. Regenerate Code before saving edits.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+			}
+
+			foreach ( $changed as $path => $change ) {
+				$source = $tools->revision_file( $path );
+				if ( is_wp_error( $source ) ) {
+					return new \WP_Error( 'revision_target_file_invalid', __( 'An edited target file is no longer available or safe to stage.', 'wp-autoplugin' ), [ 'status' => 422 ] );
+				}
+				if ( $path !== $source['path'] || $source['content_hash'] !== $change['base_content_hash'] ) {
+					return new \WP_Error( 'revision_target_file_changed', __( 'An edited target file changed after it was loaded. Reload the latest source before saving.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+				}
+				$files[] = [
+					'path'              => $source['path'],
+					'type'              => $source['type'],
+					'change_type'       => 'update',
+					'content'           => $change['content'],
+					'base_content'      => $source['content'],
+					'base_content_hash' => $source['content_hash'],
+				];
+				$manifest['files'][] = [
+					'path'        => $source['path'],
+					'type'        => $source['type'],
+					'description' => __( 'Administrator-edited target file.', 'wp-autoplugin' ),
+					'operation'   => 'update',
+				];
+				$manifest['base_hashes'][ $source['path'] ] = $source['content_hash'];
+			}
+			$manifest = ( new Code_Validator() )->manifest( $manifest );
+			if ( is_wp_error( $manifest ) ) {
+				return new \WP_Error( 'revision_manifest_invalid', __( 'The edited target files could not be added to this revision safely.', 'wp-autoplugin' ), [ 'status' => 422 ] );
+			}
 		}
-		$manifest = $base['project_manifest'] ?? $this->revision_manifest( $base );
-		if ( is_wp_error( $manifest ) ) {
-			return $manifest;
-		}
-		$issues = ( new Code_Validator() )->project_issues( $files, $manifest );
+		$issues = ( new Code_Validator() )->project_issues( $files, $manifest, Code_Validator::MAX_MANUAL_FILE_BYTES );
 		if ( $issues ) {
 			return new \WP_Error( 'revision_validation_failed', __( 'The edited project did not pass validation.', 'wp-autoplugin' ), [ 'status' => 422, 'issues' => $issues ] );
 		}
@@ -317,7 +361,7 @@ final class Revision_Repository extends Repository {
 		if ( is_wp_error( $manifest ) ) {
 			return $manifest;
 		}
-		$issues = ( new Code_Validator() )->project_issues( $files, $manifest );
+		$issues = ( new Code_Validator() )->project_issues( $files, $manifest, Code_Validator::MAX_MANUAL_FILE_BYTES );
 		if ( $issues ) {
 			return new \WP_Error( 'revision_restore_invalid', __( 'The selected historical revision no longer passes validation.', 'wp-autoplugin' ), [ 'status' => 422, 'issues' => $issues ] );
 		}

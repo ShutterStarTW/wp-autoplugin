@@ -3,6 +3,7 @@
 namespace WP_Autoplugin\V2\Rest;
 
 use WP_Autoplugin\V2\Domain\Target\Target_Scanner;
+use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 use WP_Autoplugin\V2\Domain\AI\Agent_Task;
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
@@ -135,6 +136,15 @@ final class Routes {
 			'args'                => [
 				'id'      => [ 'type' => 'integer', 'minimum' => 1 ],
 				'file_id' => [ 'type' => 'integer', 'minimum' => 1 ],
+			],
+		] );
+		register_rest_route( self::NAMESPACE, '/revisions/(?P<id>\d+)/target-file', [
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => [ $this, 'revision_target_file' ],
+			'permission_callback' => $permission,
+			'args'                => [
+				'id'   => [ 'type' => 'integer', 'minimum' => 1 ],
+				'path' => [ 'required' => true, 'type' => 'string' ],
 			],
 		] );
 		register_rest_route( self::NAMESPACE, '/revisions/(?P<id>\d+)/successors', [
@@ -429,8 +439,42 @@ final class Routes {
 	/** Return revision provenance and a body-free file manifest. */
 	public function revision( \WP_REST_Request $request ) {
 		$revision = ( new Revision_Repository() )->manifest( (int) $request['id'] );
-		if ( ! $revision || ! $this->workspace_for_current_user( (int) $revision['workspace_id'] ) ) {
+		$workspace = $revision ? $this->workspace_for_current_user( (int) $revision['workspace_id'] ) : null;
+		if ( ! $revision || ! $workspace ) {
 			return new \WP_Error( 'wp_autoplugin_revision_not_found', __( 'Revision not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+		if ( 'changes' === ( $revision['project_manifest']['scope'] ?? '' ) ) {
+			try {
+				$tree        = ( new Source_Tools( (array) $workspace['target_metadata'] ) )->revision_tree();
+				$fingerprint = (string) ( $revision['project_manifest']['target_fingerprint'] ?? '' );
+				if ( '' === $fingerprint || $fingerprint !== $tree['tree_fingerprint'] ) {
+					$revision['target_files']      = [];
+					$revision['target_directories'] = [];
+					$revision['target_tree_error'] = __( 'The installed target changed after this revision was staged. Regenerate Code to refresh its complete file tree.', 'wp-autoplugin' );
+				} else {
+					$staged = array_fill_keys( array_column( $revision['files'], 'path' ), true );
+					$target = [];
+					foreach ( $tree['files'] as $index => $file ) {
+						if ( isset( $staged[ $file['path'] ] ) ) {
+							continue;
+						}
+						$target[] = [
+							'id'           => -1 - $index,
+							'path'         => $file['path'],
+							'type'         => $file['type'],
+							'change_type'  => null,
+							'content_hash' => '',
+							'size'         => $file['size'],
+						];
+					}
+					$revision['target_files']       = $target;
+					$revision['target_directories'] = $tree['directories'];
+				}
+			} catch ( \Throwable $error ) {
+				$revision['target_files']       = [];
+				$revision['target_directories'] = [];
+				$revision['target_tree_error']  = __( 'The complete target file tree could not be loaded safely.', 'wp-autoplugin' );
+			}
 		}
 		return rest_ensure_response( $revision );
 	}
@@ -446,6 +490,51 @@ final class Routes {
 		return $file
 			? rest_ensure_response( $file )
 			: new \WP_Error( 'wp_autoplugin_revision_file_not_found', __( 'Revision file not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+	}
+
+	/** Return one untouched target file after verifying the staged target snapshot is still current. */
+	public function revision_target_file( \WP_REST_Request $request ) {
+		$repository = new Revision_Repository();
+		$revision   = $repository->manifest( (int) $request['id'] );
+		$workspace  = $revision ? $this->workspace_for_current_user( (int) $revision['workspace_id'] ) : null;
+		if ( ! $revision || ! $workspace ) {
+			return new \WP_Error( 'wp_autoplugin_revision_not_found', __( 'Revision not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+		$manifest = (array) ( $revision['project_manifest'] ?? [] );
+		if ( 'changes' !== ( $manifest['scope'] ?? '' ) ) {
+			return new \WP_Error( 'wp_autoplugin_target_file_unavailable', __( 'This revision does not edit an installed target.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+
+		$path = (string) $request['path'];
+		if ( in_array( $path, array_column( $revision['files'], 'path' ), true ) ) {
+			return new \WP_Error( 'wp_autoplugin_target_file_staged', __( 'This file already belongs to the staged revision.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+		try {
+			$tools = new Source_Tools( (array) $workspace['target_metadata'] );
+			if ( (string) ( $manifest['target_fingerprint'] ?? '' ) !== $tools->tree_fingerprint() ) {
+				return new \WP_Error( 'wp_autoplugin_target_changed', __( 'The installed target changed after this revision was staged. Regenerate Code before editing its files.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+			}
+			$file = $tools->revision_file( $path );
+		} catch ( \Throwable $error ) {
+			return new \WP_Error( 'wp_autoplugin_target_file_unavailable', __( 'The requested target file could not be loaded safely.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+		if ( is_wp_error( $file ) ) {
+			return $file;
+		}
+
+		return rest_ensure_response(
+			[
+				'id'           => 0,
+				'revision_id'  => (int) $revision['id'],
+				'path'         => $file['path'],
+				'type'         => $file['type'],
+				'change_type'  => null,
+				'content'      => $file['content'],
+				'content_hash' => $file['content_hash'],
+				'size'         => $file['size'],
+				'diff_html'    => '',
+			]
+		);
 	}
 
 	/** Save all changed buffers as exactly one immutable successor. */

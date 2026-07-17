@@ -52,6 +52,52 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$this->assertWPError( $this->validator->response( '```json {"path":"example.php","content":"<?php"} ```', $expected, 'example.php' ) );
 	}
 
+	public function test_update_response_applies_only_exact_targeted_replacements(): void {
+		$original = "<?php\nfunction fixture_value() {\n\treturn 1;\n}\n";
+		$expected = [ 'path' => 'functions.php', 'type' => 'php', 'operation' => 'update' ];
+		$manifest = [ 'scope' => 'changes', 'artifact_kind' => 'theme', 'main_file' => '' ];
+		$response = wp_json_encode(
+			[
+				'path'         => 'functions.php',
+				'replacements' => [
+					[ 'search' => "\treturn 1;", 'replace' => "\treturn 2;" ],
+				],
+			]
+		);
+
+		$result = $this->validator->update_response( (string) $response, $expected, $manifest, $original );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( "<?php\nfunction fixture_value() {\n\treturn 2;\n}\n", $result['content'] );
+		$this->assertSame( 1, $result['replacements'] );
+	}
+
+	public function test_update_response_rejects_whole_file_and_ambiguous_searches(): void {
+		$original = "<?php\nreturn 1;\nreturn 1;\n";
+		$expected = [ 'path' => 'functions.php', 'type' => 'php', 'operation' => 'update' ];
+		$manifest = [ 'scope' => 'changes', 'artifact_kind' => 'theme', 'main_file' => '' ];
+		$whole = wp_json_encode(
+			[
+				'path'         => 'functions.php',
+				'replacements' => [ [ 'search' => $original, 'replace' => "<?php\nreturn 2;\n" ] ],
+			]
+		);
+		$ambiguous = wp_json_encode(
+			[
+				'path'         => 'functions.php',
+				'replacements' => [ [ 'search' => 'return 1;', 'replace' => 'return 2;' ] ],
+			]
+		);
+
+		$whole_result = $this->validator->update_response( (string) $whole, $expected, $manifest, $original );
+		$ambiguous_result = $this->validator->update_response( (string) $ambiguous, $expected, $manifest, $original );
+
+		$this->assertWPError( $whole_result );
+		$this->assertSame( 'whole_file_replace', $whole_result->get_error_data()['issues'][0]['code'] );
+		$this->assertWPError( $ambiguous_result );
+		$this->assertSame( 'search_match_count', $ambiguous_result->get_error_data()['issues'][0]['code'] );
+	}
+
 	public function test_project_rejects_php_syntax_and_invalid_plugin_headers(): void {
 		$manifest = [
 			'main_file' => 'example.php',
@@ -92,6 +138,26 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$codes = array_column( $issues, 'code' );
 		$this->assertContains( 'file_too_large', $codes );
 		$this->assertContains( 'missing_file', $codes );
+	}
+
+	public function test_manual_target_edit_allows_a_bounded_large_text_file(): void {
+		$manifest = [
+			'scope'         => 'changes',
+			'artifact_kind' => 'theme',
+			'main_file'     => '',
+			'files'         => [
+				[ 'path' => 'notes.txt', 'type' => 'txt', 'operation' => 'update' ],
+			],
+		];
+		$files = [
+			[ 'path' => 'notes.txt', 'type' => 'txt', 'change_type' => 'update', 'content' => str_repeat( 'a', Code_Validator::MAX_FILE_BYTES + 1 ) ],
+		];
+
+		$generated_codes = array_column( $this->validator->project_issues( $files, $manifest ), 'code' );
+		$manual_codes = array_column( $this->validator->project_issues( $files, $manifest, Code_Validator::MAX_MANUAL_FILE_BYTES ), 'code' );
+
+		$this->assertContains( 'file_too_large', $generated_codes );
+		$this->assertNotContains( 'file_too_large', $manual_codes );
 	}
 
 	public function test_revision_manifest_rejects_duplicates_and_invalid_main_file(): void {

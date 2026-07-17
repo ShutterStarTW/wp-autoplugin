@@ -130,8 +130,8 @@ type RevisionSummary = {
 type RevisionFileManifest = {
 	id: number;
 	path: string;
-	type: 'php' | 'js' | 'css';
-	change_type: 'add' | 'update' | 'delete';
+	type: string;
+	change_type: 'add' | 'update' | 'delete' | null;
 	content_hash: string;
 	size: number;
 };
@@ -153,6 +153,9 @@ type RevisionManifest = RevisionSummary & {
 	} | null;
 	plan_structure_matches: boolean;
 	validation: { status: string; issues: CodeIssue[] };
+	target_files?: RevisionFileManifest[];
+	target_directories?: string[];
+	target_tree_error?: string;
 };
 
 type RevisionFile = RevisionFileManifest & {
@@ -160,6 +163,19 @@ type RevisionFile = RevisionFileManifest & {
 	content: string;
 	diff_html: string;
 };
+
+function revisionVisibleFiles(
+	manifest: RevisionManifest
+): RevisionFileManifest[] {
+	const files = new Map< string, RevisionFileManifest >();
+	( manifest.target_files ?? [] ).forEach( ( file ) =>
+		files.set( file.path, file )
+	);
+	manifest.files.forEach( ( file ) => files.set( file.path, file ) );
+	return [ ...files.values() ].sort( ( left, right ) =>
+		left.path.localeCompare( right.path )
+	);
+}
 
 type CodeIssue = { path: string; line: number; code: string; message: string };
 
@@ -1789,6 +1805,10 @@ function CodeStage( {
 		!! latestCodeJob &&
 		[ 'failed', 'cancelled' ].includes( latestCodeJob.status ) &&
 		! latestCodeJob.result?.revision_id;
+	const visibleFiles = useMemo(
+		() => ( manifest ? revisionVisibleFiles( manifest ) : [] ),
+		[ manifest ]
+	);
 
 	const loadRevisions = useCallback(
 		async ( preferredId?: number ) => {
@@ -1871,10 +1891,11 @@ function CodeStage( {
 				if ( ! current ) {
 					return;
 				}
+				const files = revisionVisibleFiles( response );
 				const selectedFile =
-					response.files.find(
+					files.find(
 						( file ) => file.path === selectedFilePath.current
-					) ?? response.files[ 0 ];
+					) ?? files[ 0 ];
 				setManifest( response );
 				setSelectedFileId( selectedFile?.id ?? null );
 				selectedFilePath.current = selectedFile?.path ?? '';
@@ -1888,19 +1909,28 @@ function CodeStage( {
 	}, [ selectedRevisionId ] );
 
 	const loadFile = useCallback(
-		async ( revisionId: number, fileId: number ) => {
-			const key = `${ revisionId }:${ fileId }`;
+		async ( revisionId: number, file: RevisionFileManifest ) => {
+			const key = `${ revisionId }:${ file.id }`;
 			if ( fileBodies[ key ] ) {
 				return fileBodies[ key ];
 			}
 			const response = await apiFetch< RevisionFile >( {
-				path: `${ rest }/revisions/${ revisionId }/files/${ fileId }`,
+				path: file.change_type
+					? `${ rest }/revisions/${ revisionId }/files/${ file.id }`
+					: `${ rest }/revisions/${ revisionId }/target-file?path=${ encodeURIComponent(
+							file.path
+					  ) }`,
 			} );
+			const loaded = {
+				...response,
+				id: file.id,
+				change_type: file.change_type,
+			};
 			setFileBodies( ( current ) => ( {
 				...current,
-				[ key ]: response,
+				[ key ]: loaded,
 			} ) );
-			return response;
+			return loaded;
 		},
 		[ fileBodies ]
 	);
@@ -1910,33 +1940,50 @@ function CodeStage( {
 			selectedRevisionId &&
 			selectedFileId &&
 			manifest?.id === selectedRevisionId &&
-			manifest.files.some( ( file ) => file.id === selectedFileId )
+			visibleFiles.some( ( file ) => file.id === selectedFileId )
 		) {
-			loadFile( selectedRevisionId, selectedFileId ).catch( ( reason ) =>
-				setLocalError( reason.message )
+			const file = visibleFiles.find(
+				( item ) => item.id === selectedFileId
 			);
+			if ( file ) {
+				loadFile( selectedRevisionId, file ).catch( ( reason ) =>
+					setLocalError( reason.message )
+				);
+			}
 		}
-	}, [ selectedRevisionId, selectedFileId, manifest, loadFile ] );
+	}, [
+		selectedRevisionId,
+		selectedFileId,
+		manifest,
+		visibleFiles,
+		loadFile,
+	] );
 
 	const selectFile = useCallback(
 		( fileId: number ) => {
-			const file = manifest?.files.find( ( item ) => item.id === fileId );
+			const file = visibleFiles.find( ( item ) => item.id === fileId );
 			selectedFilePath.current = file?.path ?? '';
 			setSelectedFileId( fileId );
+			if ( ! file?.change_type ) {
+				setMode( 'code' );
+			}
 		},
-		[ manifest ]
+		[ visibleFiles ]
 	);
 
 	const baseContents = useMemo( () => {
 		const values: Record< string, string > = {};
-		manifest?.files.forEach( ( file ) => {
+		if ( ! manifest ) {
+			return values;
+		}
+		visibleFiles.forEach( ( file ) => {
 			const loaded = fileBodies[ `${ manifest.id }:${ file.id }` ];
 			if ( loaded ) {
 				values[ file.path ] = loaded.content;
 			}
 		} );
 		return values;
-	}, [ manifest, fileBodies ] );
+	}, [ manifest, visibleFiles, fileBodies ] );
 	const dirtyPaths = useMemo(
 		() =>
 			new Set(
@@ -1960,7 +2007,7 @@ function CodeStage( {
 	}, [ dirtyPaths.size ] );
 
 	const selectedManifestFile =
-		manifest?.files.find( ( file ) => file.id === selectedFileId ) ?? null;
+		visibleFiles.find( ( file ) => file.id === selectedFileId ) ?? null;
 	const selectedFile =
 		manifest && selectedFileId
 			? fileBodies[ `${ manifest.id }:${ selectedFileId }` ] ?? null
@@ -1969,30 +2016,14 @@ function CodeStage( {
 		? buffers[ selectedManifestFile.path ] ?? selectedFile?.content ?? ''
 		: '';
 
-	async function beginEdit() {
+	function beginEdit() {
 		if ( ! manifest || manifest.id !== latestRevisionId ) {
 			return;
 		}
-		setActionBusy( true );
-		try {
-			const loaded = await Promise.all(
-				manifest.files.map( ( file ) =>
-					loadFile( manifest.id, file.id )
-				)
-			);
-			setBuffers(
-				Object.fromEntries(
-					loaded.map( ( file ) => [ file.path, file.content ] )
-				)
-			);
-			setEditing( true );
-			setMode( 'code' );
-			setProblems( [] );
-		} catch ( reason: any ) {
-			setLocalError( reason.message );
-		} finally {
-			setActionBusy( false );
-		}
+		setBuffers( {} );
+		setEditing( true );
+		setMode( 'code' );
+		setProblems( [] );
 	}
 
 	function cancelEdits() {
@@ -2031,6 +2062,14 @@ function CodeStage( {
 					changes: [ ...dirtyPaths ].map( ( path ) => ( {
 						path,
 						content: buffers[ path ],
+						base_content_hash:
+							fileBodies[
+								`${ manifest.id }:${
+									visibleFiles.find(
+										( file ) => file.path === path
+									)?.id ?? ''
+								}`
+							]?.content_hash ?? '',
 					} ) ),
 				},
 			} );
@@ -2044,7 +2083,7 @@ function CodeStage( {
 				setProblems( issues );
 			}
 			setLocalError(
-				reason?.data?.status === 409
+				reason?.code === 'revision_conflict'
 					? __(
 							'A newer revision exists. Your buffers are preserved; reload the latest revision before retrying.',
 							'wp-autoplugin'
@@ -2137,7 +2176,7 @@ function CodeStage( {
 		progressFiles.map( ( file ) => [ file.path, file.status ] )
 	);
 	const treeFiles =
-		manifest?.files ??
+		( manifest ? visibleFiles : null ) ??
 		planned.map( ( file, index ) => ( {
 			id: index,
 			path: file.path,
@@ -2146,6 +2185,12 @@ function CodeStage( {
 			content_hash: '',
 			size: 0,
 		} ) );
+	let treeLabel = __( 'PLANNED FILES', 'wp-autoplugin' );
+	if ( manifest?.project_manifest?.scope === 'changes' ) {
+		treeLabel = __( 'TARGET FILES', 'wp-autoplugin' );
+	} else if ( manifest ) {
+		treeLabel = __( 'STAGED FILES', 'wp-autoplugin' );
+	}
 	let regenerateLabel = failedLatestCode
 		? __( 'Generate again', 'wp-autoplugin' )
 		: __( 'Regenerate all code', 'wp-autoplugin' );
@@ -2288,6 +2333,11 @@ function CodeStage( {
 						  ) }
 				</Notice>
 			) }
+			{ manifest?.target_tree_error && (
+				<Notice status="warning" isDismissible={ false }>
+					{ manifest.target_tree_error }
+				</Notice>
+			) }
 			{ manifest && failedLatestCode && (
 				<Notice status="error" isDismissible={ false }>
 					{ latestCodeJob?.error_message ||
@@ -2346,13 +2396,10 @@ function CodeStage( {
 			) }
 			<div className="code-stage">
 				<aside className="code-stage__tree">
-					<strong>
-						{ manifest
-							? __( 'STAGED FILES', 'wp-autoplugin' )
-							: __( 'PLANNED FILES', 'wp-autoplugin' ) }
-					</strong>
+					<strong>{ treeLabel }</strong>
 					<FileTree
 						files={ treeFiles }
+						directories={ manifest?.target_directories ?? [] }
 						selectedId={ selectedFileId }
 						dirtyPaths={ dirtyPaths }
 						problemPaths={
@@ -2400,12 +2447,21 @@ function CodeStage( {
 									</strong>
 									{ selectedManifestFile && (
 										<small>
-											{ selectedManifestFile.type } ·{ ' ' }
-											<OperationBadge
-												operation={
-													selectedManifestFile.change_type
-												}
-											/>
+											{ selectedManifestFile.type }
+											{ ( selectedManifestFile.change_type ||
+												dirtyPaths.has(
+													selectedManifestFile.path
+												) ) && (
+												<>
+													{ ' · ' }
+													<OperationBadge
+														operation={
+															selectedManifestFile.change_type ??
+															'update'
+														}
+													/>
+												</>
+											) }
 										</small>
 									) }
 								</div>
@@ -2426,7 +2482,10 @@ function CodeStage( {
 												? 'primary'
 												: 'secondary'
 										}
-										disabled={ dirtyPaths.size > 0 }
+										disabled={
+											dirtyPaths.size > 0 ||
+											! selectedManifestFile?.change_type
+										}
 										onClick={ () => setMode( 'changes' ) }
 									>
 										{ __( 'Changes', 'wp-autoplugin' ) }
@@ -2438,7 +2497,7 @@ function CodeStage( {
 								<ProblemsPanel
 									issues={ problems }
 									onSelect={ ( issue ) => {
-										const file = manifest.files.find(
+										const file = visibleFiles.find(
 											( item ) => item.path === issue.path
 										);
 										if ( file ) {
@@ -3037,6 +3096,7 @@ type TreeNode = { directories: Map< string, TreeNode >; files: FileTreeItem[] };
 
 function FileTree( {
 	files,
+	directories,
 	selectedId,
 	dirtyPaths,
 	problemPaths,
@@ -3044,6 +3104,7 @@ function FileTree( {
 	onSelect,
 }: {
 	files: FileTreeItem[];
+	directories: string[];
 	selectedId: number | null;
 	dirtyPaths: Set< string >;
 	problemPaths: Set< string >;
@@ -3052,6 +3113,21 @@ function FileTree( {
 } ) {
 	const root = useMemo( () => {
 		const node: TreeNode = { directories: new Map(), files: [] };
+		directories.forEach( ( path ) => {
+			let cursor = node;
+			path.split( '/' ).forEach( ( directory ) => {
+				if ( ! directory ) {
+					return;
+				}
+				if ( ! cursor.directories.has( directory ) ) {
+					cursor.directories.set( directory, {
+						directories: new Map(),
+						files: [],
+					} );
+				}
+				cursor = cursor.directories.get( directory ) as TreeNode;
+			} );
+		} );
 		files.forEach( ( file ) => {
 			const parts = file.path.split( '/' );
 			const name = parts.pop() || file.path;
@@ -3071,7 +3147,7 @@ function FileTree( {
 			} );
 		} );
 		return node;
-	}, [ files ] );
+	}, [ files, directories ] );
 	return (
 		<div
 			className="file-tree"
@@ -3126,22 +3202,27 @@ function FileTreeBranch( {
 			) ) }
 			{ node.files.map( ( file ) => {
 				const status = progress[ file.path ];
+				const dirty = dirtyPaths.has( file.path );
+				const operation =
+					file.change_type ?? ( dirty ? 'update' : null );
 				return (
 					<button
 						type="button"
 						role="treeitem"
 						className={ `file-tree__file ${
 							selectedId === file.id ? 'is-selected' : ''
-						}` }
+						} ${ ! operation ? 'is-untouched' : '' }` }
 						style={ {
 							paddingInlineStart: `${ 10 + depth * 14 }px`,
 						} }
 						onClick={ () => onSelect( file.id ) }
 						key={ file.id }
 					>
-						<OperationBadge operation={ file.change_type } />
+						{ operation && (
+							<OperationBadge operation={ operation } />
+						) }
 						<span>{ file.path.split( '/' ).pop() }</span>
-						{ dirtyPaths.has( file.path ) && (
+						{ dirty && (
 							<b
 								title={ __(
 									'Unsaved changes',
@@ -3187,11 +3268,14 @@ function FileTreeDirectory( props: {
 	onSelect: ( id: number ) => void;
 } ) {
 	const [ open, setOpen ] = useState( true );
+	const untouched = ! treeHasChanges( props.node, props.dirtyPaths );
 	return (
 		<div role="group">
 			<button
 				type="button"
-				className="file-tree__directory"
+				className={ `file-tree__directory ${
+					untouched ? 'is-untouched' : ''
+				}` }
 				aria-expanded={ open }
 				style={ { paddingInlineStart: `${ 6 + props.depth * 14 }px` } }
 				onClick={ () => setOpen( ! open ) }
@@ -3203,6 +3287,19 @@ function FileTreeDirectory( props: {
 				<FileTreeBranch { ...props } depth={ props.depth + 1 } />
 			) }
 		</div>
+	);
+}
+
+function treeHasChanges( node: TreeNode, dirtyPaths: Set< string > ): boolean {
+	if (
+		node.files.some(
+			( file ) => !! file.change_type || dirtyPaths.has( file.path )
+		)
+	) {
+		return true;
+	}
+	return [ ...node.directories.values() ].some( ( child ) =>
+		treeHasChanges( child, dirtyPaths )
 	);
 }
 

@@ -146,7 +146,7 @@ final class Code_Orchestrator {
 				$generated[] = [ 'path' => $file['path'], 'operation' => $file['operation'], 'content' => (string) $file['content'] ];
 			}
 		}
-		$prompt   = $this->prompt( $workspace );
+		$prompt   = $this->prompt( $workspace, (string) $current['operation'] );
 		$response = $transport->complete(
 			$prompt['instructions'],
 			$this->prompt_input( $prompt['instance'], $workspace, $plan, $manifest, $current, $source, $generated, $feedback ),
@@ -168,7 +168,9 @@ final class Code_Orchestrator {
 			$error = new \WP_Error( 'code_response_invalid', __( 'The provider did not return a complete Code response.', 'wp-autoplugin' ), [ 'retryable' => true, 'ambiguous' => false ] );
 			return $this->retry_or_fail( $error, $job, $run, $current, (int) $current['sequence'], $token, $runs, $jobs );
 		}
-		$parsed = $validator->response( $response['content'], $current, $manifest );
+		$parsed = 'update' === $current['operation']
+			? $validator->update_response( $response['content'], $current, $manifest, $this->source_content( $source, $current['path'] ) )
+			: $validator->response( $response['content'], $current, $manifest );
 		if ( is_wp_error( $parsed ) ) {
 			$runs->account_usage( (int) $run['id'], $token, $usage );
 			return $this->retry_or_fail( $parsed, $job, $run, $current, (int) $current['sequence'], $token, $runs, $jobs );
@@ -265,13 +267,16 @@ final class Code_Orchestrator {
 	}
 
 	/** @return array{instance:object,instructions:string} */
-	private function prompt( array $workspace ): array {
+	private function prompt( array $workspace, string $operation = '' ): array {
 		$instance = match ( (string) $workspace['operation'] ) {
 			'hook_extension' => new Extension_Plugin_Code_Prompt(),
 			'modify', 'fix'  => new Existing_Target_Code_Prompt(),
 			default          => new New_Plugin_Code_Prompt(),
 		};
-		return [ 'instance' => $instance, 'instructions' => $instance->instructions() ];
+		$instructions = $instance instanceof Existing_Target_Code_Prompt
+			? $instance->instructions( $operation )
+			: $instance->instructions();
+		return [ 'instance' => $instance, 'instructions' => $instructions ];
 	}
 
 	private function prompt_input( object $prompt, array $workspace, array $plan, array $manifest, array $current, array $source, array $generated, array $feedback ): string {

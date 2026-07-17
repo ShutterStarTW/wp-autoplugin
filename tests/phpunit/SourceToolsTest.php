@@ -125,4 +125,21 @@ final class SourceToolsTest extends WP_UnitTestCase {
 		$this->assertWPError( $large_collision );
 		$this->assertSame( 'code_target_add_exists', $large_collision->get_error_code() );
 	}
+
+	public function test_revision_tree_and_file_expose_bounded_source_without_bodies_in_manifest(): void {
+		$tree = $this->tools->revision_tree();
+
+		$this->assertSame( [ 'includes' ], $tree['directories'] );
+		$this->assertSame( [ 'includes/class-fixture.php', 'plugin.php' ], array_column( $tree['files'], 'path' ) );
+		$this->assertArrayNotHasKey( 'content', $tree['files'][0] );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $tree['tree_fingerprint'] );
+
+		$file = $this->tools->revision_file( 'plugin.php' );
+		$this->assertFalse( is_wp_error( $file ) );
+		$this->assertSame( 'php', $file['type'] );
+		$this->assertStringContainsString( 'Plugin Name: Fixture', $file['content'] );
+		$this->assertSame( hash( 'sha256', $file['content'] ), $file['content_hash'] );
+
+		$this->assertWPError( $this->tools->revision_file( '../wp-config.php' ) );
+	}
 }

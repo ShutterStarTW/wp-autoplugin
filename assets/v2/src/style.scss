@@ -880,6 +880,10 @@ $surface: #fff;
 	}
 	&__directory {
 		font-weight: 600;
+		&.is-untouched {
+			color: #7c858c;
+			font-weight: 500;
+		}
 		span {
 			color: $muted;
 			font-family: sans-serif;
@@ -889,6 +893,9 @@ $surface: #fff;
 	}
 	&__file {
 		padding-inline-end: 9px;
+		&.is-untouched {
+			color: #818990;
+		}
 		&:hover,
 		&.is-selected {
 			background: #e5edf5;
