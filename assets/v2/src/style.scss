@@ -1168,23 +1168,37 @@ $surface: #fff;
 	min-height: 460px;
 	overflow: auto;
 	padding: 10px;
+
 	table.diff {
 		border-collapse: collapse;
 		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
 			monospace;
 		font-size: 11px;
+		table-layout: fixed;
 		width: 100%;
+
 		td {
+			line-height: 1.55;
+			overflow-wrap: anywhere;
 			padding: 1px 6px;
+			vertical-align: top;
 			white-space: pre-wrap;
 		}
-		.added td {
+
+		.diff-addedline {
 			background: #e7f6ec;
 		}
-		.deleted td {
+
+		.diff-deletedline {
 			background: #fce8e8;
 		}
+
+		ins,
+		del {
+			text-decoration: none;
+		}
 	}
+
 	&__fallback {
 		color: $muted;
 		padding: 20px;

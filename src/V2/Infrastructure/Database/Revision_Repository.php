@@ -584,11 +584,17 @@ final class Revision_Repository extends Repository {
 
 	private function diff_html( string $before, string $after ): string {
 		require_once ABSPATH . WPINC . '/wp-diff.php';
-		$old      = '' === $before ? [] : ( preg_split( '/(?<=\n)/', $before ) ?: [] );
-		$new      = '' === $after ? [] : ( preg_split( '/(?<=\n)/', $after ) ?: [] );
+		$old      = '' === $before ? [] : ( preg_split( '/\r\n|\r|\n/', $before ) ?: [] );
+		$new      = '' === $after ? [] : ( preg_split( '/\r\n|\r|\n/', $after ) ?: [] );
 		$diff     = new \Text_Diff( 'auto', [ $old, $new ] );
 		$renderer = new \WP_Text_Diff_Renderer_Table( [ 'show_split_view' => false ] );
-		return wp_kses_post( (string) $renderer->render( $diff ) );
+		$rows     = (string) $renderer->render( $diff );
+		if ( '' === $rows ) {
+			return '';
+		}
+
+		// The core renderer returns row fragments, which need a valid table parent in the browser.
+		return wp_kses_post( "<table class='diff'><tbody>$rows</tbody></table>" );
 	}
 
 	private function conflict(): \WP_Error {
