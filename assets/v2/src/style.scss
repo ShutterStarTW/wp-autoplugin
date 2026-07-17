@@ -1299,12 +1299,33 @@ body.wp-autoplugin-v2-distraction-free {
 			white-space: pre-wrap;
 		}
 
+		.diff-addedline,
+		.diff-deletedline {
+			padding-inline-start: 26px;
+			position: relative;
+		}
+
 		.diff-addedline {
 			background: #e7f6ec;
 		}
 
 		.diff-deletedline {
 			background: #fce8e8;
+		}
+
+		.diff-addedline .dashicons,
+		.diff-deletedline .dashicons {
+			align-items: center;
+			display: flex;
+			font-size: 13px;
+			height: 17px;
+			justify-content: center;
+			left: 5px;
+			line-height: 1;
+			position: absolute;
+			right: auto;
+			top: 2px;
+			width: 16px;
 		}
 
 		ins,
