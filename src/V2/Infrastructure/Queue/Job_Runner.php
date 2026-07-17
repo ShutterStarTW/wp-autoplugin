@@ -17,9 +17,10 @@ final class Job_Runner {
 	}
 
 	public function run( int $job_id, int $generation = 0 ): void {
-		$jobs = new Job_Repository();
-		$job  = $jobs->find( $job_id );
-		$workspace    = $job ? ( new Workspace_Repository() )->find( (int) $job['workspace_id'] ) : null;
+		$jobs       = new Job_Repository();
+		$workspaces = new Workspace_Repository();
+		$job        = $jobs->find( $job_id );
+		$workspace   = $job ? $workspaces->find( (int) $job['workspace_id'] ) : null;
 		$is_agent_job = $job && $workspace && Agent_Task::uses_source_tools( $job, $workspace );
 		$is_resumable = $is_agent_job || ( $job && Job_Repository::is_code_work( $job ) );
 
@@ -81,6 +82,18 @@ final class Job_Runner {
 					'finished_at' => current_time( 'mysql', true ),
 				]
 			);
+			$plugin_name = is_string( $result['structured']['plugin_name'] ?? null )
+				? trim( $result['structured']['plugin_name'] )
+				: '';
+			if (
+				$workspace
+				&& 'new_plugin' === ( $workspace['target_kind'] ?? '' )
+				&& 'create' === ( $workspace['operation'] ?? '' )
+				&& 'artifact' === ( $result['outcome'] ?? '' )
+				&& '' !== $plugin_name
+			) {
+				$workspaces->rename_project( (int) $workspace['id'], $plugin_name );
+			}
 			$jobs->event( $job_id, 'completed', __( 'Job completed.', 'wp-autoplugin' ) );
 		} catch ( \Throwable $error ) {
 			( new Agent_Run_Repository() )->terminate_by_job( $job_id, 'failed' );

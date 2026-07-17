@@ -172,6 +172,32 @@ final class Workspace_Repository extends Repository {
 		return false !== $updated && $updated > 0;
 	}
 
+	/** Update the durable project label shown by workspace tabs. */
+	public function rename_project( int $workspace_id, string $name ): bool {
+		$name = trim( sanitize_text_field( $name ) );
+		if ( '' === $name ) {
+			return false;
+		}
+
+		$project_id = (int) $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT project_id FROM ' . Installer::table( 'workspaces' ) . ' WHERE id = %d',
+				$workspace_id
+			)
+		);
+		if ( ! $project_id ) {
+			return false;
+		}
+
+		return false !== $this->wpdb->update(
+			Installer::table( 'projects' ),
+			[ 'name' => wp_html_excerpt( $name, 255, '' ), 'updated_at' => $this->now() ],
+			[ 'id' => $project_id ],
+			[ '%s', '%s' ],
+			[ '%d' ]
+		);
+	}
+
 	/**
 	 * @param array<string, mixed> $row Raw database row.
 	 * @return array<string, mixed>

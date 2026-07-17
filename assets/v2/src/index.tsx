@@ -319,6 +319,34 @@ function App() {
 	);
 
 	useEffect( () => {
+		if (
+			! activeWorkspace ||
+			activeWorkspace.target_kind !== 'new_plugin' ||
+			activeWorkspace.operation !== 'create'
+		) {
+			return;
+		}
+
+		const plan = latestPlanArtifact( jobs );
+		const structure = plan ? planArtifactStructure( plan ) : null;
+		const pluginName =
+			typeof structure?.plugin_name === 'string'
+				? structure.plugin_name.trim()
+				: '';
+		if ( ! pluginName || pluginName === activeWorkspace.project_name ) {
+			return;
+		}
+
+		setWorkspaces( ( items ) =>
+			items.map( ( item ) =>
+				item.id === activeWorkspace.id
+					? { ...item, project_name: pluginName }
+					: item
+			)
+		);
+	}, [ jobs, activeWorkspace ] );
+
+	useEffect( () => {
 		if ( 'new' === activeWorkspaceId ) {
 			window.localStorage.removeItem( ACTIVE_WORKSPACE_KEY );
 			setJobs( [] );
