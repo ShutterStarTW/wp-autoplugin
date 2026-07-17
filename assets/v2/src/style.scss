@@ -790,21 +790,69 @@ $surface: #fff;
 	display: grid;
 	grid-template-columns: 250px minmax(0, 1fr);
 	min-height: 520px;
+	&.is-tree-collapsed {
+		grid-template-columns: 40px minmax(0, 1fr);
+		.code-stage__tree {
+			overflow: hidden;
+			padding-inline: 0;
+		}
+		.code-stage__tree-header {
+			justify-content: center;
+			padding-inline: 0;
+			strong {
+				display: none;
+			}
+		}
+	}
 	&__tree {
 		background: #f6f7f8;
 		border-right: 1px solid #d9dfe4;
 		font-size: 11px;
 		overflow: auto;
 		padding: 14px 0;
+	}
+	&__tree-header {
+		align-items: center;
+		display: flex;
+		gap: 6px;
+		justify-content: space-between;
+		padding: 0 8px 10px 14px;
 		strong {
 			color: $muted;
 			display: block;
+			flex: 1;
 			font-size: 10px;
 			letter-spacing: 0.06em;
-			padding: 0 14px 10px;
+			padding: 0;
+		}
+	}
+	&__tree-toggle {
+		align-items: center;
+		background: transparent;
+		border: 1px solid transparent;
+		border-radius: 3px;
+		color: $muted;
+		cursor: pointer;
+		display: inline-flex;
+		font-size: 16px;
+		height: 24px;
+		justify-content: center;
+		line-height: 1;
+		padding: 0;
+		width: 24px;
+		&:hover {
+			background: #e5edf5;
+			color: #24313a;
+		}
+		&:focus-visible {
+			border-color: #2271b1;
+			box-shadow: 0 0 0 1px #2271b1;
+			outline: 0;
 		}
 	}
 	&__editor {
+		display: flex;
+		flex-direction: column;
 		min-width: 0;
 		padding: 0;
 	}
@@ -1085,23 +1133,22 @@ $surface: #fff;
 	}
 }
 .code-buffer {
-	height: 460px;
+	flex: 1 1 460px;
+	min-height: 460px;
 	.CodeMirror {
-		height: 460px;
+		height: 100%;
 		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
 			monospace;
 		font-size: 12px;
-
-		.CodeMirror-scroll {
-			padding-bottom: 0;
-		}
+		min-height: 460px;
 	}
 	> textarea {
 		background: #1e252b;
 		border: 0;
 		box-sizing: border-box;
 		color: #d9e2e8;
-		height: 460px;
+		height: 100%;
+		min-height: 460px;
 		padding: 14px;
 		resize: none;
 		width: 100%;
@@ -1110,13 +1157,15 @@ $surface: #fff;
 .code-editor-loading {
 	align-items: center;
 	display: flex;
+	flex: 1 1 460px;
 	gap: 8px;
-	height: 460px;
 	justify-content: center;
+	min-height: 460px;
 }
 .code-diff {
 	background: #fff;
-	height: 460px;
+	flex: 1 1 460px;
+	min-height: 460px;
 	overflow: auto;
 	padding: 10px;
 	table.diff {

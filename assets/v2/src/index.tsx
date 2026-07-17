@@ -1747,6 +1747,7 @@ function CodeStage( {
 		Record< string, RevisionFile >
 	>( {} );
 	const [ mode, setMode ] = useState< 'code' | 'changes' >( 'code' );
+	const [ treeCollapsed, setTreeCollapsed ] = useState( false );
 	const [ editing, setEditing ] = useState( false );
 	const [ buffers, setBuffers ] = useState< Record< string, string > >( {} );
 	const [ problems, setProblems ] = useState< CodeIssue[] >( [] );
@@ -1894,8 +1895,12 @@ function CodeStage( {
 				const files = revisionVisibleFiles( response );
 				const selectedFile =
 					files.find(
-						( file ) => file.path === selectedFilePath.current
-					) ?? files[ 0 ];
+						( file ) =>
+							!! file.change_type &&
+							file.path === selectedFilePath.current
+					) ??
+					files.find( ( file ) => !! file.change_type ) ??
+					files[ 0 ];
 				setManifest( response );
 				setSelectedFileId( selectedFile?.id ?? null );
 				selectedFilePath.current = selectedFile?.path ?? '';
@@ -2394,20 +2399,53 @@ function CodeStage( {
 					</div>
 				</div>
 			) }
-			<div className="code-stage">
+			<div
+				className={ `code-stage ${
+					treeCollapsed ? 'is-tree-collapsed' : ''
+				}` }
+			>
 				<aside className="code-stage__tree">
-					<strong>{ treeLabel }</strong>
-					<FileTree
-						files={ treeFiles }
-						directories={ manifest?.target_directories ?? [] }
-						selectedId={ selectedFileId }
-						dirtyPaths={ dirtyPaths }
-						problemPaths={
-							new Set( problems.map( ( issue ) => issue.path ) )
-						}
-						progress={ progressMap }
-						onSelect={ manifest ? selectFile : () => undefined }
-					/>
+					<div className="code-stage__tree-header">
+						<strong>{ treeLabel }</strong>
+						<button
+							type="button"
+							className="code-stage__tree-toggle"
+							aria-expanded={ ! treeCollapsed }
+							aria-label={
+								treeCollapsed
+									? __(
+											'Expand project structure',
+											'wp-autoplugin'
+									  )
+									: __(
+											'Collapse project structure',
+											'wp-autoplugin'
+									  )
+							}
+							onClick={ () =>
+								setTreeCollapsed( ! treeCollapsed )
+							}
+						>
+							<span aria-hidden="true">
+								{ treeCollapsed ? '+' : '−' }
+							</span>
+						</button>
+					</div>
+					{ ! treeCollapsed && (
+						<FileTree
+							files={ treeFiles }
+							directories={ manifest?.target_directories ?? [] }
+							selectedId={ selectedFileId }
+							dirtyPaths={ dirtyPaths }
+							problemPaths={
+								new Set(
+									problems.map( ( issue ) => issue.path )
+								)
+							}
+							progress={ progressMap }
+							onSelect={ manifest ? selectFile : () => undefined }
+						/>
+					) }
 				</aside>
 				<section className="code-stage__editor">
 					{ ! manifest ? (
