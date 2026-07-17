@@ -2503,31 +2503,49 @@ function CodeStage( {
 										</small>
 									) }
 								</div>
-								<div className="code-file-header__modes">
-									<Button
-										variant={
-											mode === 'code'
-												? 'primary'
-												: 'secondary'
-										}
-										onClick={ () => setMode( 'code' ) }
+								<div className="code-file-header__view-switcher">
+									<span>
+										{ __( 'View', 'wp-autoplugin' ) }
+									</span>
+									<div
+										className="code-file-header__modes"
+										role="group"
+										aria-label={ __(
+											'File view',
+											'wp-autoplugin'
+										) }
 									>
-										{ __( 'Code', 'wp-autoplugin' ) }
-									</Button>
-									<Button
-										variant={
-											mode === 'changes'
-												? 'primary'
-												: 'secondary'
-										}
-										disabled={
-											dirtyPaths.size > 0 ||
-											! selectedManifestFile?.change_type
-										}
-										onClick={ () => setMode( 'changes' ) }
-									>
-										{ __( 'Changes', 'wp-autoplugin' ) }
-									</Button>
+										<button
+											type="button"
+											className={
+												mode === 'code'
+													? 'is-active'
+													: ''
+											}
+											aria-pressed={ mode === 'code' }
+											onClick={ () => setMode( 'code' ) }
+										>
+											{ __( 'Code', 'wp-autoplugin' ) }
+										</button>
+										<button
+											type="button"
+											className={
+												mode === 'changes'
+													? 'is-active'
+													: ''
+											}
+											aria-pressed={ mode === 'changes' }
+											disabled={
+												dirtyPaths.size > 0 ||
+												! selectedManifestFile?.change_type
+											}
+											onClick={ () =>
+												setMode( 'changes' )
+											}
+										>
+											{ __( 'Changes', 'wp-autoplugin' ) }
+										</button>
+									</div>
 								</div>
 							</div>
 							{ filePanel }
