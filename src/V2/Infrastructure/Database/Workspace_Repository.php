@@ -154,6 +154,167 @@ final class Workspace_Repository extends Repository {
 	}
 
 	/**
+	 * Add compact job, retry, and workflow-stage summaries to recent workspaces.
+	 *
+	 * @param array<int, array<string, mixed>> $workspaces Hydrated workspace rows.
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function add_activity_summaries( array $workspaces ): array {
+		if ( ! $workspaces ) {
+			return [];
+		}
+
+		$workspace_ids   = array_map( 'intval', array_column( $workspaces, 'id' ) );
+		$placeholders    = implode( ',', array_fill( 0, count( $workspace_ids ), '%d' ) );
+		$jobs_table      = Installer::table( 'jobs' );
+		$events_table    = Installer::table( 'job_events' );
+		$revisions_table = Installer::table( 'revisions' );
+		$summaries       = [];
+		$stage_flags     = [];
+
+		foreach ( $workspace_ids as $workspace_id ) {
+			$summaries[ $workspace_id ] = [
+				'total_jobs'     => 0,
+				'follow_up_jobs' => 0,
+				'retry_count'    => 0,
+			];
+			$stage_flags[ $workspace_id ] = [];
+			foreach ( [ 'plan', 'code', 'review', 'chat' ] as $stage ) {
+				$stage_flags[ $workspace_id ][ $stage ] = [
+					'attempted' => false,
+					'active'    => false,
+					'complete'  => false,
+				];
+			}
+		}
+
+		$job_rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT id, workspace_id, task, status, payload FROM $jobs_table
+				WHERE workspace_id IN ($placeholders) ORDER BY id ASC",
+				...$workspace_ids
+			), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tables are allow-listed and placeholders are generated for integer IDs.
+			ARRAY_A
+		);
+		foreach ( (array) $job_rows as $row ) {
+			$workspace_id = (int) $row['workspace_id'];
+			if ( ! isset( $summaries[ $workspace_id ] ) ) {
+				continue;
+			}
+
+			$job = [
+				'id'           => (int) $row['id'],
+				'workspace_id' => $workspace_id,
+				'task'         => (string) $row['task'],
+				'status'       => (string) $row['status'],
+				'payload'      => $this->decode( $row['payload'] ),
+			];
+			++$summaries[ $workspace_id ]['total_jobs'];
+			if ( 'conversation' === $job['task'] ) {
+				++$summaries[ $workspace_id ]['follow_up_jobs'];
+			}
+
+			$stage = $this->job_stage( $job );
+			if ( ! $stage ) {
+				continue;
+			}
+			$stage_flags[ $workspace_id ][ $stage ]['attempted'] = true;
+			if ( in_array( $job['status'], [ 'queued', 'running', 'retrying' ], true ) ) {
+				$stage_flags[ $workspace_id ][ $stage ]['active'] = true;
+			}
+			if (
+				( 'plan' === $stage && 'plan' === $job['task'] && 'completed' === $job['status'] )
+				|| ( 'review' === $stage && 'completed' === $job['status'] )
+				|| ( 'chat' === $stage && 'completed' === $job['status'] )
+			) {
+				$stage_flags[ $workspace_id ][ $stage ]['complete'] = true;
+			}
+		}
+
+		$revision_rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT workspace_id, COUNT(*) AS revision_count FROM $revisions_table
+				WHERE workspace_id IN ($placeholders) GROUP BY workspace_id",
+				...$workspace_ids
+			), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table is allow-listed and placeholders are generated for integer IDs.
+			ARRAY_A
+		);
+		foreach ( (array) $revision_rows as $row ) {
+			$workspace_id = (int) $row['workspace_id'];
+			if ( isset( $stage_flags[ $workspace_id ] ) && (int) $row['revision_count'] > 0 ) {
+				$stage_flags[ $workspace_id ]['code']['complete'] = true;
+			}
+		}
+
+		$retry_rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT j.workspace_id, COUNT(*) AS retry_count FROM $events_table e
+				INNER JOIN $jobs_table j ON j.id = e.job_id
+				WHERE j.workspace_id IN ($placeholders) AND RIGHT(e.event, 6) = '_retry'
+				GROUP BY j.workspace_id",
+				...$workspace_ids
+			), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tables are allow-listed and placeholders are generated for integer IDs.
+			ARRAY_A
+		);
+		foreach ( (array) $retry_rows as $row ) {
+			$workspace_id = (int) $row['workspace_id'];
+			if ( isset( $summaries[ $workspace_id ] ) ) {
+				$summaries[ $workspace_id ]['retry_count'] = (int) $row['retry_count'];
+			}
+		}
+
+		foreach ( $workspaces as &$workspace ) {
+			$workspace_id = (int) $workspace['id'];
+			$stages       = [];
+			$stage_names  = 'explain' === ( $workspace['operation'] ?? '' )
+				? [ 'chat' ]
+				: [ 'plan', 'code', 'review' ];
+			foreach ( $stage_names as $stage ) {
+				$flags = $stage_flags[ $workspace_id ][ $stage ];
+				if ( $flags['active'] ) {
+					$stages[ $stage ] = 'in_progress';
+				} elseif ( $flags['complete'] ) {
+					$stages[ $stage ] = 'complete';
+				} elseif ( $flags['attempted'] ) {
+					$stages[ $stage ] = 'incomplete';
+				} else {
+					$stages[ $stage ] = 'not_started';
+				}
+			}
+			$workspace['activity_summary'] = array_merge(
+				$summaries[ $workspace_id ],
+				[ 'stages' => $stages ]
+			);
+		}
+		unset( $workspace );
+
+		return $workspaces;
+	}
+
+	/**
+	 * Resolve a durable job to the workspace stage it contributes to.
+	 *
+	 * @param array<string, mixed> $job Hydrated job summary.
+	 */
+	private function job_stage( array $job ): ?string {
+		$task = (string) ( $job['task'] ?? '' );
+		if ( 'conversation' === $task ) {
+			$stage = (string) ( $job['payload']['stage'] ?? '' );
+			return in_array( $stage, [ 'plan', 'code', 'review', 'explain' ], true )
+				? ( 'explain' === $stage ? 'chat' : $stage )
+				: null;
+		}
+		if ( in_array( $task, [ 'plan', 'plan_structure' ], true ) ) {
+			return 'plan';
+		}
+		if ( 'explain' === $task ) {
+			return 'chat';
+		}
+
+		return in_array( $task, [ 'code', 'review' ], true ) ? $task : null;
+	}
+
+	/**
 	 * List the most recently closed workspace tabs for the current user.
 	 *
 	 * @return array<int, array<string, mixed>>
@@ -179,7 +340,7 @@ final class Workspace_Repository extends Repository {
 			ARRAY_A
 		);
 
-		return array_map( [ $this, 'hydrate' ], $rows );
+		return $this->add_activity_summaries( array_map( [ $this, 'hydrate' ], $rows ) );
 	}
 
 	/**

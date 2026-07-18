@@ -280,6 +280,17 @@ type Workspace = {
 	is_closed: number;
 	closed_at: string | null;
 	updated_at: string;
+	activity_summary?: {
+		total_jobs: number;
+		follow_up_jobs: number;
+		retry_count: number;
+		stages: Partial<
+			Record<
+				'plan' | 'code' | 'review' | 'chat',
+				'complete' | 'in_progress' | 'incomplete' | 'not_started'
+			>
+		>;
+	};
 };
 
 const ACTIVE_WORKSPACE_KEY = 'wp-autoplugin-v2-active-workspace';
@@ -960,7 +971,7 @@ function WorkspaceTabBar( {
 				controls={ [
 					[
 						{
-							title: __( 'Reoper recent', 'wp-autoplugin' ),
+							title: __( 'Reopen recent', 'wp-autoplugin' ),
 							icon: 'open-folder',
 							onClick: onLoadRecent,
 						},
@@ -1076,8 +1087,6 @@ function RecentProjectsModal( {
 			{ ! loading && projects.length > 0 && (
 				<ul className="recent-projects__list">
 					{ projects.map( ( project ) => {
-						const status =
-							project.latest_job_status || project.status;
 						const targetName =
 							project.target_metadata?.name ||
 							project.project_name;
@@ -1098,11 +1107,6 @@ function RecentProjectsModal( {
 												) }
 											</small>
 										</div>
-										<span
-											className={ `recent-projects__status status--${ status }` }
-										>
-											{ getStatusLabel( status ) }
-										</span>
 									</div>
 									<p className="recent-projects__request">
 										{ project.request }
@@ -1146,6 +1150,7 @@ function RecentProjectsModal( {
 										</div>
 									</dl>
 								</div>
+								<RecentProjectActivity project={ project } />
 								<Button
 									variant="secondary"
 									isBusy={ reopeningId === project.id }
@@ -1165,6 +1170,76 @@ function RecentProjectsModal( {
 				</ul>
 			) }
 		</Modal>
+	);
+}
+
+function RecentProjectActivity( { project }: { project: Workspace } ) {
+	const summary = project.activity_summary ?? {
+		total_jobs: 0,
+		follow_up_jobs: 0,
+		retry_count: 0,
+		stages: {},
+	};
+	const stages: Array< 'plan' | 'code' | 'review' | 'chat' > =
+		project.operation === 'explain'
+			? [ 'chat' ]
+			: [ 'plan', 'code', 'review' ];
+	const counts = [
+		sprintf(
+			/* translators: %d: Number of durable jobs. */
+			_n(
+				'%d job total',
+				'%d jobs total',
+				summary.total_jobs,
+				'wp-autoplugin'
+			),
+			summary.total_jobs
+		),
+		sprintf(
+			/* translators: %d: Number of follow-up conversation jobs. */
+			_n(
+				'%d follow-up',
+				'%d follow-ups',
+				summary.follow_up_jobs,
+				'wp-autoplugin'
+			),
+			summary.follow_up_jobs
+		),
+		sprintf(
+			/* translators: %d: Number of retry attempts. */
+			_n(
+				'%d retry',
+				'%d retries',
+				summary.retry_count,
+				'wp-autoplugin'
+			),
+			summary.retry_count
+		),
+	];
+
+	return (
+		<div className="recent-projects__progress">
+			<ul aria-label={ __( 'Project progress', 'wp-autoplugin' ) }>
+				{ stages.map( ( stage ) => {
+					const status = summary.stages[ stage ] ?? 'not_started';
+					return (
+						<li className={ `status--${ status }` } key={ stage }>
+							<span
+								className="recent-projects__stage-marker"
+								aria-hidden="true"
+							>
+								{ getActivityMarker( status ) }
+							</span>
+							<strong>{ getActivityStageLabel( stage ) }</strong>
+							<small>
+								{ getActivityStatusLabel( stage, status ) }
+							</small>
+						</li>
+					);
+				} ) }
+			</ul>
+			<p>{ counts.join( ' · ' ) }</p>
+		</div>
 	);
 }
 
@@ -4306,24 +4381,54 @@ function getTargetKindLabel( kind: string ) {
 	}
 }
 
-function getStatusLabel( status: string ) {
-	switch ( status ) {
-		case 'queued':
-			return __( 'Queued', 'wp-autoplugin' );
-		case 'running':
-			return __( 'Running', 'wp-autoplugin' );
-		case 'retrying':
-			return __( 'Retrying', 'wp-autoplugin' );
-		case 'completed':
-			return __( 'Completed', 'wp-autoplugin' );
-		case 'failed':
-			return __( 'Failed', 'wp-autoplugin' );
-		case 'cancelled':
-			return __( 'Cancelled', 'wp-autoplugin' );
-		case 'staged':
-			return __( 'Staged', 'wp-autoplugin' );
+function getActivityStageLabel( stage: 'plan' | 'code' | 'review' | 'chat' ) {
+	switch ( stage ) {
+		case 'plan':
+			return __( 'Plan', 'wp-autoplugin' );
+		case 'code':
+			return __( 'Code', 'wp-autoplugin' );
+		case 'review':
+			return __( 'Review', 'wp-autoplugin' );
 		default:
-			return __( 'Draft', 'wp-autoplugin' );
+			return __( 'Chat', 'wp-autoplugin' );
+	}
+}
+
+function getActivityStatusLabel(
+	stage: 'plan' | 'code' | 'review' | 'chat',
+	status: 'complete' | 'in_progress' | 'incomplete' | 'not_started'
+) {
+	if ( status === 'in_progress' ) {
+		return __( 'In progress', 'wp-autoplugin' );
+	}
+	if ( stage === 'chat' ) {
+		if ( status === 'complete' ) {
+			return __( 'History available', 'wp-autoplugin' );
+		}
+		return status === 'incomplete'
+			? __( 'Needs attention', 'wp-autoplugin' )
+			: __( 'No messages', 'wp-autoplugin' );
+	}
+	if ( status === 'complete' ) {
+		return __( 'Complete', 'wp-autoplugin' );
+	}
+	return status === 'incomplete'
+		? __( 'Incomplete', 'wp-autoplugin' )
+		: __( 'Not started', 'wp-autoplugin' );
+}
+
+function getActivityMarker(
+	status: 'complete' | 'in_progress' | 'incomplete' | 'not_started'
+) {
+	switch ( status ) {
+		case 'complete':
+			return '✓';
+		case 'in_progress':
+			return '…';
+		case 'incomplete':
+			return '!';
+		default:
+			return '○';
 	}
 }
 
