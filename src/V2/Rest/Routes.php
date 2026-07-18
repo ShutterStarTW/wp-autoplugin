@@ -588,8 +588,8 @@ final class Routes {
 		}
 		$workspace_id = (int) $workspace['id'];
 		if ( 'code' === $stage ) {
-			if ( 'create' !== ( $workspace['operation'] ?? '' ) || 'new_plugin' !== ( $workspace['target_kind'] ?? '' ) ) {
-				return new \WP_Error( 'wp_autoplugin_code_workspace_invalid', __( 'Code follow-ups are currently available only for new-plugin workspaces.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+			if ( ! $this->supports_code( $workspace ) ) {
+				return new \WP_Error( 'wp_autoplugin_code_workspace_invalid', __( 'Code follow-ups are not available for this workspace operation.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 			if ( $jobs->has_active_code( $workspace_id ) ) {
 				return new \WP_Error( 'wp_autoplugin_code_active', __( 'Another Code job is already active in this workspace.', 'wp-autoplugin' ), [ 'status' => 409 ] );
@@ -601,12 +601,21 @@ final class Routes {
 			if ( ! $revision || (int) $revision['workspace_id'] !== $workspace_id || $revision_id !== $expected || $revision_id !== $revisions->latest_id( $workspace_id ) ) {
 				return new \WP_Error( 'wp_autoplugin_code_follow_up_conflict', __( 'Select the latest staged revision before sending a Code follow-up.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
-			return [
+			$normalized = [
 				'stage'                       => 'code',
 				'message'                     => $message,
 				'revision_id'                 => $revision_id,
 				'expected_latest_revision_id' => $expected,
 			];
+			$focused_path = str_replace( '\\', '/', trim( (string) ( $payload['focused_path'] ?? '' ) ) );
+			if ( '' !== $focused_path ) {
+				$segments = explode( '/', $focused_path );
+				if ( strlen( $focused_path ) > 1024 || str_starts_with( $focused_path, '/' ) || preg_match( '/^[A-Za-z]:/', $focused_path ) || preg_match( '/[\x00-\x1F]/', $focused_path ) || array_intersect( [ '', '.', '..' ], $segments ) ) {
+					return new \WP_Error( 'wp_autoplugin_code_focus_invalid', __( 'The selected Code file path is invalid.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+				}
+				$normalized['focused_path'] = $focused_path;
+			}
+			return $normalized;
 		}
 
 		if ( $parent ) {
@@ -628,12 +637,7 @@ final class Routes {
 
 	/** Validate and normalize explicit Code generation and regeneration payloads. */
 	private function code_payload( array $payload, array $workspace, Job_Repository $jobs ) {
-		$operation = (string) ( $workspace['operation'] ?? '' );
-		$kind      = (string) ( $workspace['target_kind'] ?? '' );
-		$supported = ( 'create' === $operation && 'new_plugin' === $kind )
-			|| ( 'hook_extension' === $operation && in_array( $kind, [ 'plugin', 'theme' ], true ) )
-			|| ( in_array( $operation, [ 'modify', 'fix' ], true ) && in_array( $kind, [ 'plugin', 'theme' ], true ) );
-		if ( ! $supported ) {
+		if ( ! $this->supports_code( $workspace ) ) {
 			return new \WP_Error( 'wp_autoplugin_code_workspace_invalid', __( 'Code generation is not available for this workspace operation.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		if ( $jobs->has_active_code( (int) $workspace['id'] ) ) {
@@ -669,6 +673,15 @@ final class Routes {
 			return new \WP_Error( 'wp_autoplugin_code_regenerate_conflict', __( 'Regeneration requires the latest revision and the latest completed Plan.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		return [ 'mode' => 'regenerate', 'plan_artifact_job_id' => $plan_id, 'parent_revision_id' => $parent, 'expected_latest_revision_id' => $expected ];
+	}
+
+	/** Whether the workspace operation has a native staged Code path. */
+	private function supports_code( array $workspace ): bool {
+		$operation = (string) ( $workspace['operation'] ?? '' );
+		$kind      = (string) ( $workspace['target_kind'] ?? '' );
+		return ( 'create' === $operation && 'new_plugin' === $kind )
+			|| ( 'hook_extension' === $operation && in_array( $kind, [ 'plugin', 'theme' ], true ) )
+			|| ( in_array( $operation, [ 'modify', 'fix' ], true ) && in_array( $kind, [ 'plugin', 'theme' ], true ) );
 	}
 
 	/**

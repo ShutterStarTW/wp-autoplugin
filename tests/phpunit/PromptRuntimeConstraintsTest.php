@@ -1,7 +1,9 @@
 <?php
 
 use WP_Autoplugin\V2\Domain\AI\Prompts\Existing_Target_Code_Prompt;
+use WP_Autoplugin\V2\Domain\AI\Prompts\Existing_Target_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Extension_Plugin_Code_Prompt;
+use WP_Autoplugin\V2\Domain\AI\Prompts\Extension_Plugin_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Code_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Plan_Prompt;
@@ -23,12 +25,14 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 	}
 
 	public function test_versioned_plan_and_code_prompts_include_runtime_constraints(): void {
-		$plan      = new New_Plugin_Plan_Prompt();
-		$code      = new New_Plugin_Code_Prompt();
-		$extension = new Extension_Plugin_Code_Prompt();
-		$existing  = new Existing_Target_Code_Prompt();
-		$follow_up = new New_Plugin_Code_Follow_Up_Prompt();
-		$prompts   = [
+		$plan                = new New_Plugin_Plan_Prompt();
+		$code                = new New_Plugin_Code_Prompt();
+		$extension           = new Extension_Plugin_Code_Prompt();
+		$existing            = new Existing_Target_Code_Prompt();
+		$follow_up           = new New_Plugin_Code_Follow_Up_Prompt();
+		$extension_follow_up = new Extension_Plugin_Code_Follow_Up_Prompt();
+		$target_follow_up    = new Existing_Target_Code_Follow_Up_Prompt();
+		$prompts             = [
 			$plan->initial_instructions(),
 			$plan->follow_up_instructions(),
 			$plan->structure_instructions(),
@@ -38,6 +42,11 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 			$existing->instructions( 'update' ),
 			$follow_up->analysis_instructions(),
 			$follow_up->file_instructions(),
+			$extension_follow_up->analysis_instructions(),
+			$extension_follow_up->file_instructions(),
+			$target_follow_up->analysis_instructions(),
+			$target_follow_up->file_instructions( 'add' ),
+			$target_follow_up->file_instructions( 'update' ),
 		];
 
 		foreach ( $prompts as $prompt ) {

@@ -3,8 +3,11 @@
 namespace WP_Autoplugin\V2\Orchestration;
 
 use WP_Autoplugin\V2\Domain\AI\Code_Follow_Up_Response;
+use WP_Autoplugin\V2\Domain\AI\Prompts\Existing_Target_Code_Follow_Up_Prompt;
+use WP_Autoplugin\V2\Domain\AI\Prompts\Extension_Plugin_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\Revision\Code_Validator;
+use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\Database\Code_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
@@ -28,8 +31,8 @@ final class Code_Follow_Up_Orchestrator {
 			return $result;
 		}
 		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
-		if ( ! $workspace || 'create' !== ( $workspace['operation'] ?? '' ) || 'new_plugin' !== ( $workspace['target_kind'] ?? '' ) ) {
-			return new \WP_Error( 'code_follow_up_workspace', __( 'Code follow-ups are available only for new-plugin workspaces.', 'wp-autoplugin' ) );
+		if ( ! $workspace || ! $this->supports( $workspace ) ) {
+			return new \WP_Error( 'code_follow_up_workspace', __( 'Code follow-ups are not available for this workspace operation.', 'wp-autoplugin' ) );
 		}
 
 		$jobs      = new Job_Repository();
@@ -53,15 +56,16 @@ final class Code_Follow_Up_Orchestrator {
 			if ( ! $capability['available'] ) {
 				return new \WP_Error( 'code_follow_up_transport', $capability['message'] );
 			}
-			$run = $runs->create_follow_up(
+			$prompt = $this->prompt_metadata( $workspace, $base['project_manifest'] );
+			$run    = $runs->create_follow_up(
 				(int) $job['id'],
 				(int) $base['plan_job_id'],
 				$base_id,
 				$capability['provider'],
 				$capability['model'],
 				$capability['effort'],
-				New_Plugin_Code_Follow_Up_Prompt::SLUG,
-				New_Plugin_Code_Follow_Up_Prompt::VERSION
+				$prompt['slug'],
+				$prompt['version']
 			);
 			$jobs->event(
 				(int) $job['id'],
@@ -98,12 +102,11 @@ final class Code_Follow_Up_Orchestrator {
 	}
 
 	private function analyze( array $job, array $workspace, array $base, array $run, string $token, Job_Repository $jobs, Code_Run_Repository $runs ) {
-		$source = $this->source( $base['files'] );
-		if ( is_wp_error( $source ) ) {
+		$prompt = $this->analysis_prompt( $job, $workspace, $base, $run );
+		if ( is_wp_error( $prompt ) ) {
 			$runs->release( (int) $run['id'], $token );
-			return $source;
+			return $prompt;
 		}
-		$prompt    = new New_Plugin_Code_Follow_Up_Prompt();
 		$transport = ( new Direct_Transport_Factory() )->create_for( $run['provider'], $run['model'], $run['effort'] );
 		if ( is_wp_error( $transport ) ) {
 			$runs->release( (int) $run['id'], $token );
@@ -111,15 +114,8 @@ final class Code_Follow_Up_Orchestrator {
 		}
 		$jobs->event( (int) $job['id'], 'code_follow_up_analysis_started', __( 'Analyzing whether the message is a question or a Code change.', 'wp-autoplugin' ), [ 'phase' => 'analysis', 'revision_id' => (int) $base['id'] ] );
 		$response = $transport->complete(
-			$prompt->analysis_instructions(),
-			$prompt->analysis_input(
-				(string) $workspace['request'],
-				$base['project_manifest'],
-				$source,
-				$this->history( (int) $job['workspace_id'], (int) $job['id'] ),
-				(string) $job['payload']['message'],
-				(int) $run['retry_count'] ? substr( (string) $run['last_error'], 0, 500 ) : ''
-			),
+			$prompt['instructions'],
+			$prompt['input'],
 			[ 'max_output_tokens' => 8192, 'json' => true ]
 		);
 
@@ -152,6 +148,13 @@ final class Code_Follow_Up_Orchestrator {
 		}
 
 		if ( 'answer' === $parsed['outcome'] ) {
+			if ( 'changes' === ( $base['project_manifest']['scope'] ?? '' ) ) {
+				$consistent = $this->target_consistent( $workspace, $base['project_manifest'] );
+				if ( is_wp_error( $consistent ) ) {
+					$runs->account_usage( (int) $run['id'], $token, $usage );
+					return $this->retry_analysis_or_fail( $consistent, $job, $run, $token, $jobs, $runs );
+				}
+			}
 			if ( ! $runs->complete_answer( (int) $run['id'], $token, $parsed['content'], $usage ) ) {
 				return new \WP_Error( 'code_follow_up_answer_save', __( 'Could not persist the Code answer.', 'wp-autoplugin' ) );
 			}
@@ -159,13 +162,21 @@ final class Code_Follow_Up_Orchestrator {
 			$completed = $runs->find_by_job( (int) $job['id'] );
 			return $completed ? $this->completed_result( $completed ) : new \WP_Error( 'code_follow_up_state', __( 'Could not reload the completed Code answer.', 'wp-autoplugin' ) );
 		}
+		if ( 'changes' === ( $parsed['manifest']['scope'] ?? '' ) ) {
+			$prepared = $this->prepare_change_manifest( $workspace, $base, $parsed['manifest'] );
+			if ( is_wp_error( $prepared ) ) {
+				$runs->account_usage( (int) $run['id'], $token, $usage );
+				return $this->retry_analysis_or_fail( $prepared, $job, $run, $token, $jobs, $runs );
+			}
+			$parsed['manifest'] = $prepared;
+		}
 
 		$runs->complete_analysis_changes( (int) $run['id'], $token, $parsed['manifest'], $parsed['change_set'], $parsed['content'], $parsed['files'], $usage );
 		$jobs->update( (int) $job['id'], [ 'progress' => $parsed['files'] ? 15 : 90 ] );
 		$jobs->event(
 			(int) $job['id'],
 			'code_follow_up_changes_planned',
-			$parsed['files'] ? __( 'The change was validated and file generation is starting.', 'wp-autoplugin' ) : __( 'The delete-only change was validated and is ready to stage.', 'wp-autoplugin' ),
+			$parsed['files'] ? __( 'The change was validated and file generation is starting.', 'wp-autoplugin' ) : __( 'The change was validated and is ready to stage without file generation.', 'wp-autoplugin' ),
 			array_merge( [ 'phase' => 'files', 'files_count' => count( $parsed['files'] ) ], $parsed['change_set'] )
 		);
 		$run = $runs->find_by_job( (int) $job['id'] );
@@ -197,29 +208,19 @@ final class Code_Follow_Up_Orchestrator {
 			[ 'phase' => 'files', 'path' => $current['path'], 'operation' => $current['operation'], 'index' => $index + 1, 'total' => count( $files ) ]
 		);
 
-		$base_source = $this->source( $base['files'] );
-		if ( is_wp_error( $base_source ) ) {
+		$prompt = $this->file_prompt( $job, $workspace, $base, $run, $files, $current, $feedback );
+		if ( is_wp_error( $prompt ) ) {
 			$runs->release( (int) $run['id'], $token );
-			return $base_source;
+			return $prompt;
 		}
-		$effective = $this->effective_source( $base_source, $files, $run['target_manifest'] );
 		$transport = ( new Direct_Transport_Factory() )->create_for( $run['provider'], $run['model'], $run['effort'] );
 		if ( is_wp_error( $transport ) ) {
 			$runs->release( (int) $run['id'], $token );
 			return $transport;
 		}
-		$prompt   = new New_Plugin_Code_Follow_Up_Prompt();
 		$response = $transport->complete(
-			$prompt->file_instructions(),
-			$prompt->file_input(
-				(string) $workspace['request'],
-				(string) $job['payload']['message'],
-				$base_source,
-				$run['target_manifest'],
-				$effective,
-				$current,
-				$feedback
-			),
+			$prompt['instructions'],
+			$prompt['input'],
 			[ 'max_output_tokens' => 16384, 'json' => true ]
 		);
 
@@ -245,12 +246,15 @@ final class Code_Follow_Up_Orchestrator {
 			$runs->account_usage( (int) $run['id'], $token, $usage );
 			return $this->retry_file_or_fail( new \WP_Error( 'code_follow_up_file_response', __( 'The provider did not return a complete Code file.', 'wp-autoplugin' ), [ 'retryable' => true ] ), $job, $run, $current, $index, $token, $jobs, $runs );
 		}
-		$parsed = ( new Code_Validator() )->response( $response['content'], $current, (string) $run['target_manifest']['main_file'] );
+		$validator = new Code_Validator();
+		$parsed    = 'changes' === ( $run['target_manifest']['scope'] ?? '' ) && 'update' === $current['operation']
+			? $validator->update_response( $response['content'], $current, $run['target_manifest'], (string) $prompt['current_content'] )
+			: $validator->response( $response['content'], $current, $run['target_manifest'] );
 		if ( is_wp_error( $parsed ) ) {
 			$runs->account_usage( (int) $run['id'], $token, $usage );
 			return $this->retry_file_or_fail( $parsed, $job, $run, $current, $index, $token, $jobs, $runs );
 		}
-		if ( 'update' === $current['operation'] && $this->base_content( $base['files'], $current['path'] ) === $parsed['content'] ) {
+		if ( '' !== (string) $prompt['current_content'] && (string) $prompt['current_content'] === $parsed['content'] ) {
 			$runs->account_usage( (int) $run['id'], $token, $usage );
 			return $this->retry_file_or_fail( new \WP_Error( 'code_follow_up_identical', __( 'A file selected for modification was returned unchanged.', 'wp-autoplugin' ), [ 'retryable' => true ] ), $job, $run, $current, $index, $token, $jobs, $runs );
 		}
@@ -278,14 +282,15 @@ final class Code_Follow_Up_Orchestrator {
 			$jobs->event( (int) $job['id'], 'cancelled', __( 'Code follow-up cancelled before staging. No partial revision was created.', 'wp-autoplugin' ) );
 			return [ '_continuation' => true ];
 		}
-		$generated = array_column( ( new Code_Run_Repository() )->files( (int) $run['id'] ), 'content', 'path' );
-		$base_map  = array_column( $base['files'], 'content', 'path' );
-		$files     = [];
-		foreach ( $run['target_manifest']['files'] as $file ) {
-			$content = array_key_exists( $file['path'], $generated ) && null !== $generated[ $file['path'] ]
-				? (string) $generated[ $file['path'] ]
-				: (string) ( $base_map[ $file['path'] ] ?? '' );
-			$files[] = [ 'path' => $file['path'], 'type' => $file['type'], 'change_type' => 'add', 'content' => $content ];
+		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
+		if ( ! $workspace ) {
+			return new \WP_Error( 'code_follow_up_workspace', __( 'The Code follow-up workspace is unavailable.', 'wp-autoplugin' ) );
+		}
+		$files = 'changes' === ( $run['target_manifest']['scope'] ?? '' )
+			? $this->change_set_files( $workspace, $base, $run )
+			: $this->project_files( $base, $run );
+		if ( is_wp_error( $files ) ) {
+			return $files;
 		}
 		$revision = ( new Revision_Repository() )->stage_code_follow_up(
 			$run,
@@ -308,6 +313,321 @@ final class Code_Follow_Up_Orchestrator {
 		$run['revision_id'] = (int) $revision['id'];
 		$run['outcome']     = 'revision';
 		return $this->completed_result( $run );
+	}
+
+	/** @return array{instructions:string,input:string}|\WP_Error */
+	private function analysis_prompt( array $job, array $workspace, array $base, array $run ) {
+		$history  = $this->history( (int) $job['workspace_id'], (int) $job['id'] );
+		$message  = (string) $job['payload']['message'];
+		$feedback = (int) $run['retry_count'] ? substr( (string) $run['last_error'], 0, 500 ) : '';
+		$plan     = $this->plan_content( (int) $base['plan_job_id'] );
+		$target   = $this->target_metadata( $workspace );
+		if ( 'changes' === ( $base['project_manifest']['scope'] ?? '' ) ) {
+			$context = $this->target_analysis_context( $job, $workspace, $base );
+			if ( is_wp_error( $context ) ) {
+				return $context;
+			}
+			$prompt = new Existing_Target_Code_Follow_Up_Prompt();
+			return [
+				'instructions' => $prompt->analysis_instructions(),
+				'input'        => $prompt->analysis_input(
+					(string) $workspace['request'],
+					$plan,
+					$target,
+					$base['project_manifest'],
+					$context['staged'],
+					$context['tree'],
+					$context['focused'],
+					$history,
+					$message,
+					$feedback
+				),
+			];
+		}
+
+		$source = $this->source( $base['files'] );
+		if ( is_wp_error( $source ) ) {
+			return $source;
+		}
+		if ( 'hook_extension' === ( $workspace['operation'] ?? '' ) ) {
+			$prompt = new Extension_Plugin_Code_Follow_Up_Prompt();
+			return [
+				'instructions' => $prompt->analysis_instructions(),
+				'input'        => $prompt->analysis_input( (string) $workspace['request'], $plan, $target, $base['project_manifest'], $source, $history, $message, $feedback ),
+			];
+		}
+
+		$prompt = new New_Plugin_Code_Follow_Up_Prompt();
+		return [
+			'instructions' => $prompt->analysis_instructions(),
+			'input'        => $prompt->analysis_input( (string) $workspace['request'], $base['project_manifest'], $source, $history, $message, $feedback ),
+		];
+	}
+
+	/** @return array{instructions:string,input:string,current_content:string}|\WP_Error */
+	private function file_prompt( array $job, array $workspace, array $base, array $run, array $run_files, array $current, array $feedback ) {
+		$plan   = $this->plan_content( (int) $base['plan_job_id'] );
+		$target = $this->target_metadata( $workspace );
+		if ( 'changes' === ( $run['target_manifest']['scope'] ?? '' ) ) {
+			$context = $this->change_file_context( $workspace, $base, $run, $run_files );
+			if ( is_wp_error( $context ) ) {
+				return $context;
+			}
+			$prompt = new Existing_Target_Code_Follow_Up_Prompt();
+			return [
+				'instructions'    => $prompt->file_instructions( (string) $current['operation'] ),
+				'input'           => $prompt->file_input(
+					(string) $workspace['request'],
+					(string) $job['payload']['message'],
+					$plan,
+					$target,
+					$run['target_manifest'],
+					$context['effective'],
+					$context['generated'],
+					$current,
+					$feedback
+				),
+				'current_content' => (string) ( $context['content'][ $current['path'] ] ?? '' ),
+			];
+		}
+
+		$base_source = $this->source( $base['files'] );
+		if ( is_wp_error( $base_source ) ) {
+			return $base_source;
+		}
+		$effective = $this->effective_source( $base_source, $run_files, $run['target_manifest'] );
+		if ( 'hook_extension' === ( $workspace['operation'] ?? '' ) ) {
+			$prompt = new Extension_Plugin_Code_Follow_Up_Prompt();
+			return [
+				'instructions'    => $prompt->file_instructions(),
+				'input'           => $prompt->file_input( (string) $workspace['request'], (string) $job['payload']['message'], $plan, $target, $base_source, $run['target_manifest'], $effective, $current, $feedback ),
+				'current_content' => $this->source_content( $base_source, (string) $current['path'] ),
+			];
+		}
+
+		$prompt = new New_Plugin_Code_Follow_Up_Prompt();
+		return [
+			'instructions'    => $prompt->file_instructions(),
+			'input'           => $prompt->file_input( (string) $workspace['request'], (string) $job['payload']['message'], $base_source, $run['target_manifest'], $effective, $current, $feedback ),
+			'current_content' => $this->source_content( $base_source, (string) $current['path'] ),
+		];
+	}
+
+	/** @return array{staged:array<int,array<string,mixed>>,tree:array<string,mixed>,focused:?array}|\WP_Error */
+	private function target_analysis_context( array $job, array $workspace, array $base ) {
+		try {
+			$tools = new Source_Tools( (array) $workspace['target_metadata'] );
+		} catch ( \Throwable $error ) {
+			return new \WP_Error( 'code_follow_up_target_unavailable', __( 'The installed target is unavailable for this Code follow-up.', 'wp-autoplugin' ), [ 'retryable' => false ] );
+		}
+		$tree     = $tools->code_follow_up_tree();
+		$expected = (string) ( $base['project_manifest']['target_fingerprint'] ?? '' );
+		if ( '' === $expected || $expected !== $tree['tree_fingerprint'] ) {
+			return $this->target_changed();
+		}
+
+		$staged = [];
+		$total  = 0;
+		foreach ( $base['files'] as $file ) {
+			$content = 'delete' === $file['change_type'] ? (string) ( $file['base_content'] ?? '' ) : (string) $file['content'];
+			$total  += strlen( $content );
+			$staged[] = [
+				'path'      => (string) $file['path'],
+				'type'      => strtolower( (string) pathinfo( $file['path'], PATHINFO_EXTENSION ) ),
+				'operation' => (string) $file['change_type'],
+				'content'   => $content,
+			];
+		}
+		if ( $total > Code_Validator::MAX_PROJECT_BYTES ) {
+			return new \WP_Error( 'code_follow_up_source_large', __( 'The effective staged target changes exceed the Code follow-up context limit.', 'wp-autoplugin' ), [ 'retryable' => false ] );
+		}
+
+		$focused = null;
+		$path    = (string) ( $job['payload']['focused_path'] ?? '' );
+		if ( '' !== $path ) {
+			foreach ( $staged as $file ) {
+				if ( $path === $file['path'] ) {
+					$focused = array_merge( $file, [ 'source' => 'staged_revision' ] );
+					break;
+				}
+			}
+			if ( ! $focused ) {
+				$focused = $tools->revision_file( $path );
+				if ( is_wp_error( $focused ) ) {
+					return new \WP_Error( 'code_follow_up_focus_unavailable', __( 'The selected target file is no longer available for this Code follow-up.', 'wp-autoplugin' ), [ 'retryable' => false ] );
+				}
+				if ( (int) $focused['size'] > Code_Validator::MAX_FILE_BYTES || $total + (int) $focused['size'] > Code_Validator::MAX_PROJECT_BYTES ) {
+					return new \WP_Error( 'code_follow_up_focus_large', __( 'The selected target file exceeds the Code follow-up context limit.', 'wp-autoplugin' ), [ 'retryable' => false ] );
+				}
+				$focused['source'] = 'installed_target';
+				unset( $focused['content_hash'] );
+			}
+		}
+
+		unset( $tree['tree_fingerprint'] );
+		return [ 'staged' => $staged, 'tree' => $tree, 'focused' => $focused ];
+	}
+
+	/** @return array<string, mixed>|\WP_Error */
+	private function prepare_change_manifest( array $workspace, array $base, array $manifest ) {
+		try {
+			$tools = new Source_Tools( (array) $workspace['target_metadata'] );
+		} catch ( \Throwable $error ) {
+			return new \WP_Error( 'code_follow_up_target_unavailable', __( 'The installed target is unavailable for this Code follow-up.', 'wp-autoplugin' ), [ 'retryable' => false ] );
+		}
+		if ( (string) ( $base['project_manifest']['target_fingerprint'] ?? '' ) !== $tools->tree_fingerprint() ) {
+			return $this->target_changed();
+		}
+		$snapshot = $tools->code_snapshot( $manifest['files'] );
+		if ( is_wp_error( $snapshot ) ) {
+			return new \WP_Error( $snapshot->get_error_code(), $snapshot->get_error_message(), [ 'retryable' => true, 'ambiguous' => false ] );
+		}
+		$manifest['target_fingerprint'] = $snapshot['target_fingerprint'];
+		$manifest['base_hashes']        = $snapshot['base_hashes'];
+		$manifest = ( new Code_Validator() )->manifest( $manifest );
+		return is_wp_error( $manifest )
+			? new \WP_Error( 'code_follow_up_manifest', $manifest->get_error_message(), [ 'retryable' => true, 'ambiguous' => false ] )
+			: $manifest;
+	}
+
+	/** @return true|\WP_Error */
+	private function target_consistent( array $workspace, array $manifest ) {
+		$snapshot = $this->target_snapshot( $workspace, $manifest );
+		return is_wp_error( $snapshot ) ? $snapshot : true;
+	}
+
+	/** @return array{effective:array<int,array<string,mixed>>,generated:array<int,array<string,mixed>>,content:array<string,string>}|\WP_Error */
+	private function change_file_context( array $workspace, array $base, array $run, array $run_files ) {
+		$snapshot = $this->target_snapshot( $workspace, $run['target_manifest'] );
+		if ( is_wp_error( $snapshot ) ) {
+			return $snapshot;
+		}
+		$content = array_column( $snapshot['source_files'], 'content', 'path' );
+		foreach ( $base['files'] as $file ) {
+			$content[ $file['path'] ] = 'delete' === $file['change_type'] ? (string) ( $file['base_content'] ?? '' ) : (string) $file['content'];
+		}
+		$generated = [];
+		foreach ( $run_files as $file ) {
+			if ( 'completed' === $file['status'] && null !== $file['content'] ) {
+				$content[ $file['path'] ] = (string) $file['content'];
+				$generated[] = [ 'path' => $file['path'], 'operation' => $file['operation'], 'content' => (string) $file['content'] ];
+			}
+		}
+		$effective = [];
+		foreach ( $run['target_manifest']['files'] as $file ) {
+			if ( 'delete' !== $file['operation'] && array_key_exists( $file['path'], $content ) ) {
+				$effective[] = [ 'path' => $file['path'], 'operation' => $file['operation'], 'content' => $content[ $file['path'] ] ];
+			}
+		}
+		return [ 'effective' => $effective, 'generated' => $generated, 'content' => $content ];
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private function project_files( array $base, array $run ): array {
+		$generated = array_column( ( new Code_Run_Repository() )->files( (int) $run['id'] ), 'content', 'path' );
+		$base_map  = array_column( $base['files'], 'content', 'path' );
+		$files     = [];
+		foreach ( $run['target_manifest']['files'] as $file ) {
+			$content = array_key_exists( $file['path'], $generated ) && null !== $generated[ $file['path'] ]
+				? (string) $generated[ $file['path'] ]
+				: (string) ( $base_map[ $file['path'] ] ?? '' );
+			$files[] = [ 'path' => $file['path'], 'type' => $file['type'], 'change_type' => 'add', 'content' => $content ];
+		}
+		return $files;
+	}
+
+	/** @return array<int,array<string,mixed>>|\WP_Error */
+	private function change_set_files( array $workspace, array $base, array $run ) {
+		$snapshot = $this->target_snapshot( $workspace, $run['target_manifest'] );
+		if ( is_wp_error( $snapshot ) ) {
+			return $snapshot;
+		}
+		$target    = array_column( $snapshot['source_files'], 'content', 'path' );
+		$generated = array_column( ( new Code_Run_Repository() )->files( (int) $run['id'] ), 'content', 'path' );
+		$base_map  = array_column( $base['files'], null, 'path' );
+		$files     = [];
+		foreach ( $run['target_manifest']['files'] as $file ) {
+			$operation = $file['operation'];
+			$content   = '';
+			if ( 'delete' !== $operation ) {
+				if ( array_key_exists( $file['path'], $generated ) && null !== $generated[ $file['path'] ] ) {
+					$content = (string) $generated[ $file['path'] ];
+				} elseif ( isset( $base_map[ $file['path'] ] ) && 'delete' !== $base_map[ $file['path'] ]['change_type'] ) {
+					$content = (string) $base_map[ $file['path'] ]['content'];
+				} else {
+					return new \WP_Error( 'code_follow_up_file_missing', sprintf( __( 'The staged content for %s is unavailable.', 'wp-autoplugin' ), $file['path'] ) );
+				}
+			}
+			$base_content = in_array( $operation, [ 'update', 'delete' ], true ) ? (string) ( $target[ $file['path'] ] ?? '' ) : null;
+			$files[] = [
+				'path'              => $file['path'],
+				'type'              => $file['type'],
+				'change_type'       => $operation,
+				'content'           => $content,
+				'base_content'      => $base_content,
+				'base_content_hash' => null === $base_content ? null : hash( 'sha256', $base_content ),
+			];
+		}
+		return $files;
+	}
+
+	/** @return array<string,mixed>|\WP_Error */
+	private function target_snapshot( array $workspace, array $manifest ) {
+		try {
+			$snapshot = ( new Source_Tools( (array) $workspace['target_metadata'] ) )->code_snapshot( $manifest['files'] );
+		} catch ( \Throwable $error ) {
+			return new \WP_Error( 'code_follow_up_target_unavailable', __( 'The installed target is unavailable for this Code follow-up.', 'wp-autoplugin' ), [ 'retryable' => false, 'ambiguous' => false ] );
+		}
+		if ( is_wp_error( $snapshot ) ) {
+			return new \WP_Error( $snapshot->get_error_code(), $snapshot->get_error_message(), [ 'retryable' => false, 'ambiguous' => false ] );
+		}
+		if ( (string) ( $manifest['target_fingerprint'] ?? '' ) !== (string) $snapshot['target_fingerprint'] || (array) ( $manifest['base_hashes'] ?? [] ) !== (array) $snapshot['base_hashes'] ) {
+			return $this->target_changed();
+		}
+		return $snapshot;
+	}
+
+	/** @param array<int,array<string,string>> $source */
+	private function source_content( array $source, string $path ): string {
+		foreach ( $source as $file ) {
+			if ( $path === (string) ( $file['path'] ?? '' ) ) {
+				return (string) ( $file['content'] ?? '' );
+			}
+		}
+		return '';
+	}
+
+	private function plan_content( int $job_id ): string {
+		$plan = ( new Job_Repository() )->find( $job_id );
+		return (string) ( $plan['result']['artifact']['content'] ?? $plan['result']['content'] ?? '' );
+	}
+
+	/** @return array<string,mixed> */
+	private function target_metadata( array $workspace ): array {
+		return array_intersect_key( (array) ( $workspace['target_metadata'] ?? [] ), array_flip( [ 'kind', 'ref', 'name', 'version', 'author', 'description', 'active', 'source_files', 'lines', 'tokens', 'hooks' ] ) );
+	}
+
+	/** @return array{slug:string,version:int} */
+	private function prompt_metadata( array $workspace, array $manifest ): array {
+		if ( 'changes' === ( $manifest['scope'] ?? '' ) ) {
+			return [ 'slug' => Existing_Target_Code_Follow_Up_Prompt::SLUG, 'version' => Existing_Target_Code_Follow_Up_Prompt::VERSION ];
+		}
+		if ( 'hook_extension' === ( $workspace['operation'] ?? '' ) ) {
+			return [ 'slug' => Extension_Plugin_Code_Follow_Up_Prompt::SLUG, 'version' => Extension_Plugin_Code_Follow_Up_Prompt::VERSION ];
+		}
+		return [ 'slug' => New_Plugin_Code_Follow_Up_Prompt::SLUG, 'version' => New_Plugin_Code_Follow_Up_Prompt::VERSION ];
+	}
+
+	private function supports( array $workspace ): bool {
+		$operation = (string) ( $workspace['operation'] ?? '' );
+		$kind      = (string) ( $workspace['target_kind'] ?? '' );
+		return ( 'create' === $operation && 'new_plugin' === $kind )
+			|| ( 'hook_extension' === $operation && in_array( $kind, [ 'plugin', 'theme' ], true ) )
+			|| ( in_array( $operation, [ 'modify', 'fix' ], true ) && in_array( $kind, [ 'plugin', 'theme' ], true ) );
+	}
+
+	private function target_changed(): \WP_Error {
+		return new \WP_Error( 'code_target_changed', __( 'The installed target changed after this revision was staged. Regenerate Code before sending another follow-up.', 'wp-autoplugin' ), [ 'retryable' => false, 'ambiguous' => false ] );
 	}
 
 	private function completed_result( array $run ): array {
@@ -430,6 +750,7 @@ final class Code_Follow_Up_Orchestrator {
 			}
 			$history[] = [
 				'revision_id' => (int) ( $previous['payload']['revision_id'] ?? 0 ),
+				'focused_path' => substr( (string) ( $previous['payload']['focused_path'] ?? '' ), 0, 1024 ),
 				'message'     => substr( (string) ( $previous['payload']['message'] ?? '' ), 0, 4096 ),
 				'status'      => $previous['status'],
 				'outcome'     => $previous['result']['outcome'] ?? null,
@@ -440,16 +761,6 @@ final class Code_Follow_Up_Orchestrator {
 			}
 		}
 		return array_reverse( $history );
-	}
-
-	/** @param array<int, array<string, mixed>> $files */
-	private function base_content( array $files, string $path ): string {
-		foreach ( $files as $file ) {
-			if ( $path === $file['path'] ) {
-				return (string) $file['content'];
-			}
-		}
-		return '';
 	}
 
 	private function conflict(): \WP_Error {

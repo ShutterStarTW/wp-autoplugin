@@ -92,4 +92,83 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 
 		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base ) );
 	}
+
+	public function test_preserves_extension_identity_for_complete_project_changes(): void {
+		$base = array_merge( $this->base, [ 'scope' => 'project', 'artifact_kind' => 'plugin', 'operation' => 'hook_extension' ] );
+		$response = [
+			'outcome'  => 'changes',
+			'content'  => 'Update the extension behavior.',
+			'manifest' => $this->base,
+			'changes'  => [ [ 'path' => 'assets/app.js', 'instruction' => 'Update the hook callback behavior.' ] ],
+		];
+
+		$result = ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $base );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( 'hook_extension', $result['manifest']['operation'] );
+		$this->assertSame( 'project', $result['manifest']['scope'] );
+	}
+
+	public function test_change_set_omission_unstages_and_explicit_delete_remains_a_target_action(): void {
+		$base = [
+			'scope'              => 'changes',
+			'artifact_kind'      => 'theme',
+			'operation'          => 'modify',
+			'plugin_name'        => 'Fixture Theme',
+			'main_file'          => '',
+			'target_ref'         => 'fixture-theme',
+			'target_fingerprint' => str_repeat( 'a', 64 ),
+			'base_hashes'        => [ 'functions.php' => str_repeat( 'b', 64 ), 'assets/old.css' => str_repeat( 'c', 64 ) ],
+			'files'              => [
+				[ 'path' => 'functions.php', 'type' => 'php', 'description' => 'Current update.', 'operation' => 'update' ],
+				[ 'path' => 'assets/old.css', 'type' => 'css', 'description' => 'Current deletion.', 'operation' => 'delete' ],
+			],
+		];
+		$response = [
+			'outcome'  => 'changes',
+			'content'  => 'Keep the PHP update, unstage the old deletion, and replace a script.',
+			'manifest' => [
+				'files' => [
+					[ 'path' => 'functions.php', 'type' => 'php', 'description' => 'Refine behavior.', 'operation' => 'update' ],
+					[ 'path' => 'assets/new.js', 'type' => 'js', 'description' => 'New behavior.', 'operation' => 'add' ],
+					[ 'path' => 'assets/obsolete.js', 'type' => 'js', 'description' => 'Remove obsolete behavior.', 'operation' => 'delete' ],
+				],
+			],
+			'changes'  => [
+				[ 'path' => 'functions.php', 'instruction' => 'Refine only the staged callback.' ],
+				[ 'path' => 'assets/new.js', 'instruction' => 'Create the replacement behavior.' ],
+			],
+		];
+
+		$result = ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $base );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( [ 'assets/new.js' ], $result['change_set']['added_paths'] );
+		$this->assertSame( [ 'functions.php' ], $result['change_set']['updated_paths'] );
+		$this->assertSame( [ 'assets/obsolete.js' ], $result['change_set']['deleted_paths'] );
+		$this->assertSame( [ 'update', 'add' ], array_column( $result['files'], 'operation' ) );
+		$this->assertNotContains( 'assets/old.css', array_column( $result['manifest']['files'], 'path' ) );
+	}
+
+	public function test_change_set_rejects_generation_for_delete_and_identical_successor(): void {
+		$base = [
+			'scope'         => 'changes',
+			'artifact_kind' => 'theme',
+			'operation'     => 'fix',
+			'plugin_name'   => 'Fixture Theme',
+			'main_file'     => '',
+			'target_ref'    => 'fixture-theme',
+			'files'         => [ [ 'path' => 'functions.php', 'type' => 'php', 'description' => 'Fix.', 'operation' => 'update' ] ],
+		];
+		$identical = [ 'outcome' => 'changes', 'content' => 'No change.', 'manifest' => [ 'files' => $base['files'] ], 'changes' => [] ];
+		$delete = [
+			'outcome'  => 'changes',
+			'content'  => 'Delete it.',
+			'manifest' => [ 'files' => [ [ 'path' => 'functions.php', 'type' => 'php', 'description' => 'Delete.', 'operation' => 'delete' ] ] ],
+			'changes'  => [ [ 'path' => 'functions.php', 'instruction' => 'Return empty content.' ] ],
+		];
+
+		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $identical ), $base ) );
+		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $delete ), $base ) );
+	}
 }

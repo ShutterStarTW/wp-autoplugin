@@ -1460,6 +1460,7 @@ body.wp-autoplugin-v2-distraction-free {
 	&__composer {
 		align-items: flex-end;
 		display: flex;
+		flex-wrap: wrap;
 		gap: 12px;
 		padding: 16px 20px;
 		.components-base-control {
@@ -1468,6 +1469,12 @@ body.wp-autoplugin-v2-distraction-free {
 		.components-base-control__field {
 			margin-bottom: 0;
 		}
+	}
+	&__focus {
+		color: $muted;
+		flex-basis: 100%;
+		font-family: monospace;
+		margin: 0;
 	}
 }
 .code-change-paths {

@@ -36,13 +36,22 @@ final class Code_Follow_Up_Response {
 		}
 
 		$validator = new Code_Validator();
-		$manifest  = $validator->manifest( $decoded['manifest'] );
-		if ( is_wp_error( $manifest ) ) {
-			return $this->error( 'code_follow_up_manifest', $manifest->get_error_message() );
-		}
-		$base = $validator->manifest( $base_manifest );
+		$base      = $validator->manifest( $base_manifest );
 		if ( is_wp_error( $base ) ) {
 			return new \WP_Error( 'code_follow_up_base_manifest', __( 'The current revision manifest is invalid.', 'wp-autoplugin' ), [ 'retryable' => false ] );
+		}
+		$candidate = $decoded['manifest'];
+		foreach ( [ 'scope', 'artifact_kind', 'operation' ] as $identity ) {
+			$candidate[ $identity ] = $base[ $identity ];
+		}
+		if ( 'changes' === $base['scope'] ) {
+			foreach ( [ 'plugin_name', 'main_file', 'target_ref', 'target_fingerprint', 'base_hashes' ] as $identity ) {
+				$candidate[ $identity ] = $base[ $identity ] ?? ( 'base_hashes' === $identity ? [] : '' );
+			}
+		}
+		$manifest = $validator->manifest( $candidate );
+		if ( is_wp_error( $manifest ) ) {
+			return $this->error( 'code_follow_up_manifest', $manifest->get_error_message() );
 		}
 
 		$base_paths   = array_column( $base['files'], null, 'path' );
@@ -60,6 +69,10 @@ final class Code_Follow_Up_Response {
 		}
 		if ( $total_bytes > self::MAX_INSTRUCTIONS_BYTES ) {
 			return $this->error( 'code_follow_up_instructions_large', __( 'The Code follow-up instructions exceed the safe limit.', 'wp-autoplugin' ) );
+		}
+
+		if ( 'changes' === $base['scope'] ) {
+			return $this->parse_change_set( $content, $base, $manifest, $instructions );
 		}
 
 		$added   = array_values( array_diff( array_keys( $target_paths ), array_keys( $base_paths ) ) );
@@ -114,6 +127,74 @@ final class Code_Follow_Up_Response {
 				'updated_paths' => $updated,
 				'deleted_paths' => $deleted,
 			],
+		];
+	}
+
+	/**
+	 * Normalize a target-relative successor. Omitted rows are unstaged; only an
+	 * explicit delete action stages deletion of a live target file.
+	 *
+	 * @param array<string, mixed> $base
+	 * @param array<string, mixed> $manifest
+	 * @param array<string, string> $instructions
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function parse_change_set( string $content, array $base, array $manifest, array $instructions ) {
+		$base_paths   = array_column( $base['files'], null, 'path' );
+		$target_paths = array_column( $manifest['files'], null, 'path' );
+		$work         = [];
+		$changed      = false;
+
+		foreach ( $manifest['files'] as $file ) {
+			$path        = $file['path'];
+			$operation   = $file['operation'];
+			$previous    = $base_paths[ $path ] ?? null;
+			$instruction = $instructions[ $path ] ?? '';
+			if ( 'delete' === $operation && '' !== $instruction ) {
+				return $this->error( 'code_follow_up_delete_instruction', __( 'A staged deletion must not request generated replacement content.', 'wp-autoplugin' ) );
+			}
+			if ( '' !== $instruction && ! in_array( $file['type'], [ 'php', 'js', 'css' ], true ) ) {
+				return $this->error( 'code_follow_up_target_type', __( 'AI Code follow-ups can generate only PHP, JavaScript, and CSS target files.', 'wp-autoplugin' ) );
+			}
+			if ( ! $previous || $previous['type'] !== $file['type'] || $previous['operation'] !== $operation ) {
+				$changed = true;
+				if ( 'delete' !== $operation && '' === $instruction ) {
+					return $this->error( 'code_follow_up_target_instruction', sprintf( __( 'The target change for %s requires a generation instruction.', 'wp-autoplugin' ), $path ) );
+				}
+			}
+			if ( '' !== $instruction ) {
+				$changed = true;
+				$work[]  = [
+					'path'        => $path,
+					'type'        => $file['type'],
+					'operation'   => $operation,
+					'instruction' => $instruction,
+				];
+			}
+		}
+		if ( array_diff( array_keys( $base_paths ), array_keys( $target_paths ) ) ) {
+			$changed = true;
+		}
+		if ( ! $changed ) {
+			return $this->error( 'code_follow_up_noop', __( 'The proposed Code follow-up does not contain a material change.', 'wp-autoplugin' ) );
+		}
+
+		$change_set = [ 'added_paths' => [], 'updated_paths' => [], 'deleted_paths' => [] ];
+		foreach ( $manifest['files'] as $file ) {
+			$key = match ( $file['operation'] ) {
+				'add'    => 'added_paths',
+				'delete' => 'deleted_paths',
+				default  => 'updated_paths',
+			};
+			$change_set[ $key ][] = $file['path'];
+		}
+
+		return [
+			'outcome'    => 'changes',
+			'content'    => $content,
+			'manifest'   => $manifest,
+			'files'      => $work,
+			'change_set' => $change_set,
 		];
 	}
 

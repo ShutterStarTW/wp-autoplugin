@@ -155,6 +155,39 @@ final class Source_Tools {
 	}
 
 	/**
+	 * Return bounded source-tree metadata for direct Code follow-up analysis.
+	 * Source bodies remain excluded; a focused body is read separately and only
+	 * after the caller has verified the revision's target fingerprint.
+	 *
+	 * @return array{files:array<int,array<string,mixed>>,total:int,truncated:bool,tree_fingerprint:string}
+	 */
+	public function code_follow_up_tree(): array {
+		$tree  = $this->tree();
+		$files = [];
+		$bytes = 0;
+		foreach ( $tree as $file ) {
+			$item = [
+				'path' => (string) $file['path'],
+				'type' => (string) $file['type'],
+				'size' => (int) $file['size'],
+			];
+			$encoded    = wp_json_encode( $item, JSON_UNESCAPED_SLASHES ) ?: '';
+			$item_bytes = strlen( $encoded ) + ( $files ? 1 : 0 );
+			if ( $bytes + $item_bytes > self::MAX_RESULT_BYTES - 1024 ) {
+				break;
+			}
+			$files[] = $item;
+			$bytes  += $item_bytes;
+		}
+		return [
+			'files'            => $files,
+			'total'            => count( $tree ),
+			'truncated'        => count( $files ) < count( $tree ),
+			'tree_fingerprint' => $this->fingerprint( $tree ),
+		];
+	}
+
+	/**
 	 * Read one complete bounded text-source file for the revision editor.
 	 *
 	 * @return array{path:string,type:string,size:int,content:string,content_hash:string}|\WP_Error
@@ -211,7 +244,7 @@ final class Source_Tools {
 		$source     = [];
 		$hashes     = [];
 		$total      = 0;
-		$allowed    = [ 'php', 'js', 'css' ];
+		$allowed    = self::EXTENSIONS;
 		foreach ( $tree as $file ) {
 			$by_path[ $file['path'] ] = $file;
 		}

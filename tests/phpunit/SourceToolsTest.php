@@ -142,4 +142,14 @@ final class SourceToolsTest extends WP_UnitTestCase {
 
 		$this->assertWPError( $this->tools->revision_file( '../wp-config.php' ) );
 	}
+
+	public function test_code_follow_up_tree_is_bounded_and_excludes_source_bodies(): void {
+		$tree = $this->tools->code_follow_up_tree();
+
+		$this->assertSame( 2, $tree['total'] );
+		$this->assertFalse( $tree['truncated'] );
+		$this->assertSame( [ 'includes/class-fixture.php', 'plugin.php' ], array_column( $tree['files'], 'path' ) );
+		$this->assertArrayNotHasKey( 'content', $tree['files'][0] );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $tree['tree_fingerprint'] );
+	}
 }

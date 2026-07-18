@@ -49,6 +49,7 @@ type Job = {
 		parent_revision_id?: number;
 		revision_id?: number;
 		expected_latest_revision_id?: number | null;
+		focused_path?: string;
 	};
 	result?: {
 		content?: string;
@@ -1148,12 +1149,13 @@ function WorkspaceView( {
 							onCreateCode={ ( payload ) =>
 								onCreateJob( 'code', payload )
 							}
-							onFollowUp={ ( message, revisionId ) =>
+							onFollowUp={ ( message, revisionId, focusedPath ) =>
 								onCreateJob( 'conversation', {
 									stage: 'code',
 									message,
 									revision_id: revisionId,
 									expected_latest_revision_id: revisionId,
+									focused_path: focusedPath || undefined,
 								} )
 							}
 						/>
@@ -1776,7 +1778,8 @@ function CodeStage( {
 	onCreateCode: ( payload: object ) => Promise< Job | null >;
 	onFollowUp: (
 		message: string,
-		revisionId: number
+		revisionId: number,
+		focusedPath?: string
 	) => Promise< Job | null >;
 } ) {
 	const [ revisions, setRevisions ] = useState< RevisionSummary[] >( [] );
@@ -2644,23 +2647,21 @@ function CodeStage( {
 					</Button>
 				</div>
 			) }
-			{ manifest &&
-				latestRevisionId &&
-				workspace.target_kind === 'new_plugin' &&
-				workspace.operation === 'create' && (
-					<CodeConversation
-						jobs={ conversationJobs }
-						revisions={ revisions }
-						latestRevisionId={ latestRevisionId }
-						selectedRevisionId={ selectedRevisionId }
-						editing={ editing }
-						dirty={ dirtyPaths.size > 0 }
-						capability={ capability }
-						activeCodeWork={ activeCodeWork }
-						onCancel={ onCancel }
-						onFollowUp={ onFollowUp }
-					/>
-				) }
+			{ manifest && latestRevisionId && (
+				<CodeConversation
+					jobs={ conversationJobs }
+					revisions={ revisions }
+					latestRevisionId={ latestRevisionId }
+					selectedRevisionId={ selectedRevisionId }
+					editing={ editing }
+					dirty={ dirtyPaths.size > 0 }
+					capability={ capability }
+					activeCodeWork={ activeCodeWork }
+					focusedPath={ selectedManifestFile?.path || '' }
+					onCancel={ onCancel }
+					onFollowUp={ onFollowUp }
+				/>
+			) }
 		</div>
 	);
 }
@@ -2674,6 +2675,7 @@ function CodeConversation( {
 	dirty,
 	capability,
 	activeCodeWork,
+	focusedPath,
 	onCancel,
 	onFollowUp,
 }: {
@@ -2685,10 +2687,12 @@ function CodeConversation( {
 	dirty: boolean;
 	capability: AgentCapability | null;
 	activeCodeWork: Job | null;
+	focusedPath: string;
 	onCancel: ( job: Job ) => void;
 	onFollowUp: (
 		message: string,
-		revisionId: number
+		revisionId: number,
+		focusedPath?: string
 	) => Promise< Job | null >;
 } ) {
 	const [ message, setMessage ] = useState( '' );
@@ -2738,12 +2742,16 @@ function CodeConversation( {
 			  );
 	};
 
-	const send = async ( value = message ) => {
+	const send = async ( value = message, contextPath = focusedPath ) => {
 		if ( disabled || ! value.trim() ) {
 			return;
 		}
 		setSubmitting( true );
-		const created = await onFollowUp( value.trim(), latestRevisionId );
+		const created = await onFollowUp(
+			value.trim(),
+			latestRevisionId,
+			contextPath || undefined
+		);
 		setSubmitting( false );
 		if ( created && value === message ) {
 			setMessage( '' );
@@ -2762,7 +2770,7 @@ function CodeConversation( {
 					</h3>
 					<p>
 						{ __(
-							'Questions use the configured coder. Change requests may use multiple billable calls and create a staged revision immediately.',
+							'Questions use the configured coder. Change requests may use multiple billable calls and create a new staged revision without writing to an installed target.',
 							'wp-autoplugin'
 						) }
 					</p>
@@ -2800,6 +2808,11 @@ function CodeConversation( {
 												{ revisionLabel( anchor ) }
 											</small>
 										) }
+										{ job.payload.focused_path && (
+											<small>
+												{ job.payload.focused_path }
+											</small>
+										) }
 									</div>
 									<p>{ job.payload.message }</p>
 								</div>
@@ -2831,7 +2844,10 @@ function CodeConversation( {
 													onClick={ () =>
 														send(
 															job.payload
-																.message || ''
+																.message || '',
+															job.payload
+																.focused_path ||
+																''
 														)
 													}
 												>
@@ -2907,7 +2923,9 @@ function CodeConversation( {
 												onClick={ () =>
 													send(
 														job.payload.message ||
-															''
+															'',
+														job.payload
+															.focused_path || ''
 													)
 												}
 											>
@@ -2925,6 +2943,15 @@ function CodeConversation( {
 				</div>
 			) }
 			<div className="code-conversation__composer">
+				{ focusedPath && (
+					<p className="code-conversation__focus">
+						{ sprintf(
+							/* translators: %s: selected source file path. */
+							__( 'Current file context: %s', 'wp-autoplugin' ),
+							focusedPath
+						) }
+					</p>
+				) }
 				<TextareaControl
 					label={ __( 'Message', 'wp-autoplugin' ) }
 					value={ message }
