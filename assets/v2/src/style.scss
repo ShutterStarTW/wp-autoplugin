@@ -133,29 +133,34 @@ body.wp-autoplugin-v2-distraction-free {
 	overflow-x: auto;
 	overflow-y: hidden;
 }
-.workspace-distraction-toggle {
-	align-items: center;
-	background: transparent;
-	border: 0;
+.workspace-options-menu {
 	border-left: 1px solid #cdd3d8;
-	color: #526069;
-	cursor: pointer;
 	display: flex;
 	flex: 0 0 43px;
-	justify-content: center;
-	padding: 0;
-	&:hover,
-	&:focus-visible {
-		background: #d7dce0;
-		color: $accent;
-		outline: 0;
+	.workspace-options-menu__toggle.components-button {
+		align-items: center;
+		border-radius: 0;
+		color: #526069;
+		height: 43px;
+		justify-content: center;
+		min-width: 43px;
+		padding: 0;
+		width: 43px;
+		&:hover,
+		&:focus-visible,
+		&.is-opened {
+			background: #d7dce0;
+			color: $accent;
+		}
+		&:focus-visible {
+			box-shadow: inset 0 0 0 2px $accent;
+			outline: 0;
+		}
 	}
-	&:focus-visible {
-		box-shadow: inset 0 0 0 2px $accent;
-	}
-	.dashicons {
+	.dashicons-ellipsis {
 		font-size: 20px;
 		height: 20px;
+		transform: rotate(90deg);
 		width: 20px;
 	}
 }

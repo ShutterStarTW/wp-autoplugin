@@ -3,6 +3,7 @@ import {
 	Button,
 	Card,
 	CardBody,
+	DropdownMenu,
 	Notice,
 	Spinner,
 	TextControl,
@@ -844,10 +845,6 @@ function WorkspaceTabBar( {
 	onNew: () => void;
 	onDistractionFreeToggle: () => void;
 } ) {
-	const distractionFreeLabel = distractionFree
-		? __( 'Exit distraction-free mode', 'wp-autoplugin' )
-		: __( 'Enter distraction-free mode', 'wp-autoplugin' );
-
 	return (
 		<div className="workspace-tab-shell">
 			<div
@@ -928,23 +925,25 @@ function WorkspaceTabBar( {
 					+
 				</button>
 			</div>
-			<button
-				type="button"
-				className="workspace-distraction-toggle"
-				onClick={ onDistractionFreeToggle }
-				aria-label={ distractionFreeLabel }
-				aria-pressed={ distractionFree }
-				title={ distractionFreeLabel }
-			>
-				<span
-					className={ `dashicons ${
-						distractionFree
-							? 'dashicons-fullscreen-exit-alt'
-							: 'dashicons-fullscreen-alt'
-					}` }
-					aria-hidden="true"
-				/>
-			</button>
+			<DropdownMenu
+				className="workspace-options-menu"
+				icon="ellipsis"
+				label={ __( 'Workspace options', 'wp-autoplugin' ) }
+				toggleProps={ {
+					className: 'workspace-options-menu__toggle',
+				} }
+				controls={ [
+					{
+						title: __( 'Distraction-free mode', 'wp-autoplugin' ),
+						icon: distractionFree
+							? 'fullscreen-exit-alt'
+							: 'fullscreen-alt',
+						isActive: distractionFree,
+						role: 'menuitemcheckbox',
+						onClick: onDistractionFreeToggle,
+					},
+				] }
+			/>
 		</div>
 	);
 }
