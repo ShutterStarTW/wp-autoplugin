@@ -490,11 +490,13 @@ body.wp-autoplugin-v2-distraction-free {
 		min-height: 420px;
 	}
 }
-.workspace-stage-tabs {
+.workspace-stage-flow {
 	border-bottom: 1px solid #dce1e4;
+	padding: 12px 24px 0;
+}
+.workspace-stage-tabs {
 	display: flex;
 	gap: 20px;
-	padding: 0 24px;
 	button {
 		background: transparent;
 		border: 0;
@@ -513,6 +515,84 @@ body.wp-autoplugin-v2-distraction-free {
 		&.is-active {
 			border-bottom-color: $accent;
 			color: $accent;
+		}
+	}
+	&.is-workflow {
+		display: grid;
+		gap: 20px;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		button {
+			align-items: center;
+			border: 1px solid #dce1e4;
+			border-bottom: 3px solid transparent;
+			border-radius: 6px 6px 0 0;
+			display: flex;
+			gap: 10px;
+			min-width: 0;
+			padding: 10px 12px;
+			position: relative;
+			text-align: left;
+			&::after {
+				color: #9ba6ad;
+				content: "›";
+				font-size: 22px;
+				font-weight: 400;
+				position: absolute;
+				right: -15px;
+				top: 50%;
+				transform: translateY(-50%);
+			}
+			&:dir(rtl)::after {
+				transform: translateY(-50%) scaleX(-1);
+			}
+			&:last-child::after {
+				content: none;
+			}
+			&:hover {
+				background: #f7f8f9;
+			}
+			&.is-active {
+				background: #f5f9fc;
+				border-color: #b8d7e8;
+				border-bottom-color: $accent;
+			}
+		}
+	}
+	&.is-single {
+		button {
+			padding-top: 0;
+		}
+	}
+	&__number {
+		align-items: center;
+		background: #e8edf1;
+		border-radius: 50%;
+		color: #526069;
+		display: inline-flex;
+		flex: 0 0 28px;
+		font-size: 12px;
+		height: 28px;
+		justify-content: center;
+		.is-active & {
+			background: $accent;
+			color: $surface;
+		}
+	}
+	&__copy {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+		strong {
+			font-size: 12px;
+		}
+		small {
+			color: $muted;
+			font-size: 10px;
+			font-weight: 400;
+		}
+		.is-active & small {
+			color: #526b7b;
 		}
 	}
 }
@@ -2038,6 +2118,26 @@ body.wp-autoplugin-v2-distraction-free {
 	}
 	.operation-picker > div {
 		grid-template-columns: 1fr;
+	}
+	.workspace-stage-flow {
+		padding-left: 16px;
+		padding-right: 16px;
+	}
+	.workspace-stage-tabs {
+		&.is-workflow {
+			gap: 12px;
+			button {
+				gap: 6px;
+				justify-content: center;
+				padding: 9px 6px;
+				&::after {
+					right: -10px;
+				}
+			}
+		}
+		&__copy small {
+			display: none;
+		}
 	}
 	.stage-toolbar,
 	.stage-next,

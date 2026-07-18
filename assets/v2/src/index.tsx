@@ -1326,6 +1326,7 @@ function WorkspaceView( {
 		workspace.operation === 'explain'
 			? [ 'explain' ]
 			: [ 'plan', 'code', 'review' ];
+	const isWorkflow = tabs.length === 3;
 	const latestPlan = latestPlanArtifact( jobs );
 	const latestPlanRun = latestJobForTask( jobs, 'plan' );
 	const latestStructureRun = latestJobForTask( jobs, 'plan_structure' );
@@ -1368,21 +1369,45 @@ function WorkspaceView( {
 				<strong>{ __( 'Request', 'wp-autoplugin' ) }</strong>
 				<p>{ workspace.request }</p>
 			</div>
-			<nav
-				className="workspace-stage-tabs"
-				aria-label={ __( 'Workspace stages', 'wp-autoplugin' ) }
-			>
-				{ tabs.map( ( tab ) => (
-					<button
-						type="button"
-						key={ tab }
-						className={ activeTab === tab ? 'is-active' : '' }
-						onClick={ () => onTabSelect( tab ) }
-					>
-						{ getTabLabel( tab ) }
-					</button>
-				) ) }
-			</nav>
+			<div className="workspace-stage-flow">
+				<nav
+					className={ `workspace-stage-tabs ${
+						isWorkflow ? 'is-workflow' : 'is-single'
+					}` }
+					aria-label={ __( 'Workspace stages', 'wp-autoplugin' ) }
+				>
+					{ tabs.map( ( tab, index ) => (
+						<button
+							type="button"
+							key={ tab }
+							className={ activeTab === tab ? 'is-active' : '' }
+							aria-current={
+								activeTab === tab ? 'step' : undefined
+							}
+							onClick={ () => onTabSelect( tab ) }
+						>
+							{ isWorkflow ? (
+								<>
+									<span
+										className="workspace-stage-tabs__number"
+										aria-hidden="true"
+									>
+										{ index + 1 }
+									</span>
+									<span className="workspace-stage-tabs__copy">
+										<strong>{ getTabLabel( tab ) }</strong>
+										<small>
+											{ getTabDescription( tab ) }
+										</small>
+									</span>
+								</>
+							) : (
+								getTabLabel( tab )
+							) }
+						</button>
+					) ) }
+				</nav>
+			</div>
 			<Card className="workspace-editor__panel">
 				<CardBody>
 					{ jobsLoading && (
@@ -4326,8 +4351,21 @@ function getTabLabel( tab: string ) {
 			return __( 'Plan', 'wp-autoplugin' );
 		case 'code':
 			return __( 'Code', 'wp-autoplugin' );
-		default:
+		case 'review':
 			return __( 'Review', 'wp-autoplugin' );
+		default:
+			return __( 'Explain', 'wp-autoplugin' );
+	}
+}
+
+function getTabDescription( tab: string ) {
+	switch ( tab ) {
+		case 'plan':
+			return __( 'Define the work', 'wp-autoplugin' );
+		case 'code':
+			return __( 'Build from the Plan', 'wp-autoplugin' );
+		default:
+			return __( 'Assess staged Code', 'wp-autoplugin' );
 	}
 }
 
