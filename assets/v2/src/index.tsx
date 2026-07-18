@@ -289,6 +289,63 @@ function workspaceStages( operation?: string ): string[] {
 		: [ 'plan', 'code', 'review' ];
 }
 
+function WorkspaceLoader() {
+	return (
+		<main
+			className="wp-autoplugin-v2-loading"
+			role="status"
+			aria-live="polite"
+			aria-busy="true"
+		>
+			<header className="wp-autoplugin-v2-loading__header">
+				<p className="wp-autoplugin-v2-loading__eyebrow">
+					WP-Autoplugin
+				</p>
+			</header>
+			<div className="wp-autoplugin-v2-loading__shell">
+				<div
+					className="wp-autoplugin-v2-loading__tabs"
+					aria-hidden="true"
+				>
+					<span className="wp-autoplugin-v2-loading__tab">
+						<span className="wp-autoplugin-v2-loading__tab-dot" />
+						<span className="wp-autoplugin-v2-loading__tab-line" />
+					</span>
+					<span className="wp-autoplugin-v2-loading__new-tab">+</span>
+				</div>
+				<div className="wp-autoplugin-v2-loading__canvas">
+					<div className="wp-autoplugin-v2-loading__status">
+						<div
+							className="wp-autoplugin-v2-loading__mark"
+							aria-hidden="true"
+						>
+							&lt;/&gt;
+						</div>
+						<p className="wp-autoplugin-v2-loading__title">
+							{ __(
+								'Preparing your workspace',
+								'wp-autoplugin'
+							) }
+						</p>
+						<p className="wp-autoplugin-v2-loading__copy">
+							{ __(
+								'Restoring your targets, tabs, and recent work…',
+								'wp-autoplugin'
+							) }
+						</p>
+						<div
+							className="wp-autoplugin-v2-loading__progress"
+							aria-hidden="true"
+						>
+							<span />
+						</div>
+					</div>
+				</div>
+			</div>
+		</main>
+	);
+}
+
 function App() {
 	const [ bootstrap, setBootstrap ] = useState< Bootstrap | null >( null );
 	const [ targets, setTargets ] = useState< Target[] >( [] );
@@ -692,11 +749,7 @@ function App() {
 	}
 
 	if ( busy && ! bootstrap ) {
-		return (
-			<div className="wp-autoplugin-v2-loading">
-				<Spinner /> { __( 'Loading workspace…', 'wp-autoplugin' ) }
-			</div>
-		);
+		return <WorkspaceLoader />;
 	}
 
 	let workspaceContent = null;
