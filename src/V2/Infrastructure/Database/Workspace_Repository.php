@@ -154,22 +154,73 @@ final class Workspace_Repository extends Repository {
 	}
 
 	/**
+	 * List the most recently closed workspace tabs for the current user.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function list_recently_closed( int $user_id, int $limit = 10 ): array {
+		$workspaces = Installer::table( 'workspaces' );
+		$projects   = Installer::table( 'projects' );
+		$targets    = Installer::table( 'targets' );
+		$jobs       = Installer::table( 'jobs' );
+		$limit      = max( 1, min( 50, $limit ) );
+		$rows       = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT w.*, p.name AS project_name, t.kind AS target_kind, t.ref AS target_ref, t.metadata AS target_metadata,
+				(SELECT j.id FROM $jobs j WHERE j.workspace_id = w.id ORDER BY j.id DESC LIMIT 1) AS latest_job_id,
+				(SELECT j.status FROM $jobs j WHERE j.workspace_id = w.id ORDER BY j.id DESC LIMIT 1) AS latest_job_status
+				FROM $workspaces w INNER JOIN $projects p ON p.id = w.project_id
+				LEFT JOIN $targets t ON t.id = p.target_id
+				WHERE w.created_by = %d AND w.is_closed = 1
+				ORDER BY w.closed_at DESC, w.id DESC LIMIT %d",
+				$user_id,
+				$limit
+			), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tables are allow-listed internal names.
+			ARRAY_A
+		);
+
+		return array_map( [ $this, 'hydrate' ], $rows );
+	}
+
+	/**
 	 * Hide a workspace tab without deleting its project, revisions, or jobs.
 	 */
 	public function close( int $id, int $user_id ): bool {
+		$now     = $this->now();
 		$updated = $this->wpdb->update(
 			Installer::table( 'workspaces' ),
 			[
-				'is_closed' => 1,
-				'closed_at' => $this->now(),
-				'updated_at' => $this->now(),
+				'is_closed'  => 1,
+				'closed_at'  => $now,
+				'updated_at' => $now,
 			],
-			[ 'id' => $id, 'created_by' => $user_id ],
+			[ 'id' => $id, 'created_by' => $user_id, 'is_closed' => 0 ],
 			[ '%d', '%s', '%s' ],
-			[ '%d', '%d' ]
+			[ '%d', '%d', '%d' ]
 		);
 
 		return false !== $updated && $updated > 0;
+	}
+
+	/**
+	 * Reopen a closed workspace tab without changing its durable project data.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public function reopen( int $id, int $user_id ): ?array {
+		$updated = $this->wpdb->update(
+			Installer::table( 'workspaces' ),
+			[
+				'is_closed'  => 0,
+				'closed_at'  => null,
+				'updated_at' => $this->now(),
+			],
+			[ 'id' => $id, 'created_by' => $user_id, 'is_closed' => 1 ],
+			[ '%d', '%s', '%s' ],
+			[ '%d', '%d', '%d' ]
+		);
+
+		return false !== $updated && $updated > 0 ? $this->find( $id ) : null;
 	}
 
 	/** Update the durable project label shown by workspace tabs. */

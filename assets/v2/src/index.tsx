@@ -4,6 +4,7 @@ import {
 	Card,
 	CardBody,
 	DropdownMenu,
+	Modal,
 	Notice,
 	Spinner,
 	TextControl,
@@ -276,6 +277,8 @@ type Workspace = {
 	target_kind: string;
 	target_ref: string;
 	target_metadata: Target;
+	is_closed: number;
+	closed_at: string | null;
 	updated_at: string;
 };
 
@@ -330,7 +333,7 @@ function WorkspaceLoader() {
 						</p>
 						<p className="wp-autoplugin-v2-loading__copy">
 							{ __(
-								'Restoring your targets, tabs, and recent work…',
+								'Restoring your projects, tabs, and recent work…',
 								'wp-autoplugin'
 							) }
 						</p>
@@ -363,6 +366,7 @@ function App() {
 	const [ activeTab, setActiveTab ] = useState( 'plan' );
 	const [ error, setError ] = useState( '' );
 	const [ busy, setBusy ] = useState( true );
+	const [ recentProjectsOpen, setRecentProjectsOpen ] = useState( false );
 	const [ distractionFree, setDistractionFree ] = useState(
 		() => 'true' === window.localStorage.getItem( DISTRACTION_FREE_KEY )
 	);
@@ -665,6 +669,18 @@ function App() {
 		}
 	}
 
+	async function reopenWorkspace( workspaceId: number ) {
+		const reopened = await apiFetch< Workspace >( {
+			path: `${ rest }/workspaces/${ workspaceId }/reopen`,
+			method: 'POST',
+		} );
+		setWorkspaces( ( current ) => [
+			reopened,
+			...current.filter( ( item ) => item.id !== reopened.id ),
+		] );
+		setActiveWorkspaceId( reopened.id );
+	}
+
 	async function cancel( job: Job ) {
 		const updated = await apiFetch< Job >( {
 			path: `${ rest }/jobs/${ job.id }/cancel`,
@@ -819,10 +835,17 @@ function App() {
 				onSelect={ setActiveWorkspaceId }
 				onClose={ closeWorkspace }
 				onNew={ () => setActiveWorkspaceId( 'new' ) }
+				onLoadRecent={ () => setRecentProjectsOpen( true ) }
 				onDistractionFreeToggle={ () =>
 					setDistractionFree( ( current ) => ! current )
 				}
 			/>
+			{ recentProjectsOpen && (
+				<RecentProjectsModal
+					onClose={ () => setRecentProjectsOpen( false ) }
+					onReopen={ reopenWorkspace }
+				/>
+			) }
 			{ workspaceContent }
 		</main>
 	);
@@ -835,6 +858,7 @@ function WorkspaceTabBar( {
 	onSelect,
 	onClose,
 	onNew,
+	onLoadRecent,
 	onDistractionFreeToggle,
 }: {
 	workspaces: Workspace[];
@@ -843,6 +867,7 @@ function WorkspaceTabBar( {
 	onSelect: ( id: number ) => void;
 	onClose: ( id: number ) => void;
 	onNew: () => void;
+	onLoadRecent: () => void;
 	onDistractionFreeToggle: () => void;
 } ) {
 	return (
@@ -933,18 +958,213 @@ function WorkspaceTabBar( {
 					className: 'workspace-options-menu__toggle',
 				} }
 				controls={ [
-					{
-						title: __( 'Distraction-free mode', 'wp-autoplugin' ),
-						icon: distractionFree
-							? 'fullscreen-exit-alt'
-							: 'fullscreen-alt',
-						isActive: distractionFree,
-						role: 'menuitemcheckbox',
-						onClick: onDistractionFreeToggle,
-					},
+					[
+						{
+							title: __( 'Reoper recent', 'wp-autoplugin' ),
+							icon: 'open-folder',
+							onClick: onLoadRecent,
+						},
+					],
+					[
+						{
+							title: __(
+								'Distraction-free mode',
+								'wp-autoplugin'
+							),
+							icon: distractionFree
+								? 'fullscreen-exit-alt'
+								: 'fullscreen-alt',
+							isActive: distractionFree,
+							role: 'menuitemcheckbox',
+							onClick: onDistractionFreeToggle,
+						},
+					],
 				] }
 			/>
 		</div>
+	);
+}
+
+function RecentProjectsModal( {
+	onClose,
+	onReopen,
+}: {
+	onClose: () => void;
+	onReopen: ( workspaceId: number ) => Promise< void >;
+} ) {
+	const [ projects, setProjects ] = useState< Workspace[] >( [] );
+	const [ loading, setLoading ] = useState( true );
+	const [ reopeningId, setReopeningId ] = useState< number | null >( null );
+	const [ loadError, setLoadError ] = useState( '' );
+
+	useEffect( () => {
+		let current = true;
+		apiFetch< { items: Workspace[] } >( {
+			path: `${ rest }/workspaces/recent`,
+		} )
+			.then( ( response ) => {
+				if ( current ) {
+					setProjects( response.items );
+				}
+			} )
+			.catch( ( reason ) => {
+				if ( current ) {
+					setLoadError( reason.message );
+				}
+			} )
+			.finally( () => {
+				if ( current ) {
+					setLoading( false );
+				}
+			} );
+
+		return () => {
+			current = false;
+		};
+	}, [] );
+
+	async function reopen( workspaceId: number ) {
+		setReopeningId( workspaceId );
+		setLoadError( '' );
+		try {
+			await onReopen( workspaceId );
+			onClose();
+		} catch ( reason: any ) {
+			setLoadError( reason.message );
+			setReopeningId( null );
+		}
+	}
+
+	return (
+		<Modal
+			className="recent-projects-modal"
+			title={ __( 'Reopen recent', 'wp-autoplugin' ) }
+			size="large"
+			isDismissible={ null === reopeningId }
+			onRequestClose={ onClose }
+		>
+			<p className="recent-projects__intro">
+				{ __(
+					'Reopen one of your recently closed projects and continue where you left off.',
+					'wp-autoplugin'
+				) }
+			</p>
+			{ loadError && (
+				<Notice status="error" isDismissible={ false }>
+					{ loadError }
+				</Notice>
+			) }
+			{ loading && (
+				<div className="recent-projects__loading" role="status">
+					<Spinner />
+					{ __( 'Loading recent projects…', 'wp-autoplugin' ) }
+				</div>
+			) }
+			{ ! loading && ! loadError && ! projects.length && (
+				<div className="recent-projects__empty">
+					<strong>
+						{ __( 'No closed projects yet', 'wp-autoplugin' ) }
+					</strong>
+					<p>
+						{ __(
+							'Projects will appear here after you close their workspace tabs.',
+							'wp-autoplugin'
+						) }
+					</p>
+				</div>
+			) }
+			{ ! loading && projects.length > 0 && (
+				<ul className="recent-projects__list">
+					{ projects.map( ( project ) => {
+						const status =
+							project.latest_job_status || project.status;
+						const targetName =
+							project.target_metadata?.name ||
+							project.project_name;
+						return (
+							<li
+								className="recent-projects__item"
+								key={ project.id }
+							>
+								<div className="recent-projects__details">
+									<div className="recent-projects__heading">
+										<div>
+											<strong>
+												{ project.project_name }
+											</strong>
+											<small>
+												{ getTargetKindLabel(
+													project.target_kind
+												) }
+											</small>
+										</div>
+										<span
+											className={ `recent-projects__status status--${ status }` }
+										>
+											{ getStatusLabel( status ) }
+										</span>
+									</div>
+									<p className="recent-projects__request">
+										{ project.request }
+									</p>
+									<dl>
+										<div>
+											<dt>
+												{ __(
+													'Operation',
+													'wp-autoplugin'
+												) }
+											</dt>
+											<dd>
+												{ getOperationLabel(
+													project.operation
+												) }
+											</dd>
+										</div>
+										<div>
+											<dt>
+												{ __(
+													'Target',
+													'wp-autoplugin'
+												) }
+											</dt>
+											<dd>{ targetName }</dd>
+										</div>
+										<div>
+											<dt>
+												{ __(
+													'Closed',
+													'wp-autoplugin'
+												) }
+											</dt>
+											<dd>
+												{ formatWorkspaceDate(
+													project.closed_at ||
+														project.updated_at
+												) }
+											</dd>
+										</div>
+									</dl>
+								</div>
+								<Button
+									variant="secondary"
+									isBusy={ reopeningId === project.id }
+									disabled={ null !== reopeningId }
+									onClick={ () => reopen( project.id ) }
+									aria-label={ sprintf(
+										/* translators: %s: Project name. */
+										__( 'Reopen %s', 'wp-autoplugin' ),
+										project.project_name
+									) }
+								>
+									{ __( 'Reopen', 'wp-autoplugin' ) }
+								</Button>
+							</li>
+						);
+					} ) }
+				</ul>
+			) }
+		</Modal>
 	);
 }
 
@@ -4059,6 +4279,45 @@ function getTargetKindLabel( kind: string ) {
 		default:
 			return __( 'New plugin', 'wp-autoplugin' );
 	}
+}
+
+function getStatusLabel( status: string ) {
+	switch ( status ) {
+		case 'queued':
+			return __( 'Queued', 'wp-autoplugin' );
+		case 'running':
+			return __( 'Running', 'wp-autoplugin' );
+		case 'retrying':
+			return __( 'Retrying', 'wp-autoplugin' );
+		case 'completed':
+			return __( 'Completed', 'wp-autoplugin' );
+		case 'failed':
+			return __( 'Failed', 'wp-autoplugin' );
+		case 'cancelled':
+			return __( 'Cancelled', 'wp-autoplugin' );
+		case 'staged':
+			return __( 'Staged', 'wp-autoplugin' );
+		default:
+			return __( 'Draft', 'wp-autoplugin' );
+	}
+}
+
+function formatWorkspaceDate( value: string ) {
+	const normalized = value.includes( 'T' )
+		? value
+		: `${ value.replace( ' ', 'T' ) }Z`;
+	const date = new Date( normalized );
+	if ( Number.isNaN( date.getTime() ) ) {
+		return value;
+	}
+
+	return new Intl.DateTimeFormat( undefined, {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric',
+		hour: 'numeric',
+		minute: '2-digit',
+	} ).format( date );
 }
 
 function getTabLabel( tab: string ) {

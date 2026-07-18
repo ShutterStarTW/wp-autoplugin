@@ -59,6 +59,11 @@ final class Routes {
 				],
 			],
 		] );
+		register_rest_route( self::NAMESPACE, '/workspaces/recent', [
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => [ $this, 'recent_workspaces' ],
+			'permission_callback' => $permission,
+		] );
 		register_rest_route( self::NAMESPACE, '/workspaces/(?P<id>\d+)', [
 			'methods'             => \WP_REST_Server::READABLE,
 			'callback'            => [ $this, 'workspace' ],
@@ -68,6 +73,12 @@ final class Routes {
 		register_rest_route( self::NAMESPACE, '/workspaces/(?P<id>\d+)/close', [
 			'methods'             => \WP_REST_Server::CREATABLE,
 			'callback'            => [ $this, 'close_workspace' ],
+			'permission_callback' => $permission,
+			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
+		] );
+		register_rest_route( self::NAMESPACE, '/workspaces/(?P<id>\d+)/reopen', [
+			'methods'             => \WP_REST_Server::CREATABLE,
+			'callback'            => [ $this, 'reopen_workspace' ],
 			'permission_callback' => $permission,
 			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
 		] );
@@ -193,6 +204,10 @@ final class Routes {
 		return rest_ensure_response( [ 'items' => ( new Workspace_Repository() )->list_open( get_current_user_id() ) ] );
 	}
 
+	public function recent_workspaces(): \WP_REST_Response {
+		return rest_ensure_response( [ 'items' => ( new Workspace_Repository() )->list_recently_closed( get_current_user_id(), 10 ) ] );
+	}
+
 	/**
 	 * @return \WP_REST_Response|\WP_Error
 	 */
@@ -252,6 +267,19 @@ final class Routes {
 		return $closed
 			? rest_ensure_response( [ 'id' => (int) $request['id'], 'closed' => true ] )
 			: new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found or already closed.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+	}
+
+	/**
+	 * Reopen a tab without creating a new project or changing its durable work.
+	 *
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function reopen_workspace( \WP_REST_Request $request ) {
+		$workspace = ( new Workspace_Repository() )->reopen( (int) $request['id'], get_current_user_id() );
+
+		return $workspace
+			? rest_ensure_response( $workspace )
+			: new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found or already open.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 	}
 
 	/**
