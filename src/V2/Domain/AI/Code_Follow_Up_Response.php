@@ -45,8 +45,12 @@ final class Code_Follow_Up_Response {
 			$candidate[ $identity ] = $base[ $identity ];
 		}
 		if ( 'changes' === $base['scope'] ) {
-			foreach ( [ 'plugin_name', 'main_file', 'target_ref', 'target_fingerprint', 'base_hashes' ] as $identity ) {
+			foreach ( [ 'plugin_name', 'main_file', 'target_ref', 'target_fingerprint', 'complete_target_fingerprint', 'base_hashes' ] as $identity ) {
 				$candidate[ $identity ] = $base[ $identity ] ?? ( 'base_hashes' === $identity ? [] : '' );
+			}
+		} elseif ( 'hook_extension' === ( $base['operation'] ?? '' ) ) {
+			foreach ( [ 'integration_target_kind', 'integration_target_ref', 'integration_target_fingerprint' ] as $identity ) {
+				$candidate[ $identity ] = $base[ $identity ] ?? '';
 			}
 		}
 		$manifest = $validator->manifest( $candidate );

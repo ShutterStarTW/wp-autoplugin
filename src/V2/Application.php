@@ -12,6 +12,9 @@ use WP_Autoplugin\V2\Orchestration\Direct_Planner;
 use WP_Autoplugin\V2\Orchestration\Code_Orchestrator;
 use WP_Autoplugin\V2\Orchestration\Code_Follow_Up_Orchestrator;
 use WP_Autoplugin\V2\Orchestration\Source_Agent;
+use WP_Autoplugin\V2\Orchestration\Review_Orchestrator;
+use WP_Autoplugin\V2\Orchestration\Package_Orchestrator;
+use WP_Autoplugin\V2\Orchestration\Promotion_Orchestrator;
 use WP_Autoplugin\V2\Rest\Routes;
 
 /**
@@ -30,6 +33,9 @@ final class Application {
 		( new Source_Agent() )->register();
 		( new Code_Orchestrator() )->register();
 		( new Code_Follow_Up_Orchestrator() )->register();
+		( new Review_Orchestrator() )->register();
+		( new Package_Orchestrator() )->register();
+		( new Promotion_Orchestrator() )->register();
 		( new Direct_Planner() )->register();
 		( new Legacy_Orchestrator() )->register();
 		( new Queue() )->register();

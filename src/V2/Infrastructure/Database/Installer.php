@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
  * Creates and upgrades v2 operational tables.
  */
 final class Installer {
-	public const SCHEMA_VERSION = '9';
+	public const SCHEMA_VERSION = '10';
 	private const OPTION_NAME   = 'wp_autoplugin_v2_schema_version';
 
 	/**
@@ -50,6 +50,12 @@ final class Installer {
 			'agent_steps',
 			'code_runs',
 			'code_run_files',
+			'review_reports',
+			'review_findings',
+			'review_finding_events',
+			'release_packages',
+			'promotions',
+			'promotion_files',
 		];
 
 		if ( ! in_array( $suffix, $allowed, true ) ) {
@@ -319,6 +325,147 @@ final class Installer {
 			KEY run_status (run_id,status)
 		) $charset;";
 
+		$sql[] = 'CREATE TABLE ' . self::table( 'review_reports' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			job_id bigint(20) unsigned NOT NULL,
+			workspace_id bigint(20) unsigned NOT NULL,
+			revision_id bigint(20) unsigned NOT NULL,
+			parent_report_id bigint(20) unsigned NULL,
+			mode varchar(20) NOT NULL DEFAULT 'initial',
+			verdict varchar(30) NOT NULL,
+			summary longtext NOT NULL,
+			tests longtext NULL,
+			provider varchar(50) NOT NULL,
+			model varchar(100) NOT NULL,
+			effort varchar(20) NOT NULL DEFAULT '',
+			prompt_slug varchar(100) NOT NULL,
+			prompt_version int(10) unsigned NOT NULL,
+			created_by bigint(20) unsigned NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY job_id (job_id),
+			KEY workspace_revision (workspace_id,revision_id),
+			KEY parent_report_id (parent_report_id)
+		) $charset;";
+
+		$sql[] = 'CREATE TABLE ' . self::table( 'review_findings' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			workspace_id bigint(20) unsigned NOT NULL,
+			created_report_id bigint(20) unsigned NOT NULL,
+			latest_report_id bigint(20) unsigned NOT NULL,
+			status varchar(30) NOT NULL DEFAULT 'open',
+			priority varchar(2) NOT NULL,
+			category varchar(30) NOT NULL,
+			title varchar(255) NOT NULL,
+			body longtext NOT NULL,
+			suggested_fix longtext NULL,
+			path varchar(500) NULL,
+			side varchar(10) NULL,
+			start_line int(10) unsigned NULL,
+			end_line int(10) unsigned NULL,
+			anchor_hash char(64) NULL,
+			addressed_by_revision_id bigint(20) unsigned NULL,
+			dismissed_by bigint(20) unsigned NULL,
+			dismissed_at datetime NULL,
+			created_by bigint(20) unsigned NOT NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY workspace_status (workspace_id,status),
+			KEY latest_report_id (latest_report_id),
+			KEY addressed_revision (addressed_by_revision_id)
+		) $charset;";
+
+		$sql[] = 'CREATE TABLE ' . self::table( 'review_finding_events' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			finding_id bigint(20) unsigned NOT NULL,
+			report_id bigint(20) unsigned NULL,
+			revision_id bigint(20) unsigned NOT NULL,
+			job_id bigint(20) unsigned NULL,
+			event varchar(30) NOT NULL,
+			actor varchar(20) NOT NULL,
+			message text NULL,
+			snapshot longtext NULL,
+			created_by bigint(20) unsigned NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY finding_id (finding_id),
+			KEY report_id (report_id),
+			KEY revision_id (revision_id)
+		) $charset;";
+
+		$sql[] = 'CREATE TABLE ' . self::table( 'release_packages' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			job_id bigint(20) unsigned NOT NULL,
+			workspace_id bigint(20) unsigned NOT NULL,
+			revision_id bigint(20) unsigned NOT NULL,
+			review_report_id bigint(20) unsigned NULL,
+			mode varchar(20) NOT NULL,
+			status varchar(20) NOT NULL DEFAULT 'queued',
+			slug varchar(100) NOT NULL,
+			plugin_file varchar(500) NULL,
+			temp_path text NULL,
+			sha256 char(64) NULL,
+			size bigint(20) unsigned NOT NULL DEFAULT 0,
+			source_fingerprint char(64) NULL,
+			artifact_fingerprint char(64) NULL,
+			header_transforms longtext NULL,
+			review_override tinyint(1) unsigned NOT NULL DEFAULT 0,
+			error_message text NULL,
+			expires_at datetime NULL,
+			created_by bigint(20) unsigned NOT NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY job_id (job_id),
+			KEY workspace_revision (workspace_id,revision_id),
+			KEY status_expires (status,expires_at)
+		) $charset;";
+
+		$sql[] = 'CREATE TABLE ' . self::table( 'promotions' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			job_id bigint(20) unsigned NOT NULL,
+			workspace_id bigint(20) unsigned NOT NULL,
+			revision_id bigint(20) unsigned NOT NULL,
+			review_report_id bigint(20) unsigned NULL,
+			mode varchar(20) NOT NULL,
+			status varchar(30) NOT NULL DEFAULT 'queued',
+			source_plugin_file varchar(500) NULL,
+			destination_plugin_file varchar(500) NULL,
+			destination_slug varchar(100) NULL,
+			target_fingerprint char(64) NULL,
+			header_transforms longtext NULL,
+			created_directories longtext NULL,
+			active_before tinyint(1) unsigned NOT NULL DEFAULT 0,
+			active_after tinyint(1) unsigned NOT NULL DEFAULT 0,
+			review_override tinyint(1) unsigned NOT NULL DEFAULT 0,
+			error_message text NULL,
+			created_by bigint(20) unsigned NOT NULL,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			finished_at datetime NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY job_id (job_id),
+			KEY workspace_revision (workspace_id,revision_id),
+			KEY destination_status (destination_plugin_file(191),status)
+		) $charset;";
+
+		$sql[] = 'CREATE TABLE ' . self::table( 'promotion_files' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			promotion_id bigint(20) unsigned NOT NULL,
+			path varchar(500) NOT NULL,
+			operation varchar(10) NOT NULL,
+			base_exists tinyint(1) unsigned NOT NULL DEFAULT 0,
+			base_content longtext NULL,
+			base_hash char(64) NULL,
+			promoted_exists tinyint(1) unsigned NOT NULL DEFAULT 0,
+			promoted_content longtext NULL,
+			promoted_hash char(64) NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY promotion_path (promotion_id,path(191))
+		) $charset;";
+
 		dbDelta( $sql );
 
 		/*
@@ -397,7 +544,25 @@ final class Installer {
 			array_keys( $code_run_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $code_runs, $column )
 		);
-		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && $revision_file_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) ) {
+		$release_packages        = self::table( 'release_packages' );
+		$release_package_columns = [
+			'source_fingerprint'   => "ALTER TABLE $release_packages ADD source_fingerprint char(64) NULL AFTER size",
+			'artifact_fingerprint' => "ALTER TABLE $release_packages ADD artifact_fingerprint char(64) NULL AFTER source_fingerprint",
+			'header_transforms'    => "ALTER TABLE $release_packages ADD header_transforms longtext NULL AFTER artifact_fingerprint",
+		];
+		foreach ( $release_package_columns as $column => $alter ) {
+			maybe_add_column( $release_packages, $column, $alter );
+		}
+		$release_package_ready = ! array_filter(
+			array_keys( $release_package_columns ),
+			static fn( string $column ): bool => ! self::column_exists( $release_packages, $column )
+		);
+		$review_release_tables = [ 'review_reports', 'review_findings', 'review_finding_events', 'release_packages', 'promotions', 'promotion_files' ];
+		$review_release_ready  = ! array_filter(
+			$review_release_tables,
+			static fn( string $table ): bool => ! self::table_exists( self::table( $table ) )
+		);
+		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && $revision_file_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) && $review_release_ready && $release_package_ready ) {
 			update_option( self::OPTION_NAME, self::SCHEMA_VERSION, false );
 		}
 	}

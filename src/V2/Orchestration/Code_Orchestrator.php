@@ -14,6 +14,7 @@ use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
+use WP_Autoplugin\V2\Release\Package_Builder;
 
 /** Executes one bounded provider request per durable Code continuation. */
 final class Code_Orchestrator {
@@ -63,9 +64,30 @@ final class Code_Orchestrator {
 				}
 				$manifest['target_fingerprint'] = $snapshot['target_fingerprint'];
 				$manifest['base_hashes']        = $snapshot['base_hashes'];
+				if ( 'plugin' === ( $manifest['artifact_kind'] ?? '' ) ) {
+					$complete = ( new Package_Builder() )->fingerprint_target( (string) $workspace['target_ref'], false );
+					if ( is_wp_error( $complete ) ) {
+						return $complete;
+					}
+					$manifest['complete_target_fingerprint'] = $complete['fingerprint'];
+				}
 				$manifest = $validator->manifest( $manifest );
 				if ( is_wp_error( $manifest ) ) {
 					return $manifest;
+				}
+			}
+			if ( 'hook_extension' === ( $workspace['operation'] ?? '' ) ) {
+				try {
+					$integration = new Source_Tools( (array) $workspace['target_metadata'] );
+					$manifest['integration_target_kind']        = (string) $workspace['target_kind'];
+					$manifest['integration_target_ref']         = (string) $workspace['target_ref'];
+					$manifest['integration_target_fingerprint'] = $integration->tree_fingerprint();
+					$manifest = $validator->manifest( $manifest );
+				} catch ( \Throwable $error ) {
+					return new \WP_Error( 'code_integration_target_unavailable', __( 'The extension integration target is unavailable.', 'wp-autoplugin' ) );
+				}
+				if ( is_wp_error( $manifest ) || empty( $manifest['integration_target_fingerprint'] ) ) {
+					return is_wp_error( $manifest ) ? $manifest : new \WP_Error( 'code_integration_identity_invalid', __( 'The extension integration target identity could not be preserved.', 'wp-autoplugin' ) );
 				}
 			}
 			$capability = ( new Direct_Transport_Factory() )->capability( 'code' );

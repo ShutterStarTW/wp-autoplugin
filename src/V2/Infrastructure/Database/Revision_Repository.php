@@ -97,7 +97,7 @@ final class Revision_Repository extends Repository {
 	 * @param array<string, mixed>             $manifest Normalized desired manifest.
 	 * @param array<int, array<string, mixed>> $files    Complete merged project.
 	 */
-	public function stage_code_follow_up( array $run, array $manifest, array $files, int $workspace_id, int $user_id, int $expected_latest_revision_id, string $summary ) {
+	public function stage_code_follow_up( array $run, array $manifest, array $files, int $workspace_id, int $user_id, int $expected_latest_revision_id, string $summary, string $origin = 'ai' ) {
 		$issues = ( new Code_Validator() )->project_issues( $files, $manifest );
 		if ( $issues ) {
 			return new \WP_Error( 'code_project_invalid', $issues[0]['message'], [ 'status' => 422, 'issues' => $issues ] );
@@ -115,7 +115,7 @@ final class Revision_Repository extends Repository {
 				$summary,
 				$user_id,
 				[
-					'origin'             => 'ai',
+					'origin'             => in_array( $origin, [ 'ai', 'review_fix' ], true ) ? $origin : 'ai',
 					'plan_job_id'        => (int) $run['plan_job_id'],
 					'source_job_id'      => (int) $run['job_id'],
 					'parent_revision_id' => $expected_latest_revision_id,
@@ -213,7 +213,10 @@ final class Revision_Repository extends Repository {
 	}
 
 	/** Return one requested source body and its parent-relative diff. */
-	public function file( int $revision_id, int $file_id ): ?array {
+	public function file( int $revision_id, int $file_id, string $side = 'staged' ): ?array {
+		if ( ! in_array( $side, [ 'staged', 'base' ], true ) ) {
+			return null;
+		}
 		$revision = $this->manifest( $revision_id );
 		if ( ! $revision ) {
 			return null;
@@ -231,8 +234,14 @@ final class Revision_Repository extends Repository {
 				$this->wpdb->prepare( 'SELECT content FROM ' . Installer::table( 'revision_files' ) . ' WHERE revision_id = %d AND path = %s', $revision['parent_revision_id'], $file['path'] )
 			);
 		}
+		if ( 'base' === $side && ! in_array( (string) $file['change_type'], [ 'update', 'delete' ], true ) ) {
+			return null;
+		}
 		$file['id']          = (int) $file['id'];
 		$file['revision_id'] = (int) $file['revision_id'];
+		$file['side']        = $side;
+		$file['content']     = 'base' === $side ? $before : (string) $file['content'];
+		$file['content_hash']= hash( 'sha256', (string) $file['content'] );
 		$file['size']        = strlen( (string) $file['content'] );
 		$file['diff_html']   = $this->diff_html( $before, (string) $file['content'] );
 		unset( $file['base_content'] );
@@ -397,9 +406,9 @@ final class Revision_Repository extends Repository {
 			$this->wpdb->get_var(
 				$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'workspaces' ) . ' WHERE id = %d FOR UPDATE', $workspace_id )
 			);
-			if ( ( new Job_Repository( $this->wpdb ) )->has_active_code( $workspace_id ) ) {
+			if ( ( new Job_Repository( $this->wpdb ) )->has_active_artifact_work( $workspace_id ) ) {
 				$this->wpdb->query( 'ROLLBACK' );
-				return new \WP_Error( 'code_work_active', __( 'Wait for the active Code work to finish before changing revision history.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+				return new \WP_Error( 'artifact_work_active', __( 'Wait for active Code, Review, or Release work to finish before changing revision history.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 			$latest = $this->locked_latest_id( $workspace_id );
 			if ( $enforce_expected && $latest !== $expected_latest_revision_id ) {

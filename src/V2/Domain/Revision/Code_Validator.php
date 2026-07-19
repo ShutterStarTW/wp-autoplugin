@@ -128,7 +128,7 @@ final class Code_Validator {
 			return new \WP_Error( 'code_manifest_main_file_invalid', __( 'The project main_file must identify a root-level PHP file in the manifest.', 'wp-autoplugin' ) );
 		}
 
-		return [
+		$result = [
 			'scope'         => 'project',
 			'artifact_kind' => 'plugin',
 			'operation'     => sanitize_key( (string) ( $manifest['operation'] ?? 'create' ) ),
@@ -136,6 +136,17 @@ final class Code_Validator {
 			'main_file'     => $main_file,
 			'files'         => $files,
 		];
+		if ( 'hook_extension' === $result['operation'] ) {
+			$integration_kind = sanitize_key( (string) ( $manifest['integration_target_kind'] ?? '' ) );
+			$integration_ref  = trim( (string) ( $manifest['integration_target_ref'] ?? '' ) );
+			$fingerprint      = (string) ( $manifest['integration_target_fingerprint'] ?? '' );
+			if ( in_array( $integration_kind, [ 'plugin', 'theme' ], true ) && '' !== $integration_ref && preg_match( '/^[a-f0-9]{64}$/', $fingerprint ) ) {
+				$result['integration_target_kind']        = $integration_kind;
+				$result['integration_target_ref']         = $integration_ref;
+				$result['integration_target_fingerprint'] = $fingerprint;
+			}
+		}
+		return $result;
 	}
 
 	/**
@@ -403,6 +414,10 @@ final class Code_Validator {
 		$fingerprint = (string) ( $manifest['target_fingerprint'] ?? '' );
 		if ( preg_match( '/^[a-f0-9]{64}$/', $fingerprint ) ) {
 			$result['target_fingerprint'] = $fingerprint;
+		}
+		$complete_fingerprint = (string) ( $manifest['complete_target_fingerprint'] ?? '' );
+		if ( 'plugin' === $kind && preg_match( '/^[a-f0-9]{64}$/', $complete_fingerprint ) ) {
+			$result['complete_target_fingerprint'] = $complete_fingerprint;
 		}
 		$base_hashes = [];
 		foreach ( (array) ( $manifest['base_hashes'] ?? [] ) as $path => $hash ) {

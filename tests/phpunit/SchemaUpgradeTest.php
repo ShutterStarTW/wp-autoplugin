@@ -110,4 +110,40 @@ final class SchemaUpgradeTest extends WP_UnitTestCase {
 		$this->assertSame( 'base_content', $wpdb->get_var( "SHOW COLUMNS FROM $files LIKE 'base_content'" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
 		$this->assertSame( 'base_content_hash', $wpdb->get_var( "SHOW COLUMNS FROM $files LIKE 'base_content_hash'" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
 	}
+
+	public function test_version_nine_upgrade_preserves_revisions_and_adds_review_release_schema(): void {
+		global $wpdb;
+
+		Installer::activate();
+		$revisions = Installer::table( 'revisions' );
+		$wpdb->insert(
+			$revisions,
+			[
+				'workspace_id'    => 987656,
+				'revision_number' => 1,
+				'status'          => 'staged',
+				'summary'         => 'Version nine fixture',
+				'origin'          => 'ai',
+				'created_by'      => 1,
+				'created_at'      => current_time( 'mysql', true ),
+			]
+		);
+		$revision_id = (int) $wpdb->insert_id;
+		$tables      = [ 'promotion_files', 'promotions', 'release_packages', 'review_finding_events', 'review_findings', 'review_reports' ];
+		foreach ( $tables as $table ) {
+			$wpdb->query( 'DROP TABLE ' . Installer::table( $table ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Internal allow-listed test tables.
+		}
+		update_option( 'wp_autoplugin_v2_schema_version', '9', false );
+
+		Installer::maybe_upgrade();
+
+		$this->assertSame( Installer::SCHEMA_VERSION, get_option( 'wp_autoplugin_v2_schema_version' ) );
+		$this->assertSame( 'Version nine fixture', $wpdb->get_var( $wpdb->prepare( "SELECT summary FROM $revisions WHERE id = %d", $revision_id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		foreach ( array_reverse( $tables ) as $table ) {
+			$this->assertSame( Installer::table( $table ), $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', Installer::table( $table ) ) ) );
+		}
+		$packages = Installer::table( 'release_packages' );
+		$this->assertSame( 'header_transforms', $wpdb->get_var( "SHOW COLUMNS FROM $packages LIKE 'header_transforms'" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		$wpdb->delete( $revisions, [ 'id' => $revision_id ] );
+	}
 }

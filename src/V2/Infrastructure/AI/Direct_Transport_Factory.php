@@ -10,7 +10,7 @@ use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 final class Direct_Transport_Factory {
 	/** @return array{available:bool,provider:string,model:string,effort:string,message:string} */
 	public function capability( string $stage = 'plan' ): array {
-		$role   = 'code' === $stage ? 'coder' : ( 'explain' === $stage ? 'reviewer' : 'planner' );
+		$role   = 'code' === $stage ? 'coder' : ( in_array( $stage, [ 'explain', 'review' ], true ) ? 'reviewer' : 'planner' );
 		$model  = Model_Effort::selected_model( $role );
 		$effort = Model_Effort::for_role( $role );
 		$models = Admin::get_models();

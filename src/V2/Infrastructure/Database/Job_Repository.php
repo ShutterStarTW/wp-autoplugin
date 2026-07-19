@@ -13,18 +13,18 @@ final class Job_Repository extends Repository {
 	 * @return array<string, mixed>
 	 */
 	public function create( int $workspace_id, string $task, array $payload, int $user_id ): array {
-		$now       = $this->now();
-		$code_lock = self::is_code_work( [ 'task' => $task, 'payload' => $payload ] );
-		if ( $code_lock ) {
+		$now           = $this->now();
+		$artifact_lock = self::is_artifact_work( [ 'task' => $task, 'payload' => $payload ] );
+		if ( $artifact_lock ) {
 			$this->wpdb->query( 'START TRANSACTION' );
 		}
 		try {
-			if ( $code_lock ) {
+			if ( $artifact_lock ) {
 				$this->wpdb->get_var(
 					$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'workspaces' ) . ' WHERE id = %d FOR UPDATE', $workspace_id )
 				);
-				if ( $this->has_active_code( $workspace_id ) ) {
-					throw new \RuntimeException( __( 'Another Code job is already active in this workspace.', 'wp-autoplugin' ), 409 );
+				if ( $this->has_active_artifact_work( $workspace_id ) ) {
+					throw new \RuntimeException( __( 'Another Code, Review, or Release operation is already active in this workspace.', 'wp-autoplugin' ), 409 );
 				}
 			}
 			$this->wpdb->insert(
@@ -53,11 +53,11 @@ final class Job_Repository extends Repository {
 				[ '%s' ],
 				[ '%d' ]
 			);
-			if ( $code_lock ) {
+			if ( $artifact_lock ) {
 				$this->wpdb->query( 'COMMIT' );
 			}
 		} catch ( \Throwable $error ) {
-			if ( $code_lock ) {
+			if ( $artifact_lock ) {
 				$this->wpdb->query( 'ROLLBACK' );
 			}
 			throw $error;
@@ -115,10 +115,8 @@ final class Job_Repository extends Repository {
 	public function has_active_code( int $workspace_id ): bool {
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE workspace_id = %d AND task IN (%s,%s) AND status IN (%s,%s,%s)',
+				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE workspace_id = %d AND status IN (%s,%s,%s)',
 				$workspace_id,
-				'code',
-				'conversation',
 				'queued',
 				'running',
 				'retrying'
@@ -133,10 +131,39 @@ final class Job_Repository extends Repository {
 		return false;
 	}
 
+	/** Whether revision-mutating or revision-bound work is active in the workspace. */
+	public function has_active_artifact_work( int $workspace_id ): bool {
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE workspace_id = %d AND status IN (%s,%s,%s)',
+				$workspace_id,
+				'queued',
+				'running',
+				'retrying'
+			),
+			ARRAY_A
+		);
+		foreach ( (array) $rows as $row ) {
+			if ( self::is_artifact_work( $this->hydrate( $row ) ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** Whether a job participates in the mutually exclusive Code-work lock. */
 	public static function is_code_work( array $job ): bool {
-		return 'code' === ( $job['task'] ?? '' )
+		return in_array( (string) ( $job['task'] ?? '' ), [ 'code', 'review_fix' ], true )
 			|| ( 'conversation' === ( $job['task'] ?? '' ) && 'code' === ( $job['payload']['stage'] ?? '' ) );
+	}
+
+	/** Whether a job participates in the workspace artifact lock. */
+	public static function is_artifact_work( array $job ): bool {
+		if ( in_array( (string) ( $job['task'] ?? '' ), [ 'code', 'review', 'review_fix', 'package', 'promotion' ], true ) ) {
+			return true;
+		}
+		return 'conversation' === ( $job['task'] ?? '' )
+			&& in_array( (string) ( $job['payload']['stage'] ?? '' ), [ 'code', 'review' ], true );
 	}
 
 	/**

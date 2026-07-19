@@ -95,6 +95,7 @@ final class Job_Runner {
 				$workspaces->rename_project( (int) $workspace['id'], $plugin_name );
 			}
 			$jobs->event( $job_id, 'completed', __( 'Job completed.', 'wp-autoplugin' ) );
+			do_action( 'wp_autoplugin_v2_job_completed', $jobs->find( $job_id ), $result );
 		} catch ( \Throwable $error ) {
 			( new Agent_Run_Repository() )->terminate_by_job( $job_id, 'failed' );
 			( new Code_Run_Repository() )->terminate_by_job( $job_id, 'failed', $error->getMessage() );

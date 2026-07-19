@@ -52,11 +52,25 @@ type Job = {
 		revision_id?: number;
 		expected_latest_revision_id?: number | null;
 		focused_path?: string;
+		review_report_id?: number;
+		parent_report_id?: number;
+		finding_ids?: number[];
+		auto_re_review?: boolean;
+		action?: 'activate' | 'rollback';
+		promotion_id?: number;
 	};
 	result?: {
 		content?: string;
 		structured?: Record< string, unknown >;
-		outcome?: 'answer' | 'artifact' | 'revision';
+		outcome?:
+			| 'answer'
+			| 'artifact'
+			| 'revision'
+			| 'blocked'
+			| 'report'
+			| 'package'
+			| 'promotion'
+			| 'promotion_action';
 		artifact?: {
 			type?: string;
 			content?: string;
@@ -66,6 +80,12 @@ type Job = {
 		provider?: string;
 		effort?: string;
 		revision_id?: number;
+		report_id?: number;
+		package_id?: number;
+		promotion_id?: number;
+		status?: string;
+		mode?: string;
+		expires_at?: string;
 		base_revision_id?: number;
 		added_paths?: string[];
 		updated_paths?: string[];
@@ -117,7 +137,7 @@ type RevisionSummary = {
 	workspace_id: number;
 	revision_number: number;
 	status: string;
-	origin: 'ai' | 'manual' | 'restore';
+	origin: 'ai' | 'manual' | 'restore' | 'review_fix';
 	plan_job_id: number | null;
 	source_job_id: number | null;
 	parent_revision_id: number | null;
@@ -167,6 +187,97 @@ type RevisionFile = RevisionFileManifest & {
 	diff_html: string;
 };
 
+type ReviewFindingEvent = {
+	id: number;
+	event: string;
+	actor: string;
+	message: string;
+	report_id: number | null;
+	revision_id: number;
+	created_at: string;
+};
+
+type ReviewFinding = {
+	id: number;
+	label: string;
+	status: 'open' | 'addressed' | 'resolved' | 'retracted' | 'dismissed';
+	priority: 'P0' | 'P1' | 'P2' | 'P3';
+	category:
+		| 'security'
+		| 'correctness'
+		| 'compatibility'
+		| 'performance'
+		| 'maintainability';
+	title: string;
+	body: string;
+	suggested_fix: string;
+	path: string | null;
+	side: 'staged' | 'base' | null;
+	start_line: number | null;
+	end_line: number | null;
+	source_revision_id: number;
+	timeline: ReviewFindingEvent[];
+};
+
+type ReviewTest = { title: string; steps: string[]; expected: string };
+
+type ReviewReport = {
+	id: number;
+	job_id: number;
+	workspace_id: number;
+	revision_id: number;
+	parent_report_id: number | null;
+	mode: 'initial' | 'verification' | 'follow_up';
+	verdict: 'all_clear' | 'action_required';
+	effective_status:
+		| 'all_clear'
+		| 'cleared_with_dismissals'
+		| 'action_required'
+		| 'stale'
+		| 'in_progress'
+		| 'failed'
+		| 'not_started';
+	summary: string;
+	tests: ReviewTest[];
+	provider: string;
+	model: string;
+	effort: string;
+	created_at: string;
+	findings: ReviewFinding[];
+};
+
+type ReviewHistory = {
+	items: Array<
+		Pick<
+			ReviewReport,
+			| 'id'
+			| 'job_id'
+			| 'revision_id'
+			| 'parent_report_id'
+			| 'mode'
+			| 'verdict'
+			| 'effective_status'
+			| 'summary'
+			| 'provider'
+			| 'model'
+			| 'effort'
+			| 'created_at'
+		>
+	>;
+	current: {
+		status:
+			| ReviewReport[ 'effective_status' ]
+			| 'in_progress'
+			| 'failed'
+			| 'not_started';
+		report_id: number | null;
+		revision_id: number | null;
+		open: number;
+		dismissed: number;
+	};
+	latest_revision_id: number | null;
+};
+
 function revisionVisibleFiles(
 	manifest: RevisionManifest
 ): RevisionFileManifest[] {
@@ -203,6 +314,19 @@ type Bootstrap = {
 	plan_agent: AgentCapability;
 	direct_plan: AgentCapability;
 	direct_code: AgentCapability;
+	direct_review: AgentCapability;
+	release: ReleaseCapability;
+};
+
+type ReleaseCapability = {
+	zip: boolean;
+	file_modifications: boolean;
+	single_site_mutations: boolean;
+	can_download: boolean;
+	can_install: boolean;
+	can_activate: boolean;
+	can_modify: boolean;
+	disabled_reasons: string[];
 };
 
 type AgentCapability = {
@@ -287,7 +411,15 @@ type Workspace = {
 		stages: Partial<
 			Record<
 				'plan' | 'code' | 'review' | 'chat',
-				'complete' | 'in_progress' | 'incomplete' | 'not_started'
+				| 'complete'
+				| 'in_progress'
+				| 'incomplete'
+				| 'not_started'
+				| 'all_clear'
+				| 'cleared_with_dismissals'
+				| 'action_required'
+				| 'stale'
+				| 'failed'
 			>
 		>;
 	};
@@ -548,7 +680,7 @@ function App() {
 					apiFetch< Job >( { path: `${ rest }/jobs/${ item.id }` } )
 				)
 			)
-				.then( ( updatedJobs ) => {
+				.then( async ( updatedJobs ) => {
 					setJobs( ( items ) =>
 						items.map(
 							( item ) =>
@@ -570,11 +702,24 @@ function App() {
 							)
 						);
 					}
+					if (
+						activeWorkspaceId !== 'new' &&
+						updatedJobs.some( ( item ) =>
+							[ 'completed', 'failed', 'cancelled' ].includes(
+								item.status
+							)
+						)
+					) {
+						const refreshed = await apiFetch< { items: Job[] } >( {
+							path: `${ rest }/workspaces/${ activeWorkspaceId }/jobs`,
+						} );
+						setJobs( refreshed.items );
+					}
 				} )
 				.catch( ( reason ) => setError( reason.message ) );
 		}, 2000 );
 		return () => window.clearInterval( timer );
-	}, [ jobs ] );
+	}, [ jobs, activeWorkspaceId ] );
 
 	const target = useMemo(
 		() =>
@@ -710,7 +855,13 @@ function App() {
 	}
 
 	async function createJob(
-		task: 'plan' | 'code' | 'explain' | 'conversation',
+		task:
+			| 'plan'
+			| 'code'
+			| 'review'
+			| 'review_fix'
+			| 'explain'
+			| 'conversation',
 		payload = {}
 	) {
 		if ( ! activeWorkspace ) {
@@ -735,6 +886,25 @@ function App() {
 						: item
 				)
 			);
+			return created;
+		} catch ( reason: any ) {
+			setError( reason.message );
+			return null;
+		}
+	}
+
+	async function queueWorkspaceEndpoint( path: string, data: object ) {
+		if ( ! activeWorkspace ) {
+			return null;
+		}
+		setError( '' );
+		try {
+			const created = await apiFetch< Job >( {
+				path,
+				method: 'POST',
+				data,
+			} );
+			setJobs( ( items ) => [ ...items, created ] );
 			return created;
 		} catch ( reason: any ) {
 			setError( reason.message );
@@ -810,10 +980,13 @@ function App() {
 				jobs={ jobs }
 				jobsLoading={ jobsLoading }
 				codeCapability={ bootstrap?.direct_code ?? null }
+				reviewCapability={ bootstrap?.direct_review ?? null }
+				releaseCapability={ bootstrap?.release ?? null }
 				activeTab={ activeTab }
 				onTabSelect={ selectWorkspaceStage }
 				onCancel={ cancel }
 				onCreateJob={ createJob }
+				onQueueEndpoint={ queueWorkspaceEndpoint }
 				onSavePlan={ savePlan }
 			/>
 		);
@@ -1377,23 +1550,35 @@ function WorkspaceView( {
 	jobs,
 	jobsLoading,
 	codeCapability,
+	reviewCapability,
+	releaseCapability,
 	activeTab,
 	onTabSelect,
 	onCancel,
 	onCreateJob,
+	onQueueEndpoint,
 	onSavePlan,
 }: {
 	workspace: Workspace;
 	jobs: Job[];
 	jobsLoading: boolean;
 	codeCapability: AgentCapability | null;
+	reviewCapability: AgentCapability | null;
+	releaseCapability: ReleaseCapability | null;
 	activeTab: string;
 	onTabSelect: ( tab: string ) => void;
 	onCancel: ( job: Job ) => void;
 	onCreateJob: (
-		task: 'plan' | 'code' | 'explain' | 'conversation',
+		task:
+			| 'plan'
+			| 'code'
+			| 'review'
+			| 'review_fix'
+			| 'explain'
+			| 'conversation',
 		payload?: object
 	) => Promise< Job | null >;
+	onQueueEndpoint: ( path: string, data: object ) => Promise< Job | null >;
 	onSavePlan: ( job: Job, content: string ) => Promise< boolean >;
 } ) {
 	const target = workspace.target_metadata;
@@ -1415,6 +1600,9 @@ function WorkspaceView( {
 	);
 	const codeConversationJobs = jobs.filter(
 		( job ) => job.task === 'conversation' && job.payload.stage === 'code'
+	);
+	const reviewConversationJobs = jobs.filter(
+		( job ) => job.task === 'conversation' && job.payload.stage === 'review'
 	);
 	return (
 		<section className="workspace-editor">
@@ -1530,10 +1718,20 @@ function WorkspaceView( {
 									focused_path: focusedPath || undefined,
 								} )
 							}
+							onContinue={ () => onTabSelect( 'review' ) }
 						/>
 					) }
 					{ ! jobsLoading && activeTab === 'review' && (
-						<ReviewStage plan={ latestPlan } />
+						<ReviewStage
+							workspace={ workspace }
+							jobs={ jobs }
+							conversationJobs={ reviewConversationJobs }
+							capability={ reviewCapability }
+							releaseCapability={ releaseCapability }
+							onCancel={ onCancel }
+							onCreateJob={ onCreateJob }
+							onQueueEndpoint={ onQueueEndpoint }
+						/>
 					) }
 					{ ! jobsLoading && activeTab === 'explain' && (
 						<ExplainStage
@@ -2140,6 +2338,7 @@ function CodeStage( {
 	conversationJobs,
 	onCreateCode,
 	onFollowUp,
+	onContinue,
 }: {
 	workspace: Workspace;
 	plan: Job | null;
@@ -2153,6 +2352,7 @@ function CodeStage( {
 		revisionId: number,
 		focusedPath?: string
 	) => Promise< Job | null >;
+	onContinue: () => void;
 } ) {
 	const [ revisions, setRevisions ] = useState< RevisionSummary[] >( [] );
 	const [ latestRevisionId, setLatestRevisionId ] = useState< number | null >(
@@ -3009,12 +3209,9 @@ function CodeStage( {
 						{ manifest.updates ?? 0 } · D { manifest.deletes ?? 0 }
 					</span>
 					<span className="code-statusbar__next">
-						{ __(
-							'Review is the next unimplemented stage.',
-							'wp-autoplugin'
-						) }
+						{ __( 'Next: revision-bound Review', 'wp-autoplugin' ) }
 					</span>
-					<Button variant="primary" disabled>
+					<Button variant="primary" onClick={ onContinue }>
 						{ __( 'Continue to Review', 'wp-autoplugin' ) }
 					</Button>
 				</div>
@@ -3845,18 +4042,21 @@ function CodeBufferEditor( {
 	type,
 	readOnly,
 	focusLine,
+	markerEndLine = focusLine,
 	onChange,
 }: {
 	value: string;
 	type: string;
 	readOnly: boolean;
 	focusLine: number;
+	markerEndLine?: number;
 	onChange: ( value: string ) => void;
 } ) {
 	const textarea = useRef< HTMLTextAreaElement >( null );
 	const editor = useRef< any >( null );
 	const onChangeRef = useRef( onChange );
 	const initialValue = useRef( value );
+	const marker = useRef< any >( null );
 	onChangeRef.current = onChange;
 	useEffect( () => {
 		if ( ! textarea.current || ! window.wp?.codeEditor ) {
@@ -3898,8 +4098,28 @@ function CodeBufferEditor( {
 		if ( focusLine > 0 && editor.current ) {
 			editor.current.setCursor( { line: focusLine - 1, ch: 0 } );
 			editor.current.focus();
+			marker.current?.clear?.();
+			marker.current = editor.current.markText(
+				{ line: focusLine - 1, ch: 0 },
+				{
+					line: Math.max( focusLine, markerEndLine ) - 1,
+					ch:
+						editor.current.getLine(
+							Math.max( focusLine, markerEndLine ) - 1
+						)?.length ?? 0,
+				},
+				{ className: 'review-source-marker' }
+			);
+		} else if ( focusLine > 0 && textarea.current ) {
+			const lines = value.split( /\r\n|\r|\n/ );
+			const offset = lines
+				.slice( 0, Math.max( 0, focusLine - 1 ) )
+				.reduce( ( total, line ) => total + line.length + 1, 0 );
+			textarea.current.setSelectionRange( offset, offset );
+			textarea.current.scrollTop = Math.max( 0, ( focusLine - 3 ) * 18 );
 		}
-	}, [ focusLine ] );
+		return () => marker.current?.clear?.();
+	}, [ focusLine, markerEndLine, value ] );
 	return (
 		<div className="code-buffer">
 			<textarea
@@ -4108,37 +4328,1542 @@ function revisionOrigin( origin: RevisionSummary[ 'origin' ] ): string {
 	if ( 'restore' === origin ) {
 		return __( 'Restored', 'wp-autoplugin' );
 	}
+	if ( 'review_fix' === origin ) {
+		return __( 'Review fix', 'wp-autoplugin' );
+	}
 	return __( 'AI generated', 'wp-autoplugin' );
 }
 
-function ReviewStage( { plan }: { plan: Job | null } ) {
+function ReviewStage( {
+	workspace,
+	jobs,
+	conversationJobs,
+	capability,
+	releaseCapability,
+	onCancel,
+	onCreateJob,
+	onQueueEndpoint,
+}: {
+	workspace: Workspace;
+	jobs: Job[];
+	conversationJobs: Job[];
+	capability: AgentCapability | null;
+	releaseCapability: ReleaseCapability | null;
+	onCancel: ( job: Job ) => void;
+	onCreateJob: (
+		task: 'review' | 'review_fix' | 'conversation',
+		payload?: object
+	) => Promise< Job | null >;
+	onQueueEndpoint: ( path: string, data: object ) => Promise< Job | null >;
+} ) {
+	type ReviewView = 'issues' | 'tests' | 'discussion' | 'release';
+	const [ history, setHistory ] = useState< ReviewHistory | null >( null );
+	const [ report, setReport ] = useState< ReviewReport | null >( null );
+	const [ revision, setRevision ] = useState< RevisionManifest | null >(
+		null
+	);
+	const [ revisions, setRevisions ] = useState< RevisionSummary[] >( [] );
+	const [ selected, setSelected ] = useState< Set< number > >( new Set() );
+	const [ message, setMessage ] = useState( '' );
+	const [ view, setView ] = useState< ReviewView >( 'issues' );
+	const [ historyFinding, setHistoryFinding ] =
+		useState< ReviewFinding | null >( null );
+	const [ showReportHistory, setShowReportHistory ] = useState( false );
+	const [ loading, setLoading ] = useState( true );
+	const [ actionError, setActionError ] = useState( '' );
+	const [ forkSlug, setForkSlug ] = useState( () =>
+		slugify(
+			`${
+				workspace.target_ref.split( '/' )[ 0 ] || 'plugin'
+			}-wp-autoplugin-fork`
+		)
+	);
+	const [ viewer, setViewer ] = useState< {
+		file: RevisionFile;
+		finding: ReviewFinding;
+	} | null >( null );
+	const [ checkedTests, setCheckedTests ] = useState< Set< number > >(
+		new Set()
+	);
+	const refreshKey = jobs
+		.map(
+			( job ) =>
+				`${ job.id }:${ job.status }:${ job.result?.report_id ?? '' }:${
+					job.result?.revision_id ?? ''
+				}`
+		)
+		.join( '|' );
+
+	const load = useCallback( async () => {
+		setLoading( true );
+		try {
+			const [ revisionResponse, reviewResponse ] = await Promise.all( [
+				apiFetch< {
+					items: RevisionSummary[];
+					latest_revision_id: number | null;
+				} >( {
+					path: `${ rest }/workspaces/${ workspace.id }/revisions`,
+				} ),
+				apiFetch< ReviewHistory >( {
+					path: `${ rest }/workspaces/${ workspace.id }/review-reports`,
+				} ),
+			] );
+			setRevisions( revisionResponse.items );
+			setHistory( reviewResponse );
+			const [ latestRevision, currentReport ] = await Promise.all( [
+				revisionResponse.latest_revision_id
+					? apiFetch< RevisionManifest >( {
+							path: `${ rest }/revisions/${ revisionResponse.latest_revision_id }`,
+					  } )
+					: Promise.resolve( null ),
+				reviewResponse.current.report_id
+					? apiFetch< ReviewReport >( {
+							path: `${ rest }/review-reports/${ reviewResponse.current.report_id }`,
+					  } )
+					: Promise.resolve( null ),
+			] );
+			setRevision( latestRevision );
+			setReport( currentReport );
+			setSelected(
+				new Set(
+					( currentReport?.findings ?? [] )
+						.filter( ( finding ) => finding.status === 'open' )
+						.map( ( finding ) => finding.id )
+				)
+			);
+		} catch ( reason: any ) {
+			setActionError( reason.message );
+		} finally {
+			setLoading( false );
+		}
+	}, [ workspace.id ] );
+
+	useEffect( () => {
+		load();
+	}, [ load, refreshKey ] );
+
+	const activeArtifactJob = [ ...jobs ]
+		.reverse()
+		.find(
+			( job ) =>
+				[ 'queued', 'running', 'retrying' ].includes( job.status ) &&
+				( [
+					'code',
+					'review',
+					'review_fix',
+					'package',
+					'promotion',
+				].includes( job.task ) ||
+					( job.task === 'conversation' &&
+						[ 'code', 'review' ].includes(
+							job.payload.stage || ''
+						) ) )
+		);
+	const latestReviewJob = [ ...jobs ]
+		.reverse()
+		.find(
+			( job ) =>
+				job.task === 'review' ||
+				( job.task === 'conversation' &&
+					job.payload.stage === 'review' )
+		);
+	const latestReviewFixJob = [ ...jobs ]
+		.reverse()
+		.find(
+			( job ) =>
+				job.task === 'review_fix' &&
+				job.payload.review_report_id === report?.id
+		);
+	const openFindings = ( report?.findings ?? [] ).filter(
+		( finding ) => finding.status === 'open'
+	);
+	const actionableFindings = ( report?.findings ?? [] ).filter( ( finding ) =>
+		[ 'open', 'addressed' ].includes( finding.status )
+	);
+	const historyFindings = ( report?.findings ?? [] ).filter( ( finding ) =>
+		[ 'resolved', 'retracted', 'dismissed' ].includes( finding.status )
+	);
+	const priorityOrder = { P0: 0, P1: 1, P2: 2, P3: 3 };
+	const visibleFindings = [ ...actionableFindings ].sort(
+		( first, second ) =>
+			priorityOrder[ first.priority ] - priorityOrder[ second.priority ]
+	);
+	const currentReport =
+		!! report && report.revision_id === history?.latest_revision_id;
+	const reviewedRevisionNumber = report
+		? revisions.find( ( item ) => item.id === report.revision_id )
+				?.revision_number ?? report.revision_id
+		: 0;
+	const releaseSafe = [ 'all_clear', 'cleared_with_dismissals' ].includes(
+		history?.current.status || ''
+	);
+	const themeReleaseDisabled =
+		revision?.project_manifest?.scope === 'changes' &&
+		revision.project_manifest.artifact_kind === 'theme';
+	const pluginProject =
+		revision?.project_manifest?.scope === 'project' &&
+		revision.project_manifest.artifact_kind === 'plugin';
+	const pluginChanges =
+		revision?.project_manifest?.scope === 'changes' &&
+		revision.project_manifest.artifact_kind === 'plugin';
+	const releaseJobs = jobs.filter( ( job ) =>
+		[ 'package', 'promotion' ].includes( job.task )
+	);
+
+	async function startReview() {
+		if ( ! history?.latest_revision_id ) {
+			return;
+		}
+		let mode = 'initial';
+		if ( report ) {
+			mode =
+				report.revision_id === history.latest_revision_id
+					? 'follow_up'
+					: 'verification';
+		}
+		await onCreateJob( 'review', {
+			revision_id: history.latest_revision_id,
+			expected_latest_revision_id: history.latest_revision_id,
+			mode,
+			parent_report_id: report?.id || undefined,
+		} );
+	}
+
+	async function fix( ids: number[], autoReReview: boolean ) {
+		if ( ! report || ! history?.latest_revision_id || ! ids.length ) {
+			return;
+		}
+		await onCreateJob( 'review_fix', {
+			revision_id: history.latest_revision_id,
+			expected_latest_revision_id: history.latest_revision_id,
+			review_report_id: report.id,
+			finding_ids: ids,
+			auto_re_review: autoReReview,
+		} );
+	}
+
+	async function transition(
+		finding: ReviewFinding,
+		action: 'dismiss' | 'reopen'
+	) {
+		if ( ! report || ! currentReport ) {
+			return;
+		}
+		let reason = '';
+		if ( action === 'dismiss' ) {
+			if (
+				// eslint-disable-next-line no-alert
+				! window.confirm(
+					__(
+						'Dismiss this issue? You can reopen it later.',
+						'wp-autoplugin'
+					)
+				)
+			) {
+				return;
+			}
+			reason =
+				// eslint-disable-next-line no-alert
+				window.prompt(
+					__( 'Optional dismissal reason', 'wp-autoplugin' ),
+					''
+				) || '';
+		}
+		setActionError( '' );
+		try {
+			await apiFetch( {
+				path: `${ rest }/review-findings/${ finding.id }/${ action }`,
+				method: 'POST',
+				data: {
+					report_id: report.id,
+					revision_id: report.revision_id,
+					reason,
+				},
+			} );
+			await load();
+		} catch ( reasonValue: any ) {
+			setActionError( reasonValue.message );
+		}
+	}
+
+	async function openFinding( finding: ReviewFinding ) {
+		if ( ! report || ! finding.path || ! finding.side ) {
+			return;
+		}
+		try {
+			const sourceRevision: RevisionManifest =
+				revision && finding.source_revision_id === revision.id
+					? revision
+					: await apiFetch< RevisionManifest >( {
+							path: `${ rest }/revisions/${ finding.source_revision_id }`,
+					  } );
+			const manifestFile = sourceRevision.files.find(
+				( file ) => file.path === finding.path
+			);
+			if ( ! manifestFile ) {
+				return;
+			}
+			const file = await apiFetch< RevisionFile >( {
+				path: `${ rest }/revisions/${ finding.source_revision_id }/files/${ manifestFile.id }?side=${ finding.side }`,
+			} );
+			setViewer( { file, finding } );
+		} catch ( reason: any ) {
+			setActionError( reason.message );
+		}
+	}
+
+	async function sendMessage() {
+		if ( ! report || ! message.trim() || ! currentReport ) {
+			return;
+		}
+		await onCreateJob( 'conversation', {
+			stage: 'review',
+			message,
+			revision_id: report.revision_id,
+			expected_latest_revision_id: report.revision_id,
+			review_report_id: report.id,
+		} );
+		setMessage( '' );
+	}
+
+	function reviewOverride(): boolean | null {
+		if ( releaseSafe ) {
+			return false;
+		}
+		const priorities = actionableFindings.reduce<
+			Record< string, number >
+		>(
+			( counts, finding ) => ( {
+				...counts,
+				[ finding.priority ]: ( counts[ finding.priority ] || 0 ) + 1,
+			} ),
+			{}
+		);
+		// eslint-disable-next-line no-alert
+		return window.confirm(
+			sprintf(
+				/* translators: 1: Review status. 2: Open finding priority counts. */
+				__(
+					'Proceed without current all-clear Review? Status: %1$s. Open findings: %2$s. This override will be recorded.',
+					'wp-autoplugin'
+				),
+				history?.current.status || 'not_started',
+				Object.entries( priorities )
+					.map( ( [ key, value ] ) => `${ key }: ${ value }` )
+					.join( ', ' ) || __( 'none', 'wp-autoplugin' )
+			)
+		)
+			? true
+			: null;
+	}
+
+	async function queuePackage( mode: 'project' | 'fork' | 'replacement' ) {
+		if ( ! revision ) {
+			return;
+		}
+		const override = reviewOverride();
+		if ( override === null ) {
+			return;
+		}
+		await onQueueEndpoint(
+			`${ rest }/revisions/${ revision.id }/release-packages`,
+			{
+				expected_latest_revision_id: revision.id,
+				mode,
+				destination_slug:
+					mode === 'fork'
+						? forkSlug
+						: slugify(
+								revision.project_manifest?.plugin_name || ''
+						  ),
+				review_report_id: report?.id || undefined,
+				review_override: override,
+			}
+		);
+	}
+
+	async function queuePromotion(
+		mode: 'install_project' | 'install_fork' | 'modify_original'
+	) {
+		if ( ! revision ) {
+			return;
+		}
+		const override = reviewOverride();
+		if ( override === null ) {
+			return;
+		}
+		let targetConfirmation = '';
+		if ( mode === 'modify_original' ) {
+			if (
+				// eslint-disable-next-line no-alert
+				! window.confirm(
+					__(
+						'Modify the original plugin directly? Upstream updates remain enabled and may overwrite these changes. Rollback restores files only, not database or runtime side effects, and becomes unavailable if affected files drift.',
+						'wp-autoplugin'
+					)
+				)
+			) {
+				return;
+			}
+			targetConfirmation =
+				// eslint-disable-next-line no-alert
+				window.prompt(
+					sprintf(
+						/* translators: %s: Exact plugin reference. */
+						__( 'Type %s to confirm', 'wp-autoplugin' ),
+						workspace.target_ref
+					),
+					''
+				) || '';
+			if ( targetConfirmation !== workspace.target_ref ) {
+				return;
+			}
+		}
+		await onQueueEndpoint(
+			`${ rest }/revisions/${ revision.id }/promotions`,
+			{
+				expected_latest_revision_id: revision.id,
+				mode,
+				destination_slug:
+					mode === 'install_fork'
+						? forkSlug
+						: slugify(
+								revision.project_manifest?.plugin_name || ''
+						  ),
+				review_report_id: report?.id || undefined,
+				review_override: override,
+				target_confirmation: targetConfirmation,
+			}
+		);
+	}
+
+	async function downloadPackage( packageId: number ) {
+		try {
+			const response = ( await apiFetch( {
+				path: `${ rest }/release-packages/${ packageId }/download`,
+				parse: false,
+			} as any ) ) as Response;
+			const blob = await response.blob();
+			const url = window.URL.createObjectURL( blob );
+			const anchor = document.createElement( 'a' );
+			anchor.href = url;
+			anchor.download = 'wp-autoplugin-release.zip';
+			anchor.click();
+			window.URL.revokeObjectURL( url );
+		} catch ( reason: any ) {
+			setActionError( reason.message );
+		}
+	}
+
+	if ( loading && ! history ) {
+		return (
+			<div className="review-stage__loading" role="status">
+				<Spinner /> { __( 'Loading Review…', 'wp-autoplugin' ) }
+			</div>
+		);
+	}
+	let startReviewLabel = __( 'Start Review', 'wp-autoplugin' );
+	if ( report ) {
+		startReviewLabel =
+			revision?.origin === 'review_fix'
+				? __( 'Verify fixes', 'wp-autoplugin' )
+				: __( 'Review latest', 'wp-autoplugin' );
+	}
+
 	return (
 		<div className="review-stage">
-			<div className="review-stage__summary">
-				<span>✓</span>
+			{ actionError && (
+				<Notice status="error" onRemove={ () => setActionError( '' ) }>
+					{ actionError }
+				</Notice>
+			) }
+			<header className="review-stage__header">
 				<div>
-					<strong>{ __( 'Review queue', 'wp-autoplugin' ) }</strong>
+					<h3>{ __( 'Review', 'wp-autoplugin' ) }</h3>
+					{ revision && (
+						<small>
+							{ sprintf(
+								/* translators: %d: Current revision number. */
+								__( 'Revision %d', 'wp-autoplugin' ),
+								revision.revision_number
+							) }
+							{ report &&
+							reviewedRevisionNumber !==
+								revision.revision_number ? (
+								<>
+									{ ' · ' }
+									{ sprintf(
+										/* translators: %d: Reviewed revision number. */
+										__(
+											'Reviewed revision %d',
+											'wp-autoplugin'
+										),
+										reviewedRevisionNumber
+									) }
+								</>
+							) : (
+								''
+							) }
+						</small>
+					) }
+				</div>
+				<div className="review-stage__header-actions">
+					{ ( history?.items.length ?? 0 ) > 1 && (
+						<Button
+							variant="tertiary"
+							onClick={ () => setShowReportHistory( true ) }
+						>
+							{ __( 'Previous reviews', 'wp-autoplugin' ) }
+						</Button>
+					) }
+					<span
+						className={ `review-verdict review-verdict--${
+							history?.current.status || 'not_started'
+						}` }
+					>
+						{ reviewStatusLabel(
+							history?.current.status || 'not_started'
+						) }
+					</span>
+				</div>
+			</header>
+
+			{ ! revision && (
+				<Notice status="info" isDismissible={ false }>
+					{ __(
+						'Complete Code before starting Review.',
+						'wp-autoplugin'
+					) }
+				</Notice>
+			) }
+			{ capability && ! capability.available && (
+				<Notice status="warning" isDismissible={ false }>
+					{ capability.message }
+				</Notice>
+			) }
+			{ report && ! currentReport && (
+				<Notice status="warning" isDismissible={ false }>
+					{ __(
+						'This Review is stale because a newer revision exists. Review latest before relying on its verdict.',
+						'wp-autoplugin'
+					) }
+				</Notice>
+			) }
+			{ activeArtifactJob && (
+				<JobStatus job={ activeArtifactJob } onCancel={ onCancel } />
+			) }
+			{ ! activeArtifactJob &&
+				latestReviewFixJob?.status === 'completed' &&
+				latestReviewFixJob.result?.outcome === 'blocked' && (
+					<Notice status="warning" isDismissible={ false }>
+						<strong>
+							{ __(
+								'No safe material fix was staged',
+								'wp-autoplugin'
+							) }
+						</strong>
+						<Markdown
+							content={ latestReviewFixJob.result?.content || '' }
+						/>
+					</Notice>
+				) }
+			{ ! activeArtifactJob &&
+				latestReviewFixJob &&
+				[ 'failed', 'cancelled' ].includes(
+					latestReviewFixJob.status
+				) && (
+					<Notice status="error" isDismissible={ false }>
+						{ latestReviewFixJob.error_message ||
+							__(
+								'The Review fix did not complete. The staged revision was not changed.',
+								'wp-autoplugin'
+							) }
+					</Notice>
+				) }
+			{ revision && (
+				<nav
+					className="review-subnav"
+					aria-label={ __( 'Review sections', 'wp-autoplugin' ) }
+				>
+					{ (
+						[
+							[ 'issues', __( 'Issues', 'wp-autoplugin' ) ],
+							[ 'tests', __( 'Manual testing', 'wp-autoplugin' ) ],
+							[
+								'discussion',
+								__( 'Discussion', 'wp-autoplugin' ),
+							],
+							[ 'release', __( 'Release', 'wp-autoplugin' ) ],
+						] as Array< [ ReviewView, string ] >
+					 ).map( ( [ key, label ] ) => (
+						<button
+							type="button"
+							key={ key }
+							className={ view === key ? 'is-active' : '' }
+							aria-pressed={ view === key }
+							onClick={ () => setView( key ) }
+						>
+							{ label }
+							{ key === 'issues' &&
+								actionableFindings.length > 0 && (
+									<span>{ actionableFindings.length }</span>
+								) }
+						</button>
+					) ) }
+				</nav>
+			) }
+			{ ! activeArtifactJob &&
+				view === 'issues' &&
+				revision &&
+				( ! report || ! currentReport ) && (
+					<Button
+						variant="primary"
+						disabled={ ! capability?.available }
+						onClick={ startReview }
+					>
+						{ startReviewLabel }
+					</Button>
+				) }
+			{ ! activeArtifactJob &&
+				view === 'issues' &&
+				currentReport &&
+				latestReviewJob &&
+				[ 'failed', 'cancelled' ].includes(
+					latestReviewJob.status
+				) && (
+					<Button variant="secondary" onClick={ startReview }>
+						{ __( 'Retry Review', 'wp-autoplugin' ) }
+					</Button>
+				) }
+
+			{ report && (
+				<>
+					<section
+						className="review-summary"
+						hidden={ view !== 'issues' }
+					>
+						<div className="review-summary__verdict">
+							<Markdown content={ report.summary } />
+						</div>
+					</section>
+
+					<section
+						className="review-findings"
+						hidden={ view !== 'issues' }
+					>
+						<div className="review-findings__heading">
+							<h4>{ __( 'Issues', 'wp-autoplugin' ) }</h4>
+							{ currentReport && openFindings.length > 0 && (
+								<div className="review-findings__actions">
+									<Button
+										variant="primary"
+										disabled={
+											! selected.size ||
+											!! activeArtifactJob
+										}
+										onClick={ () =>
+											fix( [ ...selected ], true )
+										}
+									>
+										{ __(
+											'Fix selected',
+											'wp-autoplugin'
+										) }
+									</Button>
+									<DropdownMenu
+										icon="ellipsis"
+										label={ __(
+											'More fix options',
+											'wp-autoplugin'
+										) }
+										controls={ [
+											[
+												{
+													title: __(
+														'Fix selected without review',
+														'wp-autoplugin'
+													),
+													isDisabled:
+														! selected.size ||
+														!! activeArtifactJob,
+													onClick: () =>
+														fix(
+															[ ...selected ],
+															false
+														),
+												},
+												{
+													title: __(
+														'Fix all issues',
+														'wp-autoplugin'
+													),
+													isDisabled:
+														!! activeArtifactJob,
+													onClick: () =>
+														fix(
+															openFindings.map(
+																( item ) =>
+																	item.id
+															),
+															true
+														),
+												},
+											],
+										] }
+									/>
+								</div>
+							) }
+						</div>
+						{ visibleFindings.map( ( finding ) => (
+							<ReviewFindingCard
+								key={ finding.id }
+								finding={ finding }
+								selected={ selected.has( finding.id ) }
+								selectable={
+									currentReport && finding.status === 'open'
+								}
+								onSelect={ ( checked ) =>
+									setSelected( ( current ) => {
+										const next = new Set( current );
+										if ( checked ) {
+											next.add( finding.id );
+										} else {
+											next.delete( finding.id );
+										}
+										return next;
+									} )
+								}
+								onOpen={ () => openFinding( finding ) }
+								onFix={
+									activeArtifactJob
+										? undefined
+										: () => fix( [ finding.id ], true )
+								}
+								onDismiss={
+									activeArtifactJob
+										? undefined
+										: () => transition( finding, 'dismiss' )
+								}
+								onHistory={ () => setHistoryFinding( finding ) }
+							/>
+						) ) }
+						{ visibleFindings.length === 0 && (
+							<p className="review-findings__empty">
+								{ __(
+									'No issues to address.',
+									'wp-autoplugin'
+								) }
+							</p>
+						) }
+						{ historyFindings.length > 0 && (
+							<details className="review-history-findings">
+								<summary>
+									{ sprintf(
+										/* translators: %d: Historical finding count. */
+										__(
+											'Previous issues (%d)',
+											'wp-autoplugin'
+										),
+										historyFindings.length
+									) }
+								</summary>
+								{ historyFindings.map( ( finding ) => (
+									<ReviewFindingCard
+										key={ finding.id }
+										finding={ finding }
+										selected={ false }
+										selectable={ false }
+										onSelect={ () => undefined }
+										onOpen={ () => openFinding( finding ) }
+										onReopen={
+											finding.status === 'dismissed'
+												? () =>
+														transition(
+															finding,
+															'reopen'
+														)
+												: undefined
+										}
+										onHistory={ () =>
+											setHistoryFinding( finding )
+										}
+									/>
+								) ) }
+							</details>
+						) }
+					</section>
+
+					{ viewer && (
+						<Modal
+							className="review-source-modal"
+							title={ `${ viewer.finding.label } · ${ viewer.file.path }` }
+							onRequestClose={ () => setViewer( null ) }
+						>
+							<p className="review-modal__meta">
+								{ viewer.finding.side } ·{ ' ' }
+								{ viewer.finding.start_line }–
+								{ viewer.finding.end_line }
+							</p>
+							<CodeBufferEditor
+								key={ `${ viewer.file.revision_id }:${ viewer.file.id }:${ viewer.finding.side }` }
+								value={ viewer.file.content }
+								type={ viewer.file.type }
+								readOnly
+								focusLine={ viewer.finding.start_line || 1 }
+								markerEndLine={
+									viewer.finding.end_line ||
+									viewer.finding.start_line ||
+									1
+								}
+								onChange={ () => undefined }
+							/>
+						</Modal>
+					) }
+
+					<section
+						className="review-tests"
+						hidden={ view !== 'tests' }
+					>
+						<h4>{ __( 'Suggested tests', 'wp-autoplugin' ) }</h4>
+						<p>
+							{ __(
+								'These tests have not been run.',
+								'wp-autoplugin'
+							) }
+						</p>
+						{ report.tests.length ? (
+							<ol>
+								{ report.tests.map( ( test, index ) => (
+									<li key={ `${ test.title }:${ index }` }>
+										<label
+											htmlFor={ `review-test-${ report.id }-${ index }` }
+										>
+											<input
+												id={ `review-test-${ report.id }-${ index }` }
+												type="checkbox"
+												checked={ checkedTests.has(
+													index
+												) }
+												onChange={ ( event ) =>
+													setCheckedTests(
+														( current ) => {
+															const next =
+																new Set(
+																	current
+																);
+															if (
+																event.target
+																	.checked
+															) {
+																next.add(
+																	index
+																);
+															} else {
+																next.delete(
+																	index
+																);
+															}
+															return next;
+														}
+													)
+												}
+											/>
+											<strong>{ test.title }</strong>
+										</label>
+										<ul>
+											{ test.steps.map( ( step ) => (
+												<li key={ step }>{ step }</li>
+											) ) }
+										</ul>
+										<p>
+											<strong>
+												{ __(
+													'Expected:',
+													'wp-autoplugin'
+												) }
+											</strong>{ ' ' }
+											{ test.expected }
+										</p>
+									</li>
+								) ) }
+							</ol>
+						) : (
+							<p>
+								{ __(
+									'No manual test cases were supplied.',
+									'wp-autoplugin'
+								) }
+							</p>
+						) }
+					</section>
+
+					<section
+						className="review-conversation"
+						hidden={ view !== 'discussion' }
+					>
+						<h4>{ __( 'Discuss the review', 'wp-autoplugin' ) }</h4>
+						{ conversationJobs.map( ( job ) => (
+							<div
+								className="review-conversation__message"
+								key={ job.id }
+							>
+								<p>
+									<strong>
+										{ __( 'You', 'wp-autoplugin' ) }
+									</strong>{ ' ' }
+									{ job.payload.message }
+								</p>
+								{ job.status === 'completed' &&
+									job.result?.outcome === 'report' && (
+										<Notice
+											status="info"
+											isDismissible={ false }
+										>
+											{ __(
+												'The review was updated.',
+												'wp-autoplugin'
+											) }
+										</Notice>
+									) }
+								{ job.status === 'completed' &&
+									job.result?.outcome !== 'report' && (
+										<Markdown
+											content={
+												job.result?.content || ''
+											}
+										/>
+									) }
+								{ job.status !== 'completed' && (
+									<JobStatus
+										job={ job }
+										onCancel={ onCancel }
+									/>
+								) }
+							</div>
+						) ) }
+						<TextareaControl
+							label={ __(
+								'Ask about or update the Review',
+								'wp-autoplugin'
+							) }
+							placeholder={ __(
+								'Ask a question, request reconsideration, or ask for another area to be inspected…',
+								'wp-autoplugin'
+							) }
+							value={ message }
+							onChange={ setMessage }
+							disabled={ ! currentReport || !! activeArtifactJob }
+							help={ __(
+								'To change code, use Fix on an issue.',
+								'wp-autoplugin'
+							) }
+						/>
+						<Button
+							variant="primary"
+							disabled={
+								! message.trim() ||
+								! currentReport ||
+								!! activeArtifactJob
+							}
+							onClick={ sendMessage }
+						>
+							{ __( 'Send', 'wp-autoplugin' ) }
+						</Button>
+					</section>
+				</>
+			) }
+			{ ! report && revision && view === 'tests' && (
+				<Notice status="info" isDismissible={ false }>
+					{ __(
+						'Start Review to get suggested tests.',
+						'wp-autoplugin'
+					) }
+				</Notice>
+			) }
+			{ ! report && revision && view === 'discussion' && (
+				<Notice status="info" isDismissible={ false }>
+					{ __(
+						'Start Review before asking the reviewer a question.',
+						'wp-autoplugin'
+					) }
+				</Notice>
+			) }
+
+			{ revision && view === 'release' && (
+				<ReleasePanel
+					revision={ revision }
+					capability={ releaseCapability }
+					active={ !! activeArtifactJob }
+					themeDisabled={ themeReleaseDisabled }
+					pluginProject={ pluginProject }
+					pluginChanges={ pluginChanges }
+					forkSlug={ forkSlug }
+					onForkSlug={ setForkSlug }
+					onPackage={ queuePackage }
+					onPromotion={ queuePromotion }
+					releaseJobs={ releaseJobs }
+					onQueueEndpoint={ onQueueEndpoint }
+					onDownload={ downloadPackage }
+				/>
+			) }
+			{ historyFinding && (
+				<Modal
+					className="review-history-modal"
+					title={ sprintf(
+						/* translators: %s: Issue label. */
+						__( '%s history', 'wp-autoplugin' ),
+						historyFinding.label
+					) }
+					onRequestClose={ () => setHistoryFinding( null ) }
+				>
+					<ol className="review-modal-timeline">
+						{ historyFinding.timeline.map( ( event ) => (
+							<li key={ event.id }>
+								<strong>
+									{ event.event.replace( /_/g, ' ' ) }
+								</strong>
+								<small>{ event.created_at } UTC</small>
+								{ event.message && <p>{ event.message }</p> }
+							</li>
+						) ) }
+					</ol>
+				</Modal>
+			) }
+			{ showReportHistory && history && (
+				<Modal
+					className="review-history-modal"
+					title={ __( 'Previous reviews', 'wp-autoplugin' ) }
+					onRequestClose={ () => setShowReportHistory( false ) }
+				>
+					<ul className="review-report-list">
+						{ history?.items.map( ( item ) => (
+							<li key={ item.id }>
+								<div>
+									<strong>
+										{ sprintf(
+											/* translators: %d: Revision number. */
+											__(
+												'Revision %d',
+												'wp-autoplugin'
+											),
+											revisions.find(
+												( revisionItem ) =>
+													revisionItem.id ===
+													item.revision_id
+											)?.revision_number ??
+												item.revision_id
+										) }
+									</strong>
+									<small>{ item.created_at } UTC</small>
+								</div>
+								<span>
+									{ reviewStatusLabel(
+										item.effective_status
+									) }
+								</span>
+								<p>{ item.summary }</p>
+							</li>
+						) ) }
+					</ul>
+				</Modal>
+			) }
+		</div>
+	);
+}
+
+function ReviewFindingCard( {
+	finding,
+	selected,
+	selectable,
+	onSelect,
+	onOpen,
+	onFix,
+	onDismiss,
+	onReopen,
+	onHistory,
+}: {
+	finding: ReviewFinding;
+	selected: boolean;
+	selectable: boolean;
+	onSelect: ( checked: boolean ) => void;
+	onOpen: () => void;
+	onFix?: () => void;
+	onDismiss?: () => void;
+	onReopen?: () => void;
+	onHistory?: () => void;
+} ) {
+	return (
+		<article
+			className={ `review-finding review-finding--${ finding.priority.toLowerCase() } status--${
+				finding.status
+			}` }
+		>
+			<header>
+				{ selectable && (
+					<input
+						type="checkbox"
+						checked={ selected }
+						onChange={ ( event ) =>
+							onSelect( event.target.checked )
+						}
+						aria-label={ sprintf(
+							/* translators: %s: Finding label. */
+							__( 'Select %s', 'wp-autoplugin' ),
+							finding.label
+						) }
+					/>
+				) }
+				<div>
+					<span className="review-finding__priority">
+						{ finding.priority }
+					</span>
+					<span className="review-finding__id">
+						{ finding.label }
+					</span>
+					<strong>{ finding.title }</strong>
+				</div>
+				<small>
+					{ finding.category }
+					{ finding.status !== 'open'
+						? ` · ${ finding.status.replace( /_/g, ' ' ) }`
+						: '' }
+				</small>
+			</header>
+			<Markdown content={ finding.body } />
+			{ finding.suggested_fix && (
+				<details className="review-finding__fix">
+					<summary>
+						{ __( 'Suggested fix', 'wp-autoplugin' ) }
+					</summary>
+					<Markdown content={ finding.suggested_fix } />
+				</details>
+			) }
+			<div className="review-finding__footer">
+				{ finding.path ? (
+					<Button variant="link" onClick={ onOpen }>
+						<code>
+							{ finding.path }
+							{ finding.start_line
+								? `:${ finding.start_line }`
+								: '' }
+						</code>
+					</Button>
+				) : (
+					<small>
+						{ __( 'Project-level finding', 'wp-autoplugin' ) }
+					</small>
+				) }
+				<div>
+					{ onHistory && finding.timeline?.length > 1 && (
+						<Button variant="tertiary" onClick={ onHistory }>
+							{ __( 'History', 'wp-autoplugin' ) }
+						</Button>
+					) }
+					{ onFix && finding.status === 'open' && (
+						<Button variant="secondary" onClick={ onFix }>
+							{ __( 'Fix', 'wp-autoplugin' ) }
+						</Button>
+					) }
+					{ onDismiss &&
+						[ 'open', 'addressed' ].includes( finding.status ) && (
+							<Button variant="tertiary" onClick={ onDismiss }>
+								{ __( 'Dismiss', 'wp-autoplugin' ) }
+							</Button>
+						) }
+					{ onReopen && (
+						<Button variant="tertiary" onClick={ onReopen }>
+							{ __( 'Reopen', 'wp-autoplugin' ) }
+						</Button>
+					) }
+				</div>
+			</div>
+		</article>
+	);
+}
+
+function ReleasePanel( {
+	revision,
+	capability,
+	active,
+	themeDisabled,
+	pluginProject,
+	pluginChanges,
+	forkSlug,
+	onForkSlug,
+	onPackage,
+	onPromotion,
+	releaseJobs,
+	onQueueEndpoint,
+	onDownload,
+}: {
+	revision: RevisionManifest;
+	capability: ReleaseCapability | null;
+	active: boolean;
+	themeDisabled: boolean;
+	pluginProject: boolean;
+	pluginChanges: boolean;
+	forkSlug: string;
+	onForkSlug: ( value: string ) => void;
+	onPackage: ( mode: 'project' | 'fork' | 'replacement' ) => void;
+	onPromotion: (
+		mode: 'install_project' | 'install_fork' | 'modify_original'
+	) => void;
+	releaseJobs: Job[];
+	onQueueEndpoint: ( path: string, data: object ) => Promise< Job | null >;
+	onDownload: ( packageId: number ) => void;
+} ) {
+	const installed = [ ...releaseJobs ]
+		.filter(
+			( candidate ) =>
+				! releaseJobs.some(
+					( action ) =>
+						action.task === 'promotion' &&
+						action.result?.outcome === 'promotion_action' &&
+						action.result?.action === 'activate' &&
+						action.result?.promotion_id ===
+							candidate.result?.promotion_id &&
+						[ 'activated', 'switched' ].includes(
+							action.result?.status || ''
+						)
+				)
+		)
+		.reverse()
+		.find(
+			( job ) =>
+				job.task === 'promotion' &&
+				job.result?.outcome === 'promotion' &&
+				job.result.status === 'installed'
+		);
+	const direct = [ ...releaseJobs ]
+		.filter(
+			( candidate ) =>
+				! releaseJobs.some(
+					( action ) =>
+						action.task === 'promotion' &&
+						action.result?.outcome === 'promotion_action' &&
+						action.result?.action === 'rollback' &&
+						action.result?.promotion_id ===
+							candidate.result?.promotion_id &&
+						action.result?.status === 'rolled_back'
+				)
+		)
+		.reverse()
+		.find(
+			( job ) =>
+				job.task === 'promotion' &&
+				job.result?.mode === 'modify_original' &&
+				job.result.status === 'completed'
+		);
+	const disabled = active || ! revision.id;
+
+	return (
+		<section className="release-panel">
+			<header>
+				<h3>{ __( 'Release', 'wp-autoplugin' ) }</h3>
+				<small>
+					{ sprintf(
+						/* translators: %d: Revision number. */
+						__( 'Revision %d', 'wp-autoplugin' ),
+						revision.revision_number
+					) }
+				</small>
+			</header>
+			{ capability?.disabled_reasons.map( ( reason ) => (
+				<Notice status="warning" isDismissible={ false } key={ reason }>
+					{ reason }
+				</Notice>
+			) ) }
+
+			{ themeDisabled && (
+				<div className="release-panel__actions release-panel__actions--disabled">
+					<Notice status="info" isDismissible={ false }>
+						{ __(
+							'Theme release is not available yet. Review and finding fixes remain fully available.',
+							'wp-autoplugin'
+						) }
+					</Notice>
+					<Button disabled>
+						{ __( 'Download theme ZIP', 'wp-autoplugin' ) }
+					</Button>
+					<Button disabled>
+						{ __( 'Install as copy', 'wp-autoplugin' ) }
+					</Button>
+					<Button disabled>
+						{ __( 'Modify theme directly', 'wp-autoplugin' ) }
+					</Button>
+				</div>
+			) }
+
+			{ pluginProject && (
+				<div className="release-panel__actions">
+					<Button
+						variant="secondary"
+						disabled={ disabled || ! capability?.zip }
+						onClick={ () => onPackage( 'project' ) }
+					>
+						{ __( 'Download ZIP', 'wp-autoplugin' ) }
+					</Button>
+					<Button
+						variant="primary"
+						disabled={ disabled || ! capability?.can_install }
+						onClick={ () => onPromotion( 'install_project' ) }
+					>
+						{ __( 'Install on this site', 'wp-autoplugin' ) }
+					</Button>
+				</div>
+			) }
+
+			{ pluginChanges && (
+				<>
+					<div className="release-panel__fork">
+						<h4>
+							{ __(
+								'Recommended: release as a fork',
+								'wp-autoplugin'
+							) }
+						</h4>
+						<p>
+							{ __(
+								'The fork and original share plugin data and must not be active together. A fork does not automatically receive upstream releases.',
+								'wp-autoplugin'
+							) }
+						</p>
+						<TextControl
+							label={ __( 'Fork plugin slug', 'wp-autoplugin' ) }
+							value={ forkSlug }
+							onChange={ ( value ) =>
+								onForkSlug( slugify( value ) )
+							}
+						/>
+						<div className="release-panel__actions">
+							<Button
+								variant="secondary"
+								disabled={
+									disabled || ! capability?.zip || ! forkSlug
+								}
+								onClick={ () => onPackage( 'fork' ) }
+							>
+								{ __( 'Download fork ZIP', 'wp-autoplugin' ) }
+							</Button>
+							<Button
+								variant="primary"
+								disabled={
+									disabled ||
+									! capability?.can_install ||
+									! forkSlug
+								}
+								onClick={ () => onPromotion( 'install_fork' ) }
+							>
+								{ __( 'Install as fork', 'wp-autoplugin' ) }
+							</Button>
+						</div>
+						<details className="release-panel__fork-details">
+							<summary>
+								{ __( 'Fork details', 'wp-autoplugin' ) }
+							</summary>
+							<dl className="release-panel__transform-preview">
+								<div>
+									<dt>
+										{ __( 'Plugin Name', 'wp-autoplugin' ) }
+									</dt>
+									<dd>
+										{
+											revision.project_manifest
+												?.plugin_name
+										}{ ' ' }
+										—{ ' ' }
+										{ __(
+											'WP-Autoplugin Fork',
+											'wp-autoplugin'
+										) }
+									</dd>
+								</div>
+								<div>
+									<dt>
+										{ __( 'Update URI', 'wp-autoplugin' ) }
+									</dt>
+									<dd>
+										<code>
+											https://wp-autoplugin.local/fork/
+											{ forkSlug }
+										</code>
+									</dd>
+								</div>
+								<div>
+									<dt>
+										{ __( 'Version', 'wp-autoplugin' ) }
+									</dt>
+									<dd>
+										{ __(
+											'Patch version bump',
+											'wp-autoplugin'
+										) }
+									</dd>
+								</div>
+							</dl>
+						</details>
+					</div>
+					<details className="release-panel__advanced">
+						<summary>
+							{ __(
+								'Advanced: replace or modify the original',
+								'wp-autoplugin'
+							) }
+						</summary>
+						<p>
+							{ __(
+								'The replacement ZIP is for manual deployment. Upstream updates remain enabled and may overwrite direct changes. File rollback cannot undo database or runtime side effects and is blocked after affected-file drift.',
+								'wp-autoplugin'
+							) }
+						</p>
+						<div className="release-panel__actions">
+							<Button
+								variant="secondary"
+								disabled={ disabled || ! capability?.zip }
+								onClick={ () => onPackage( 'replacement' ) }
+							>
+								{ __(
+									'Download replacement ZIP',
+									'wp-autoplugin'
+								) }
+							</Button>
+							<Button
+								variant="secondary"
+								isDestructive
+								disabled={
+									disabled || ! capability?.can_modify
+								}
+								onClick={ () =>
+									onPromotion( 'modify_original' )
+								}
+							>
+								{ __( 'Modify original', 'wp-autoplugin' ) }
+							</Button>
+						</div>
+					</details>
+				</>
+			) }
+
+			{ installed?.result?.promotion_id && (
+				<Notice status="success" isDismissible={ false }>
 					<p>
 						{ __(
-							'A GitHub-style review will show an all-clear verdict or priority comments pinned to staged code.',
+							'Installed inactive. Activation remains a separate, explicit action.',
 							'wp-autoplugin'
 						) }
 					</p>
-				</div>
-			</div>
-			<Notice status="info" isDismissible={ false }>
-				{ plan?.status === 'completed'
-					? __(
-							'AI Review is the next stage and is not implemented yet. Staged Code remains available in revision history.',
+					<Button
+						variant="primary"
+						disabled={ active || ! capability?.can_activate }
+						onClick={ () =>
+							onQueueEndpoint(
+								`${ rest }/promotions/${ installed.result?.promotion_id }/activate`,
+								{}
+							)
+						}
+					>
+						{ installed.result.mode === 'install_fork'
+							? __( 'Switch to fork', 'wp-autoplugin' )
+							: __( 'Activate', 'wp-autoplugin' ) }
+					</Button>
+				</Notice>
+			) }
+
+			{ direct?.result?.promotion_id && (
+				<Notice status="warning" isDismissible={ false }>
+					<p>
+						{ __(
+							'The original plugin files were modified. Rollback remains available only while every affected file matches the promoted state.',
 							'wp-autoplugin'
-					  )
-					: __(
-							'Complete Plan and Code before starting Review.',
-							'wp-autoplugin'
-					  ) }
-			</Notice>
-		</div>
+						) }
+					</p>
+					<Button
+						variant="secondary"
+						isDestructive
+						disabled={ active || ! capability?.can_modify }
+						onClick={ () =>
+							onQueueEndpoint(
+								`${ rest }/promotions/${ direct.result?.promotion_id }/rollback`,
+								{}
+							)
+						}
+					>
+						{ __( 'Rollback files', 'wp-autoplugin' ) }
+					</Button>
+				</Notice>
+			) }
+
+			{ releaseJobs.length > 0 && (
+				<details className="release-panel__jobs">
+					<summary>
+						{ __( 'Release activity', 'wp-autoplugin' ) }
+					</summary>
+					<ul>
+						{ releaseJobs
+							.slice( -6 )
+							.reverse()
+							.map( ( job ) => (
+								<li key={ job.id }>
+									<strong>
+										#{ job.id } · { job.task }
+									</strong>
+									<span>{ job.status }</span>
+									{ job.error_message && (
+										<small>{ job.error_message }</small>
+									) }
+									{ job.status === 'completed' &&
+										job.result?.package_id && (
+											<Button
+												variant="link"
+												onClick={ () =>
+													onDownload(
+														job.result
+															?.package_id || 0
+													)
+												}
+											>
+												{ __(
+													'Download ready ZIP',
+													'wp-autoplugin'
+												) }
+											</Button>
+										) }
+								</li>
+							) ) }
+					</ul>
+				</details>
+			) }
+		</section>
 	);
+}
+
+function slugify( value: string ): string {
+	return value
+		.toLowerCase()
+		.normalize( 'NFD' )
+		.replace( /[\u0300-\u036f]/g, '' )
+		.replace( /[^a-z0-9]+/g, '-' )
+		.replace( /^-+|-+$/g, '' )
+		.slice( 0, 100 );
+}
+
+function reviewStatusLabel( status: string ): string {
+	switch ( status ) {
+		case 'all_clear':
+			return __( 'No actionable issues found', 'wp-autoplugin' );
+		case 'cleared_with_dismissals':
+			return __( 'Cleared with dismissals', 'wp-autoplugin' );
+		case 'action_required':
+			return __( 'Action required', 'wp-autoplugin' );
+		case 'stale':
+			return __( 'Stale', 'wp-autoplugin' );
+		case 'in_progress':
+			return __( 'In progress', 'wp-autoplugin' );
+		case 'failed':
+			return __( 'Failed', 'wp-autoplugin' );
+		default:
+			return __( 'Not started', 'wp-autoplugin' );
+	}
 }
 
 function ExplainStage( {
@@ -4396,8 +6121,23 @@ function getActivityStageLabel( stage: 'plan' | 'code' | 'review' | 'chat' ) {
 
 function getActivityStatusLabel(
 	stage: 'plan' | 'code' | 'review' | 'chat',
-	status: 'complete' | 'in_progress' | 'incomplete' | 'not_started'
+	status:
+		| 'complete'
+		| 'in_progress'
+		| 'incomplete'
+		| 'not_started'
+		| 'all_clear'
+		| 'cleared_with_dismissals'
+		| 'action_required'
+		| 'stale'
+		| 'failed'
 ) {
+	if (
+		stage === 'review' &&
+		! [ 'complete', 'incomplete' ].includes( status )
+	) {
+		return reviewStatusLabel( status );
+	}
 	if ( status === 'in_progress' ) {
 		return __( 'In progress', 'wp-autoplugin' );
 	}
@@ -4418,14 +6158,28 @@ function getActivityStatusLabel(
 }
 
 function getActivityMarker(
-	status: 'complete' | 'in_progress' | 'incomplete' | 'not_started'
+	status:
+		| 'complete'
+		| 'in_progress'
+		| 'incomplete'
+		| 'not_started'
+		| 'all_clear'
+		| 'cleared_with_dismissals'
+		| 'action_required'
+		| 'stale'
+		| 'failed'
 ) {
 	switch ( status ) {
 		case 'complete':
+		case 'all_clear':
+		case 'cleared_with_dismissals':
 			return '✓';
 		case 'in_progress':
 			return '…';
 		case 'incomplete':
+		case 'action_required':
+		case 'stale':
+		case 'failed':
 			return '!';
 		default:
 			return '○';

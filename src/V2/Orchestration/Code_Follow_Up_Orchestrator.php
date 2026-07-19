@@ -27,7 +27,7 @@ final class Code_Follow_Up_Orchestrator {
 	 * @param array<string, mixed>      $job    Durable job.
 	 */
 	public function execute( $result, array $job, int $generation = 0 ) {
-		if ( null !== $result || ! Job_Repository::is_code_work( $job ) || 'conversation' !== ( $job['task'] ?? '' ) ) {
+		if ( null !== $result || ! Job_Repository::is_code_work( $job ) || ! in_array( (string) ( $job['task'] ?? '' ), [ 'conversation', 'review_fix' ], true ) ) {
 			return $result;
 		}
 		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
@@ -299,10 +299,23 @@ final class Code_Follow_Up_Orchestrator {
 			(int) $job['workspace_id'],
 			(int) $job['created_by'],
 			(int) $base['id'],
-			(string) $run['change_summary']
+			(string) $run['change_summary'],
+			'review_fix' === ( $job['task'] ?? '' ) ? 'review_fix' : 'ai'
 		);
 		if ( is_wp_error( $revision ) ) {
 			return $revision;
+		}
+		if ( 'review_fix' === ( $job['task'] ?? '' ) ) {
+			$addressed = ( new \WP_Autoplugin\V2\Infrastructure\Database\Review_Repository() )->address(
+				(int) $job['workspace_id'],
+				(array) ( $job['payload']['finding_ids'] ?? [] ),
+				(int) $revision['id'],
+				(int) $job['id'],
+				(int) $job['created_by']
+			);
+			if ( ! $addressed ) {
+				return new \WP_Error( 'review_fix_finding_conflict', __( 'The successor revision was staged, but the selected Review finding state changed unexpectedly.', 'wp-autoplugin' ) );
+			}
 		}
 		$jobs->event(
 			(int) $job['id'],
@@ -633,9 +646,10 @@ final class Code_Follow_Up_Orchestrator {
 	private function completed_result( array $run ): array {
 		$usage = [ 'input_tokens' => (int) $run['input_tokens'], 'output_tokens' => (int) $run['output_tokens'] ];
 		$base  = (int) $run['parent_revision_id'];
+		$job   = ( new Job_Repository() )->find( (int) $run['job_id'] );
 		if ( 'answer' === $run['outcome'] ) {
-			return [
-				'outcome'          => 'answer',
+			$result = [
+				'outcome'          => $job && 'review_fix' === $job['task'] ? 'blocked' : 'answer',
 				'content'          => (string) $run['answer_content'],
 				'base_revision_id' => $base,
 				'provider'         => $run['provider'],
@@ -643,9 +657,14 @@ final class Code_Follow_Up_Orchestrator {
 				'effort'           => $run['effort'],
 				'usage'            => $usage,
 			];
+			if ( $job && 'review_fix' === $job['task'] ) {
+				$result['finding_ids']     = array_values( array_map( 'absint', (array) ( $job['payload']['finding_ids'] ?? [] ) ) );
+				$result['review_report_id'] = (int) ( $job['payload']['review_report_id'] ?? 0 );
+			}
+			return $result;
 		}
 		$changes = (array) $run['change_instructions'];
-		return [
+		$result = [
 			'outcome'          => 'revision',
 			'content'          => (string) $run['change_summary'],
 			'base_revision_id' => $base,
@@ -659,6 +678,12 @@ final class Code_Follow_Up_Orchestrator {
 			'usage'            => $usage,
 			'prompt'           => [ 'slug' => $run['prompt_slug'], 'version' => (int) $run['prompt_version'] ],
 		];
+		if ( $job && 'review_fix' === $job['task'] ) {
+			$result['finding_ids']    = array_values( array_map( 'absint', (array) ( $job['payload']['finding_ids'] ?? [] ) ) );
+			$result['review_report_id'] = (int) ( $job['payload']['review_report_id'] ?? 0 );
+			$result['auto_re_review'] = ! empty( $job['payload']['auto_re_review'] );
+		}
+		return $result;
 	}
 
 	private function retry_analysis_or_fail( \WP_Error $error, array $job, array $run, string $token, Job_Repository $jobs, Code_Run_Repository $runs ) {

@@ -171,6 +171,7 @@ final class Workspace_Repository extends Repository {
 		$revisions_table = Installer::table( 'revisions' );
 		$summaries       = [];
 		$stage_flags     = [];
+		$latest_revisions = [];
 
 		foreach ( $workspace_ids as $workspace_id ) {
 			$summaries[ $workspace_id ] = [
@@ -184,6 +185,7 @@ final class Workspace_Repository extends Repository {
 					'attempted' => false,
 					'active'    => false,
 					'complete'  => false,
+					'failed'    => false,
 				];
 			}
 		}
@@ -222,6 +224,9 @@ final class Workspace_Repository extends Repository {
 			if ( in_array( $job['status'], [ 'queued', 'running', 'retrying' ], true ) ) {
 				$stage_flags[ $workspace_id ][ $stage ]['active'] = true;
 			}
+			if ( in_array( $job['status'], [ 'failed', 'cancelled' ], true ) ) {
+				$stage_flags[ $workspace_id ][ $stage ]['failed'] = true;
+			}
 			if (
 				( 'plan' === $stage && 'plan' === $job['task'] && 'completed' === $job['status'] )
 				|| ( 'review' === $stage && 'completed' === $job['status'] )
@@ -233,7 +238,7 @@ final class Workspace_Repository extends Repository {
 
 		$revision_rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				"SELECT workspace_id, COUNT(*) AS revision_count FROM $revisions_table
+				"SELECT workspace_id, COUNT(*) AS revision_count, MAX(id) AS latest_revision_id FROM $revisions_table
 				WHERE workspace_id IN ($placeholders) GROUP BY workspace_id",
 				...$workspace_ids
 			), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table is allow-listed and placeholders are generated for integer IDs.
@@ -243,6 +248,7 @@ final class Workspace_Repository extends Repository {
 			$workspace_id = (int) $row['workspace_id'];
 			if ( isset( $stage_flags[ $workspace_id ] ) && (int) $row['revision_count'] > 0 ) {
 				$stage_flags[ $workspace_id ]['code']['complete'] = true;
+				$latest_revisions[ $workspace_id ] = (int) $row['latest_revision_id'];
 			}
 		}
 
@@ -281,6 +287,15 @@ final class Workspace_Repository extends Repository {
 					$stages[ $stage ] = 'not_started';
 				}
 			}
+			if ( in_array( 'review', $stage_names, true ) ) {
+				$review_status = ( new Review_Repository( $this->wpdb ) )->workspace_status( $workspace_id, $latest_revisions[ $workspace_id ] ?? null )['status'];
+				if ( $stage_flags[ $workspace_id ]['review']['active'] ) {
+					$review_status = 'in_progress';
+				} elseif ( 'not_started' === $review_status && $stage_flags[ $workspace_id ]['review']['failed'] ) {
+					$review_status = 'failed';
+				}
+				$stages['review'] = $review_status;
+			}
 			$workspace['activity_summary'] = array_merge(
 				$summaries[ $workspace_id ],
 				[ 'stages' => $stages ]
@@ -311,6 +326,9 @@ final class Workspace_Repository extends Repository {
 			return 'chat';
 		}
 
+		if ( 'review_fix' === $task ) {
+			return 'code';
+		}
 		return in_array( $task, [ 'code', 'review' ], true ) ? $task : null;
 	}
 
