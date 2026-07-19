@@ -164,17 +164,33 @@ body.wp-autoplugin-v2-distraction-free {
 		width: 20px;
 	}
 }
-.recent-projects-modal {
-	.recent-projects__intro {
+.all-projects-modal {
+	.all-projects__intro {
 		color: $muted;
 		line-height: 1.5;
-		margin: 0 0 20px;
+		margin: 0 0 16px;
 	}
 	.components-notice {
 		margin: 0 0 16px;
 	}
 }
-.recent-projects__loading {
+.all-projects__filter {
+	align-items: flex-end;
+	display: flex;
+	gap: 16px;
+	margin-bottom: 16px;
+	.components-base-control {
+		flex: 1;
+		margin-bottom: 0;
+	}
+}
+.all-projects__result-count {
+	color: $muted;
+	font-size: 12px;
+	padding-bottom: 9px;
+	white-space: nowrap;
+}
+.all-projects__loading {
 	align-items: center;
 	color: $muted;
 	display: flex;
@@ -182,7 +198,7 @@ body.wp-autoplugin-v2-distraction-free {
 	justify-content: center;
 	min-height: 220px;
 }
-.recent-projects__empty {
+.all-projects__empty {
 	background: #f6f7f8;
 	border: 1px solid #d9dfe4;
 	border-radius: 6px;
@@ -196,14 +212,14 @@ body.wp-autoplugin-v2-distraction-free {
 		margin: 7px 0 0;
 	}
 }
-.recent-projects__list {
+.all-projects__list {
 	display: grid;
 	gap: 10px;
 	list-style: none;
 	margin: 0;
 	padding: 0;
 }
-.recent-projects__item {
+.all-projects__item {
 	align-items: center;
 	background: #fff;
 	border: 1px solid #d9dfe4;
@@ -216,7 +232,7 @@ body.wp-autoplugin-v2-distraction-free {
 		align-self: center;
 	}
 }
-.recent-projects__details {
+.all-projects__details {
 	min-width: 0;
 	dl {
 		display: flex;
@@ -240,10 +256,11 @@ body.wp-autoplugin-v2-distraction-free {
 		}
 	}
 }
-.recent-projects__heading {
+.all-projects__heading {
 	align-items: flex-start;
 	display: flex;
 	gap: 12px;
+	justify-content: space-between;
 	strong,
 	small {
 		display: block;
@@ -256,7 +273,31 @@ body.wp-autoplugin-v2-distraction-free {
 		margin-top: 2px;
 	}
 }
-.recent-projects__request {
+.all-projects__state {
+	align-items: center;
+	background: #e8edf1;
+	border-radius: 999px;
+	color: #526069;
+	display: inline-flex;
+	font-size: 10px;
+	font-weight: 600;
+	gap: 5px;
+	line-height: 1;
+	padding: 5px 7px;
+	white-space: nowrap;
+	&::before {
+		background: currentColor;
+		border-radius: 50%;
+		content: '';
+		height: 6px;
+		width: 6px;
+	}
+	&.is-open {
+		background: #d7f0df;
+		color: #14612c;
+	}
+}
+.all-projects__request {
 	color: #34424b;
 	display: -webkit-box;
 	line-height: 1.45;
@@ -265,7 +306,7 @@ body.wp-autoplugin-v2-distraction-free {
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 2;
 }
-.recent-projects__progress {
+.all-projects__progress {
 	border-left: 1px solid #e1e5e8;
 	padding-left: 20px;
 	ul {
@@ -289,19 +330,19 @@ body.wp-autoplugin-v2-distraction-free {
 			white-space: nowrap;
 		}
 		&.status--complete {
-			.recent-projects__stage-marker {
+			.all-projects__stage-marker {
 				background: #d7f0df;
 				color: #14612c;
 			}
 		}
 		&.status--in_progress {
-			.recent-projects__stage-marker {
+			.all-projects__stage-marker {
 				background: #fff2c7;
 				color: #755b08;
 			}
 		}
 		&.status--incomplete {
-			.recent-projects__stage-marker {
+			.all-projects__stage-marker {
 				background: #f7d9dc;
 				color: #8b1a24;
 			}
@@ -316,7 +357,7 @@ body.wp-autoplugin-v2-distraction-free {
 		padding-top: 8px;
 	}
 }
-.recent-projects__stage-marker {
+.all-projects__stage-marker {
 	align-items: center;
 	background: #e8edf1;
 	border-radius: 50%;
@@ -329,11 +370,17 @@ body.wp-autoplugin-v2-distraction-free {
 	line-height: 1;
 	width: 17px;
 }
+.all-projects__load-more {
+	display: flex;
+	justify-content: center;
+	min-height: 48px;
+	padding-top: 12px;
+}
 @media ( max-width: 782px ) {
-	.recent-projects__item {
+	.all-projects__item {
 		grid-template-columns: minmax( 0, 1fr ) auto;
 	}
-	.recent-projects__progress {
+	.all-projects__progress {
 		border-left: 0;
 		border-top: 1px solid #e1e5e8;
 		grid-column: 1 / -1;
@@ -342,7 +389,15 @@ body.wp-autoplugin-v2-distraction-free {
 	}
 }
 @media ( max-width: 600px ) {
-	.recent-projects__item {
+	.all-projects__filter {
+		align-items: stretch;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.all-projects__result-count {
+		padding-bottom: 0;
+	}
+	.all-projects__item {
 		align-items: stretch;
 		grid-template-columns: 1fr;
 		> .components-button {

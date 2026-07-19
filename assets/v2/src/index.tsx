@@ -425,10 +425,21 @@ type Workspace = {
 	};
 };
 
+type ProjectsResponse = {
+	items: Workspace[];
+	page: number;
+	per_page: number;
+	total: number;
+	total_pages: number;
+	has_more: boolean;
+};
+
 const ACTIVE_WORKSPACE_KEY = 'wp-autoplugin-v2-active-workspace';
 const ACTIVE_STAGE_KEY_PREFIX = 'wp-autoplugin-v2-active-stage:';
 const DISTRACTION_FREE_KEY = 'wp-autoplugin-v2-distraction-free';
 const DISTRACTION_FREE_CLASS = 'wp-autoplugin-v2-distraction-free';
+const PROJECTS_PAGE_SIZE = 20;
+const PROJECT_SEARCH_DELAY = 300;
 
 function workspaceStages( operation?: string ): string[] {
 	return operation === 'explain'
@@ -509,7 +520,7 @@ function App() {
 	const [ activeTab, setActiveTab ] = useState( 'plan' );
 	const [ error, setError ] = useState( '' );
 	const [ busy, setBusy ] = useState( true );
-	const [ recentProjectsOpen, setRecentProjectsOpen ] = useState( false );
+	const [ allProjectsOpen, setAllProjectsOpen ] = useState( false );
 	const [ distractionFree, setDistractionFree ] = useState(
 		() => 'true' === window.localStorage.getItem( DISTRACTION_FREE_KEY )
 	);
@@ -837,6 +848,22 @@ function App() {
 		setActiveWorkspaceId( reopened.id );
 	}
 
+	async function openProject( project: Workspace ) {
+		if ( project.is_closed ) {
+			await reopenWorkspace( project.id );
+			return;
+		}
+
+		setWorkspaces( ( current ) =>
+			current.some( ( item ) => item.id === project.id )
+				? current.map( ( item ) =>
+						item.id === project.id ? project : item
+				  )
+				: [ project, ...current ]
+		);
+		setActiveWorkspaceId( project.id );
+	}
+
 	async function cancel( job: Job ) {
 		const updated = await apiFetch< Job >( {
 			path: `${ rest }/jobs/${ job.id }/cancel`,
@@ -1019,15 +1046,15 @@ function App() {
 				onSelect={ setActiveWorkspaceId }
 				onClose={ closeWorkspace }
 				onNew={ () => setActiveWorkspaceId( 'new' ) }
-				onLoadRecent={ () => setRecentProjectsOpen( true ) }
+				onLoadProjects={ () => setAllProjectsOpen( true ) }
 				onDistractionFreeToggle={ () =>
 					setDistractionFree( ( current ) => ! current )
 				}
 			/>
-			{ recentProjectsOpen && (
-				<RecentProjectsModal
-					onClose={ () => setRecentProjectsOpen( false ) }
-					onReopen={ reopenWorkspace }
+			{ allProjectsOpen && (
+				<AllProjectsModal
+					onClose={ () => setAllProjectsOpen( false ) }
+					onOpen={ openProject }
 				/>
 			) }
 			{ workspaceContent }
@@ -1042,7 +1069,7 @@ function WorkspaceTabBar( {
 	onSelect,
 	onClose,
 	onNew,
-	onLoadRecent,
+	onLoadProjects,
 	onDistractionFreeToggle,
 }: {
 	workspaces: Workspace[];
@@ -1051,7 +1078,7 @@ function WorkspaceTabBar( {
 	onSelect: ( id: number ) => void;
 	onClose: ( id: number ) => void;
 	onNew: () => void;
-	onLoadRecent: () => void;
+	onLoadProjects: () => void;
 	onDistractionFreeToggle: () => void;
 } ) {
 	return (
@@ -1144,9 +1171,9 @@ function WorkspaceTabBar( {
 				controls={ [
 					[
 						{
-							title: __( 'Reopen recent', 'wp-autoplugin' ),
+							title: __( 'All projects', 'wp-autoplugin' ),
 							icon: 'open-folder',
-							onClick: onLoadRecent,
+							onClick: onLoadProjects,
 						},
 					],
 					[
@@ -1169,35 +1196,64 @@ function WorkspaceTabBar( {
 	);
 }
 
-function RecentProjectsModal( {
+function AllProjectsModal( {
 	onClose,
-	onReopen,
+	onOpen,
 }: {
 	onClose: () => void;
-	onReopen: ( workspaceId: number ) => Promise< void >;
+	onOpen: ( project: Workspace ) => Promise< void >;
 } ) {
 	const [ projects, setProjects ] = useState< Workspace[] >( [] );
+	const [ search, setSearch ] = useState( '' );
+	const [ debouncedSearch, setDebouncedSearch ] = useState( '' );
 	const [ loading, setLoading ] = useState( true );
-	const [ reopeningId, setReopeningId ] = useState< number | null >( null );
+	const [ loadingMore, setLoadingMore ] = useState( false );
+	const [ nextPage, setNextPage ] = useState( 2 );
+	const [ total, setTotal ] = useState( 0 );
+	const [ hasMore, setHasMore ] = useState( false );
+	const [ openingId, setOpeningId ] = useState< number | null >( null );
 	const [ loadError, setLoadError ] = useState( '' );
+	const requestSequence = useRef( 0 );
+	const loadingMoreRef = useRef( false );
+	const loadMoreTriggerRef = useRef< HTMLDivElement | null >( null );
+
+	useEffect( () => {
+		const timer = window.setTimeout(
+			() => setDebouncedSearch( search.trim() ),
+			PROJECT_SEARCH_DELAY
+		);
+
+		return () => window.clearTimeout( timer );
+	}, [ search ] );
 
 	useEffect( () => {
 		let current = true;
-		apiFetch< { items: Workspace[] } >( {
-			path: `${ rest }/workspaces/recent`,
+		const requestNumber = ++requestSequence.current;
+		loadingMoreRef.current = false;
+		setProjects( [] );
+		setLoading( true );
+		setLoadingMore( false );
+		setLoadError( '' );
+
+		apiFetch< ProjectsResponse >( {
+			path: getProjectsPath( debouncedSearch, 1 ),
 		} )
 			.then( ( response ) => {
-				if ( current ) {
+				if ( current && requestNumber === requestSequence.current ) {
 					setProjects( response.items );
+					setNextPage( 2 );
+					setTotal( response.total );
+					setHasMore( response.has_more );
 				}
 			} )
 			.catch( ( reason ) => {
-				if ( current ) {
+				if ( current && requestNumber === requestSequence.current ) {
 					setLoadError( reason.message );
+					setHasMore( false );
 				}
 			} )
 			.finally( () => {
-				if ( current ) {
+				if ( current && requestNumber === requestSequence.current ) {
 					setLoading( false );
 				}
 			} );
@@ -1205,71 +1261,184 @@ function RecentProjectsModal( {
 		return () => {
 			current = false;
 		};
-	}, [] );
+	}, [ debouncedSearch ] );
 
-	async function reopen( workspaceId: number ) {
-		setReopeningId( workspaceId );
+	const loadMore = useCallback( async () => {
+		if ( loading || loadingMoreRef.current || ! hasMore ) {
+			return;
+		}
+
+		const requestNumber = requestSequence.current;
+		const requestedPage = nextPage;
+		loadingMoreRef.current = true;
+		setLoadingMore( true );
 		setLoadError( '' );
 		try {
-			await onReopen( workspaceId );
+			const response = await apiFetch< ProjectsResponse >( {
+				path: getProjectsPath( debouncedSearch, requestedPage ),
+			} );
+			if ( requestNumber !== requestSequence.current ) {
+				return;
+			}
+			setProjects( ( current ) => {
+				const loadedIds = new Set( current.map( ( item ) => item.id ) );
+				return [
+					...current,
+					...response.items.filter(
+						( item ) => ! loadedIds.has( item.id )
+					),
+				];
+			} );
+			setNextPage( requestedPage + 1 );
+			setTotal( response.total );
+			setHasMore( response.has_more );
+		} catch ( reason: any ) {
+			if ( requestNumber === requestSequence.current ) {
+				setLoadError( reason.message );
+				setHasMore( false );
+			}
+		} finally {
+			if ( requestNumber === requestSequence.current ) {
+				loadingMoreRef.current = false;
+				setLoadingMore( false );
+			}
+		}
+	}, [ debouncedSearch, hasMore, loading, nextPage ] );
+
+	useEffect( () => {
+		const trigger = loadMoreTriggerRef.current;
+		if (
+			! trigger ||
+			! hasMore ||
+			loading ||
+			! ( 'IntersectionObserver' in window )
+		) {
+			return;
+		}
+
+		const observer = new window.IntersectionObserver(
+			( entries ) => {
+				if ( entries[ 0 ]?.isIntersecting ) {
+					void loadMore();
+				}
+			},
+			{ rootMargin: '240px 0px' }
+		);
+		observer.observe( trigger );
+
+		return () => observer.disconnect();
+	}, [ hasMore, loadMore, loading ] );
+
+	async function open( project: Workspace ) {
+		setOpeningId( project.id );
+		setLoadError( '' );
+		try {
+			await onOpen( project );
 			onClose();
 		} catch ( reason: any ) {
 			setLoadError( reason.message );
-			setReopeningId( null );
+			setOpeningId( null );
 		}
 	}
 
 	return (
 		<Modal
-			className="recent-projects-modal"
-			title={ __( 'Reopen recent', 'wp-autoplugin' ) }
+			className="all-projects-modal"
+			title={ __( 'All projects', 'wp-autoplugin' ) }
 			size="large"
-			isDismissible={ null === reopeningId }
+			isDismissible={ null === openingId }
 			onRequestClose={ onClose }
 		>
-			<p className="recent-projects__intro">
+			<p className="all-projects__intro">
 				{ __(
-					'Reopen one of your recently closed projects and continue where you left off.',
+					'Browse every project, switch to an open workspace, or reopen a closed one.',
 					'wp-autoplugin'
 				) }
 			</p>
+			<div className="all-projects__filter">
+				<TextControl
+					label={ __( 'Search projects', 'wp-autoplugin' ) }
+					value={ search }
+					onChange={ setSearch }
+					placeholder={ __(
+						'Search by project, request, or target',
+						'wp-autoplugin'
+					) }
+				/>
+				{ ! loading && (
+					<span
+						className="all-projects__result-count"
+						aria-live="polite"
+					>
+						{ sprintf(
+							/* translators: %d: Number of projects found. */
+							_n(
+								'%d project',
+								'%d projects',
+								total,
+								'wp-autoplugin'
+							),
+							total
+						) }
+					</span>
+				) }
+			</div>
 			{ loadError && (
 				<Notice status="error" isDismissible={ false }>
 					{ loadError }
 				</Notice>
 			) }
 			{ loading && (
-				<div className="recent-projects__loading" role="status">
+				<div className="all-projects__loading" role="status">
 					<Spinner />
-					{ __( 'Loading recent projects…', 'wp-autoplugin' ) }
+					{ __( 'Loading projects…', 'wp-autoplugin' ) }
 				</div>
 			) }
 			{ ! loading && ! loadError && ! projects.length && (
-				<div className="recent-projects__empty">
+				<div className="all-projects__empty">
 					<strong>
-						{ __( 'No closed projects yet', 'wp-autoplugin' ) }
+						{ debouncedSearch
+							? __( 'No matching projects', 'wp-autoplugin' )
+							: __( 'No projects yet', 'wp-autoplugin' ) }
 					</strong>
 					<p>
-						{ __(
-							'Projects will appear here after you close their workspace tabs.',
-							'wp-autoplugin'
-						) }
+						{ debouncedSearch
+							? __(
+									'Try a different project name, request, or target.',
+									'wp-autoplugin'
+							  )
+							: __(
+									'Projects will appear here after you create a workspace.',
+									'wp-autoplugin'
+							  ) }
 					</p>
 				</div>
 			) }
 			{ ! loading && projects.length > 0 && (
-				<ul className="recent-projects__list">
+				<ul className="all-projects__list">
 					{ projects.map( ( project ) => {
 						const targetName =
 							project.target_metadata?.name ||
 							project.project_name;
+						const isClosed = Boolean( project.is_closed );
+						const actionAriaLabel = isClosed
+							? sprintf(
+									/* translators: %s: Project name. */
+									__( 'Reopen %s', 'wp-autoplugin' ),
+									project.project_name
+							  )
+							: sprintf(
+									/* translators: %s: Project name. */
+									__( 'Open %s', 'wp-autoplugin' ),
+									project.project_name
+							  );
 						return (
 							<li
-								className="recent-projects__item"
+								className="all-projects__item"
 								key={ project.id }
 							>
-								<div className="recent-projects__details">
-									<div className="recent-projects__heading">
+								<div className="all-projects__details">
+									<div className="all-projects__heading">
 										<div>
 											<strong>
 												{ project.project_name }
@@ -1280,8 +1449,23 @@ function RecentProjectsModal( {
 												) }
 											</small>
 										</div>
+										<span
+											className={ `all-projects__state is-${
+												isClosed ? 'closed' : 'open'
+											}` }
+										>
+											{ isClosed
+												? __(
+														'Closed',
+														'wp-autoplugin'
+												  )
+												: __(
+														'Open',
+														'wp-autoplugin'
+												  ) }
+										</span>
 									</div>
-									<p className="recent-projects__request">
+									<p className="all-projects__request">
 										{ project.request }
 									</p>
 									<dl>
@@ -1309,10 +1493,15 @@ function RecentProjectsModal( {
 										</div>
 										<div>
 											<dt>
-												{ __(
-													'Closed',
-													'wp-autoplugin'
-												) }
+												{ isClosed
+													? __(
+															'Closed',
+															'wp-autoplugin'
+													  )
+													: __(
+															'Updated',
+															'wp-autoplugin'
+													  ) }
 											</dt>
 											<dd>
 												{ formatWorkspaceDate(
@@ -1323,30 +1512,51 @@ function RecentProjectsModal( {
 										</div>
 									</dl>
 								</div>
-								<RecentProjectActivity project={ project } />
+								<ProjectActivity project={ project } />
 								<Button
 									variant="secondary"
-									isBusy={ reopeningId === project.id }
-									disabled={ null !== reopeningId }
-									onClick={ () => reopen( project.id ) }
-									aria-label={ sprintf(
-										/* translators: %s: Project name. */
-										__( 'Reopen %s', 'wp-autoplugin' ),
-										project.project_name
-									) }
+									isBusy={ openingId === project.id }
+									disabled={ null !== openingId }
+									onClick={ () => open( project ) }
+									aria-label={ actionAriaLabel }
 								>
-									{ __( 'Reopen', 'wp-autoplugin' ) }
+									{ isClosed
+										? __( 'Reopen', 'wp-autoplugin' )
+										: __( 'Open', 'wp-autoplugin' ) }
 								</Button>
 							</li>
 						);
 					} ) }
 				</ul>
 			) }
+			{ ! loading && hasMore && (
+				<div
+					className="all-projects__load-more"
+					ref={ loadMoreTriggerRef }
+				>
+					<Button
+						variant="tertiary"
+						isBusy={ loadingMore }
+						disabled={ loadingMore }
+						onClick={ loadMore }
+					>
+						{ loadingMore
+							? __( 'Loading more projects…', 'wp-autoplugin' )
+							: __( 'Load more projects', 'wp-autoplugin' ) }
+					</Button>
+				</div>
+			) }
 		</Modal>
 	);
 }
 
-function RecentProjectActivity( { project }: { project: Workspace } ) {
+function getProjectsPath( search: string, page: number ): string {
+	return `${ rest }/projects?search=${ encodeURIComponent(
+		search
+	) }&page=${ page }&per_page=${ PROJECTS_PAGE_SIZE }`;
+}
+
+function ProjectActivity( { project }: { project: Workspace } ) {
 	const summary = project.activity_summary ?? {
 		total_jobs: 0,
 		follow_up_jobs: 0,
@@ -1391,14 +1601,14 @@ function RecentProjectActivity( { project }: { project: Workspace } ) {
 	];
 
 	return (
-		<div className="recent-projects__progress">
+		<div className="all-projects__progress">
 			<ul aria-label={ __( 'Project progress', 'wp-autoplugin' ) }>
 				{ stages.map( ( stage ) => {
 					const status = summary.stages[ stage ] ?? 'not_started';
 					return (
 						<li className={ `status--${ status }` } key={ stage }>
 							<span
-								className="recent-projects__stage-marker"
+								className="all-projects__stage-marker"
 								aria-hidden="true"
 							>
 								{ getActivityMarker( status ) }
@@ -4888,7 +5098,10 @@ function ReviewStage( {
 					{ (
 						[
 							[ 'issues', __( 'Issues', 'wp-autoplugin' ) ],
-							[ 'tests', __( 'Manual testing', 'wp-autoplugin' ) ],
+							[
+								'tests',
+								__( 'Manual testing', 'wp-autoplugin' ),
+							],
 							[
 								'discussion',
 								__( 'Discussion', 'wp-autoplugin' ),
@@ -5748,7 +5961,7 @@ function ReleasePanel( {
 				<Notice status="success" isDismissible={ false }>
 					<p>
 						{ __(
-							'Installed inactive. Activation remains a separate, explicit action.',
+							'Installed. Click Activate to enable the plugin on this site.',
 							'wp-autoplugin'
 						) }
 					</p>

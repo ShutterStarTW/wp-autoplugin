@@ -154,7 +154,7 @@ final class Workspace_Repository extends Repository {
 	}
 
 	/**
-	 * Add compact job, retry, and workflow-stage summaries to recent workspaces.
+	 * Add compact job, retry, and workflow-stage summaries to workspaces.
 	 *
 	 * @param array<int, array<string, mixed>> $workspaces Hydrated workspace rows.
 	 * @return array<int, array<string, mixed>>
@@ -330,6 +330,63 @@ final class Workspace_Repository extends Repository {
 			return 'code';
 		}
 		return in_array( $task, [ 'code', 'review' ], true ) ? $task : null;
+	}
+
+	/**
+	 * List all projects for the current user with server-side filtering and pagination.
+	 *
+	 * Projects currently have one workspace each, so workspace summaries provide the
+	 * operation, request, tab state, and durable activity needed by the project browser.
+	 *
+	 * @return array{items: array<int, array<string, mixed>>, page: int, per_page: int, total: int, total_pages: int, has_more: bool}
+	 */
+	public function list_projects( int $user_id, string $search = '', int $page = 1, int $per_page = 20 ): array {
+		$workspaces = Installer::table( 'workspaces' );
+		$projects   = Installer::table( 'projects' );
+		$targets    = Installer::table( 'targets' );
+		$jobs       = Installer::table( 'jobs' );
+		$search     = trim( sanitize_text_field( $search ) );
+		$page       = max( 1, $page );
+		$per_page   = max( 1, min( 50, $per_page ) );
+		$offset     = ( $page - 1 ) * $per_page;
+		$where      = 'WHERE w.created_by = %d';
+		$where_args = [ $user_id ];
+
+		if ( '' !== $search ) {
+			$like        = '%' . $this->wpdb->esc_like( $search ) . '%';
+			$where      .= ' AND (p.name LIKE %s OR w.request LIKE %s OR t.name LIKE %s OR t.ref LIKE %s)';
+			$where_args = array_merge( $where_args, [ $like, $like, $like, $like ] );
+		}
+
+		$total = (int) $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT COUNT(*) FROM $workspaces w INNER JOIN $projects p ON p.id = w.project_id
+				LEFT JOIN $targets t ON t.id = p.target_id $where",
+				...$where_args
+			) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tables are allow-listed and all values use generated placeholders.
+		);
+		$rows  = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT w.*, p.name AS project_name, t.kind AS target_kind, t.ref AS target_ref, t.metadata AS target_metadata,
+				(SELECT j.id FROM $jobs j WHERE j.workspace_id = w.id ORDER BY j.id DESC LIMIT 1) AS latest_job_id,
+				(SELECT j.status FROM $jobs j WHERE j.workspace_id = w.id ORDER BY j.id DESC LIMIT 1) AS latest_job_status
+				FROM $workspaces w INNER JOIN $projects p ON p.id = w.project_id
+				LEFT JOIN $targets t ON t.id = p.target_id $where
+				ORDER BY w.updated_at DESC, w.id DESC LIMIT %d OFFSET %d",
+				...array_merge( $where_args, [ $per_page, $offset ] )
+			), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tables are allow-listed and all values use generated placeholders.
+			ARRAY_A
+		);
+		$items = $this->add_activity_summaries( array_map( [ $this, 'hydrate' ], $rows ) );
+
+		return [
+			'items'       => $items,
+			'page'        => $page,
+			'per_page'    => $per_page,
+			'total'       => $total,
+			'total_pages' => $total ? (int) ceil( $total / $per_page ) : 0,
+			'has_more'    => ( $page * $per_page ) < $total,
+		];
 	}
 
 	/**

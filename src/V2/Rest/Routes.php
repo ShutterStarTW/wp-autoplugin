@@ -44,6 +44,16 @@ final class Routes {
 			'callback'            => [ $this, 'targets' ],
 			'permission_callback' => $permission,
 		] );
+		register_rest_route( self::NAMESPACE, '/projects', [
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => [ $this, 'projects' ],
+			'permission_callback' => $permission,
+			'args'                => [
+				'search'   => [ 'type' => 'string', 'default' => '', 'sanitize_callback' => 'sanitize_text_field' ],
+				'page'     => [ 'type' => 'integer', 'default' => 1, 'minimum' => 1 ],
+				'per_page' => [ 'type' => 'integer', 'default' => 20, 'minimum' => 1, 'maximum' => 50 ],
+			],
+		] );
 		register_rest_route( self::NAMESPACE, '/workspaces', [
 			[
 				'methods'             => \WP_REST_Server::READABLE,
@@ -293,6 +303,17 @@ final class Routes {
 
 	public function targets(): \WP_REST_Response {
 		return rest_ensure_response( [ 'items' => ( new Target_Scanner() )->all() ] );
+	}
+
+	public function projects( \WP_REST_Request $request ): \WP_REST_Response {
+		return rest_ensure_response(
+			( new Workspace_Repository() )->list_projects(
+				get_current_user_id(),
+				(string) $request['search'],
+				(int) $request['page'],
+				(int) $request['per_page']
+			)
+		);
 	}
 
 	public function workspaces(): \WP_REST_Response {
