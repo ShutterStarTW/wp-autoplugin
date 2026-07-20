@@ -4706,6 +4706,20 @@ function ReviewStage( {
 		? revisions.find( ( item ) => item.id === report.revision_id )
 				?.revision_number ?? report.revision_id
 		: 0;
+	const reviewRevisionLabel = ( id: number ) => {
+		const revisionItem = revisions.find( ( item ) => item.id === id );
+		return revisionItem
+			? sprintf(
+					/* translators: %d: immutable revision number. */
+					__( 'Revision %d', 'wp-autoplugin' ),
+					revisionItem.revision_number
+			  )
+			: sprintf(
+					/* translators: %d: revision record ID. */
+					__( 'Revision ID %d', 'wp-autoplugin' ),
+					id
+			  );
+	};
 	const releaseSafe = [ 'all_clear', 'cleared_with_dismissals' ].includes(
 		history?.current.status || ''
 	);
@@ -5312,9 +5326,27 @@ function ReviewStage( {
 										key={ job.id }
 									>
 										<div className="review-conversation__question">
-											<strong>
-												{ __( 'You', 'wp-autoplugin' ) }
-											</strong>
+											<div className="review-conversation__question-meta">
+												<strong>
+													{ __(
+														'You',
+														'wp-autoplugin'
+													) }
+												</strong>
+												{ ( job.result?.revision_id ??
+													job.payload.revision_id ??
+													0 ) > 0 && (
+													<small>
+														{ reviewRevisionLabel(
+															job.result
+																?.revision_id ??
+																job.payload
+																	.revision_id ??
+																0
+														) }
+													</small>
+												) }
+											</div>
 											<p>{ job.payload.message }</p>
 										</div>
 										<div className="review-conversation__answer">

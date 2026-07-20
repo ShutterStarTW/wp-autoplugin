@@ -2172,6 +2172,14 @@ body.wp-autoplugin-v2-distraction-free {
 		background: #e9efff;
 		margin-left: 80px;
 	}
+	&__question-meta {
+		align-items: center;
+		display: flex;
+		gap: 10px;
+		small {
+			color: $muted;
+		}
+	}
 	&__answer {
 		background: #f7f8fa;
 		border: 1px solid #d9dfe4;
