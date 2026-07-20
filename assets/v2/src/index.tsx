@@ -4566,7 +4566,6 @@ function ReviewStage( {
 	) => Promise< Job | null >;
 	onQueueEndpoint: ( path: string, data: object ) => Promise< Job | null >;
 } ) {
-	type ReviewView = 'issues' | 'tests' | 'discussion' | 'release';
 	const [ history, setHistory ] = useState< ReviewHistory | null >( null );
 	const [ report, setReport ] = useState< ReviewReport | null >( null );
 	const [ revision, setRevision ] = useState< RevisionManifest | null >(
@@ -4575,7 +4574,6 @@ function ReviewStage( {
 	const [ revisions, setRevisions ] = useState< RevisionSummary[] >( [] );
 	const [ selected, setSelected ] = useState< Set< number > >( new Set() );
 	const [ message, setMessage ] = useState( '' );
-	const [ view, setView ] = useState< ReviewView >( 'issues' );
 	const [ historyFinding, setHistoryFinding ] =
 		useState< ReviewFinding | null >( null );
 	const [ showReportHistory, setShowReportHistory ] = useState( false );
@@ -4651,6 +4649,10 @@ function ReviewStage( {
 	useEffect( () => {
 		load();
 	}, [ load, refreshKey ] );
+
+	useEffect( () => {
+		setCheckedTests( new Set() );
+	}, [ report?.id ] );
 
 	const activeArtifactJob = [ ...jobs ]
 		.reverse()
@@ -5090,43 +5092,7 @@ function ReviewStage( {
 							) }
 					</Notice>
 				) }
-			{ revision && (
-				<nav
-					className="review-subnav"
-					aria-label={ __( 'Review sections', 'wp-autoplugin' ) }
-				>
-					{ (
-						[
-							[ 'issues', __( 'Issues', 'wp-autoplugin' ) ],
-							[
-								'tests',
-								__( 'Manual testing', 'wp-autoplugin' ),
-							],
-							[
-								'discussion',
-								__( 'Discussion', 'wp-autoplugin' ),
-							],
-							[ 'release', __( 'Release', 'wp-autoplugin' ) ],
-						] as Array< [ ReviewView, string ] >
-					 ).map( ( [ key, label ] ) => (
-						<button
-							type="button"
-							key={ key }
-							className={ view === key ? 'is-active' : '' }
-							aria-pressed={ view === key }
-							onClick={ () => setView( key ) }
-						>
-							{ label }
-							{ key === 'issues' &&
-								actionableFindings.length > 0 && (
-									<span>{ actionableFindings.length }</span>
-								) }
-						</button>
-					) ) }
-				</nav>
-			) }
 			{ ! activeArtifactJob &&
-				view === 'issues' &&
 				revision &&
 				( ! report || ! currentReport ) && (
 					<Button
@@ -5138,7 +5104,6 @@ function ReviewStage( {
 					</Button>
 				) }
 			{ ! activeArtifactJob &&
-				view === 'issues' &&
 				currentReport &&
 				latestReviewJob &&
 				[ 'failed', 'cancelled' ].includes(
@@ -5151,19 +5116,13 @@ function ReviewStage( {
 
 			{ report && (
 				<>
-					<section
-						className="review-summary"
-						hidden={ view !== 'issues' }
-					>
+					<section className="review-summary">
 						<div className="review-summary__verdict">
 							<Markdown content={ report.summary } />
 						</div>
 					</section>
 
-					<section
-						className="review-findings"
-						hidden={ view !== 'issues' }
-					>
+					<section className="review-findings">
 						<div className="review-findings__heading">
 							<h4>{ __( 'Issues', 'wp-autoplugin' ) }</h4>
 							{ currentReport && openFindings.length > 0 && (
@@ -5333,143 +5292,102 @@ function ReviewStage( {
 						</Modal>
 					) }
 
-					<section
-						className="review-tests"
-						hidden={ view !== 'tests' }
-					>
-						<h4>{ __( 'Suggested tests', 'wp-autoplugin' ) }</h4>
-						<p>
-							{ __(
-								'These tests have not been run.',
-								'wp-autoplugin'
-							) }
-						</p>
-						{ report.tests.length ? (
-							<ol>
-								{ report.tests.map( ( test, index ) => (
-									<li key={ `${ test.title }:${ index }` }>
-										<label
-											htmlFor={ `review-test-${ report.id }-${ index }` }
-										>
-											<input
-												id={ `review-test-${ report.id }-${ index }` }
-												type="checkbox"
-												checked={ checkedTests.has(
-													index
-												) }
-												onChange={ ( event ) =>
-													setCheckedTests(
-														( current ) => {
-															const next =
-																new Set(
-																	current
-																);
-															if (
-																event.target
-																	.checked
-															) {
-																next.add(
-																	index
-																);
-															} else {
-																next.delete(
-																	index
-																);
-															}
-															return next;
-														}
-													)
-												}
-											/>
-											<strong>{ test.title }</strong>
-										</label>
-										<ul>
-											{ test.steps.map( ( step ) => (
-												<li key={ step }>{ step }</li>
-											) ) }
-										</ul>
-										<p>
-											<strong>
-												{ __(
-													'Expected:',
-													'wp-autoplugin'
-												) }
-											</strong>{ ' ' }
-											{ test.expected }
-										</p>
-									</li>
-								) ) }
-							</ol>
-						) : (
+					<section className="review-conversation">
+						<header>
+							<h4>
+								{ __( 'Follow-up questions', 'wp-autoplugin' ) }
+							</h4>
 							<p>
 								{ __(
-									'No manual test cases were supplied.',
+									'Ask the reviewer to explain a finding or reconsider the current Review.',
 									'wp-autoplugin'
 								) }
 							</p>
-						) }
-					</section>
-
-					<section
-						className="review-conversation"
-						hidden={ view !== 'discussion' }
-					>
-						<h4>{ __( 'Discuss the review', 'wp-autoplugin' ) }</h4>
-						{ conversationJobs.map( ( job ) => (
-							<div
-								className="review-conversation__message"
-								key={ job.id }
-							>
-								<p>
-									<strong>
-										{ __( 'You', 'wp-autoplugin' ) }
-									</strong>{ ' ' }
-									{ job.payload.message }
-								</p>
-								{ job.status === 'completed' &&
-									job.result?.outcome === 'report' && (
-										<Notice
-											status="info"
-											isDismissible={ false }
-										>
-											{ __(
-												'The review was updated.',
-												'wp-autoplugin'
+						</header>
+						{ conversationJobs.length > 0 && (
+							<div className="review-conversation__messages">
+								{ conversationJobs.map( ( job ) => (
+									<article
+										className="review-conversation__message"
+										key={ job.id }
+									>
+										<div className="review-conversation__question">
+											<strong>
+												{ __( 'You', 'wp-autoplugin' ) }
+											</strong>
+											<p>{ job.payload.message }</p>
+										</div>
+										<div className="review-conversation__answer">
+											<strong>
+												{ __(
+													'Reviewer',
+													'wp-autoplugin'
+												) }
+											</strong>
+											{ job.status === 'completed' &&
+												job.result?.outcome ===
+													'report' && (
+													<Notice
+														status="info"
+														isDismissible={ false }
+													>
+														{ __(
+															'The review was updated.',
+															'wp-autoplugin'
+														) }
+													</Notice>
+												) }
+											{ job.status === 'completed' &&
+												job.result?.outcome !==
+													'report' && (
+													<Markdown
+														content={
+															job.result
+																?.content || ''
+														}
+													/>
+												) }
+											{ job.status !== 'completed' && (
+												<JobStatus
+													job={ job }
+													onCancel={ onCancel }
+												/>
 											) }
-										</Notice>
-									) }
-								{ job.status === 'completed' &&
-									job.result?.outcome !== 'report' && (
-										<Markdown
-											content={
-												job.result?.content || ''
-											}
-										/>
-									) }
-								{ job.status !== 'completed' && (
-									<JobStatus
-										job={ job }
-										onCancel={ onCancel }
-									/>
-								) }
+										</div>
+									</article>
+								) ) }
 							</div>
-						) ) }
+						) }
 						<TextareaControl
-							label={ __(
-								'Ask about or update the Review',
-								'wp-autoplugin'
-							) }
+							label={ __( 'Ask a follow-up', 'wp-autoplugin' ) }
 							placeholder={ __(
 								'Ask a question, request reconsideration, or ask for another area to be inspected…',
 								'wp-autoplugin'
 							) }
 							value={ message }
 							onChange={ setMessage }
+							onKeyDown={ ( event ) => {
+								if (
+									'Enter' === event.key &&
+									! event.shiftKey &&
+									! event.nativeEvent.isComposing
+								) {
+									event.preventDefault();
+									sendMessage();
+								}
+							} }
 							disabled={ ! currentReport || !! activeArtifactJob }
-							help={ __(
-								'To change code, use Fix on an issue.',
-								'wp-autoplugin'
-							) }
+							help={
+								currentReport
+									? __(
+											'To change code, use Fix on an issue.',
+											'wp-autoplugin'
+									  )
+									: __(
+											'Review latest before asking another question.',
+											'wp-autoplugin'
+									  )
+							}
 						/>
 						<Button
 							variant="primary"
@@ -5485,24 +5403,8 @@ function ReviewStage( {
 					</section>
 				</>
 			) }
-			{ ! report && revision && view === 'tests' && (
-				<Notice status="info" isDismissible={ false }>
-					{ __(
-						'Start Review to get suggested tests.',
-						'wp-autoplugin'
-					) }
-				</Notice>
-			) }
-			{ ! report && revision && view === 'discussion' && (
-				<Notice status="info" isDismissible={ false }>
-					{ __(
-						'Start Review before asking the reviewer a question.',
-						'wp-autoplugin'
-					) }
-				</Notice>
-			) }
 
-			{ revision && view === 'release' && (
+			{ revision && (
 				<ReleasePanel
 					revision={ revision }
 					capability={ releaseCapability }
@@ -5517,6 +5419,22 @@ function ReviewStage( {
 					releaseJobs={ releaseJobs }
 					onQueueEndpoint={ onQueueEndpoint }
 					onDownload={ downloadPackage }
+					manualTests={ report?.tests ?? [] }
+					manualTestStatus={
+						history?.current.status || 'not_started'
+					}
+					checkedTests={ checkedTests }
+					onToggleTest={ ( index, checked ) =>
+						setCheckedTests( ( current ) => {
+							const next = new Set( current );
+							if ( checked ) {
+								next.add( index );
+							} else {
+								next.delete( index );
+							}
+							return next;
+						} )
+					}
 				/>
 			) }
 			{ historyFinding && (
@@ -5708,6 +5626,10 @@ function ReleasePanel( {
 	releaseJobs,
 	onQueueEndpoint,
 	onDownload,
+	manualTests,
+	manualTestStatus,
+	checkedTests,
+	onToggleTest,
 }: {
 	revision: RevisionManifest;
 	capability: ReleaseCapability | null;
@@ -5724,6 +5646,10 @@ function ReleasePanel( {
 	releaseJobs: Job[];
 	onQueueEndpoint: ( path: string, data: object ) => Promise< Job | null >;
 	onDownload: ( packageId: number ) => void;
+	manualTests: ReviewTest[];
+	manualTestStatus: ReviewHistory[ 'current' ][ 'status' ];
+	checkedTests: Set< number >;
+	onToggleTest: ( index: number, checked: boolean ) => void;
 } ) {
 	const installed = [ ...releaseJobs ]
 		.filter(
@@ -5772,7 +5698,10 @@ function ReleasePanel( {
 	return (
 		<section className="release-panel">
 			<header>
-				<h3>{ __( 'Release', 'wp-autoplugin' ) }</h3>
+				<div>
+					<p>{ __( 'Deployment', 'wp-autoplugin' ) }</p>
+					<h3>{ __( 'Release', 'wp-autoplugin' ) }</h3>
+				</div>
 				<small>
 					{ sprintf(
 						/* translators: %d: Revision number. */
@@ -6006,6 +5935,105 @@ function ReleasePanel( {
 				</Notice>
 			) }
 
+			<details className="release-panel__testing">
+				<summary>
+					<span>
+						<strong>
+							{ __( 'Manual testing', 'wp-autoplugin' ) }
+						</strong>
+						<small>
+							{ manualTests.length
+								? sprintf(
+										/* translators: %d: Number of suggested manual tests. */
+										__(
+											'%d suggested checks',
+											'wp-autoplugin'
+										),
+										manualTests.length
+								  )
+								: __(
+										'Review-generated checks',
+										'wp-autoplugin'
+								  ) }
+						</small>
+					</span>
+				</summary>
+				<div className="release-panel__testing-content">
+					<p>
+						{ themeDisabled
+							? __(
+									'Deploy the changes to a test site with the theme active before working through these checks.',
+									'wp-autoplugin'
+							  )
+							: __(
+									'Install this release and activate the plugin on a test site before working through these checks.',
+									'wp-autoplugin'
+							  ) }
+					</p>
+					{ manualTestStatus === 'stale' &&
+						manualTests.length > 0 && (
+							<Notice status="warning" isDismissible={ false }>
+								{ __(
+									'These suggestions belong to an earlier revision. Review latest to refresh them before testing.',
+									'wp-autoplugin'
+								) }
+							</Notice>
+						) }
+					{ manualTests.length > 0 ? (
+						<ol className="release-panel__test-list">
+							{ manualTests.map( ( test, index ) => (
+								<li key={ `${ test.title }:${ index }` }>
+									<label
+										htmlFor={ `release-test-${ revision.id }-${ index }` }
+									>
+										<input
+											id={ `release-test-${ revision.id }-${ index }` }
+											type="checkbox"
+											checked={ checkedTests.has(
+												index
+											) }
+											onChange={ ( event ) =>
+												onToggleTest(
+													index,
+													event.target.checked
+												)
+											}
+										/>
+										<strong>{ test.title }</strong>
+									</label>
+									<ul>
+										{ test.steps.map( ( step ) => (
+											<li key={ step }>{ step }</li>
+										) ) }
+									</ul>
+									<p>
+										<strong>
+											{ __(
+												'Expected:',
+												'wp-autoplugin'
+											) }
+										</strong>{ ' ' }
+										{ test.expected }
+									</p>
+								</li>
+							) ) }
+						</ol>
+					) : (
+						<p className="release-panel__testing-empty">
+							{ manualTestingEmptyLabel( manualTestStatus ) }
+						</p>
+					) }
+					{ manualTests.length > 0 && (
+						<small>
+							{ __(
+								'Checklist progress is kept only for this browser session.',
+								'wp-autoplugin'
+							) }
+						</small>
+					) }
+				</div>
+			</details>
+
 			{ releaseJobs.length > 0 && (
 				<details className="release-panel__jobs">
 					<summary>
@@ -6077,6 +6105,39 @@ function reviewStatusLabel( status: string ): string {
 		default:
 			return __( 'Not started', 'wp-autoplugin' );
 	}
+}
+
+function manualTestingEmptyLabel(
+	status: ReviewHistory[ 'current' ][ 'status' ]
+): string {
+	if ( status === 'not_started' ) {
+		return __(
+			'Start Review to generate suggested manual checks for this revision.',
+			'wp-autoplugin'
+		);
+	}
+	if ( status === 'in_progress' ) {
+		return __(
+			'Suggested manual checks will appear when Review completes.',
+			'wp-autoplugin'
+		);
+	}
+	if ( status === 'failed' ) {
+		return __(
+			'Retry Review to generate suggested manual checks.',
+			'wp-autoplugin'
+		);
+	}
+	if ( status === 'stale' ) {
+		return __(
+			'Review latest to generate manual checks for this revision.',
+			'wp-autoplugin'
+		);
+	}
+	return __(
+		'The current Review did not include any manual test cases.',
+		'wp-autoplugin'
+	);
 }
 
 function ExplainStage( {

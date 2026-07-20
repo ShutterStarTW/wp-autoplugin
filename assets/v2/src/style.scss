@@ -1906,44 +1906,6 @@ body.wp-autoplugin-v2-distraction-free {
 		margin: 12px 0;
 	}
 }
-.review-subnav {
-	border-bottom: 1px solid #d9dfe4;
-	display: flex;
-	gap: 2px;
-	margin: -4px 0 20px;
-	overflow-x: auto;
-	button {
-		align-items: center;
-		background: transparent;
-		border: 0;
-		border-bottom: 2px solid transparent;
-		color: #4c5962;
-		cursor: pointer;
-		display: flex;
-		font-weight: 600;
-		gap: 6px;
-		margin-bottom: -1px;
-		padding: 10px 14px;
-		white-space: nowrap;
-		&:hover,
-		&:focus-visible {
-			color: $accent;
-		}
-		&.is-active {
-			border-bottom-color: $accent;
-			color: $accent;
-		}
-		span {
-			background: #e8ebee;
-			border-radius: 999px;
-			font-size: 11px;
-			line-height: 18px;
-			min-width: 18px;
-			padding: 0 5px;
-			text-align: center;
-		}
-	}
-}
 .review-verdict {
 	background: #f0f2f4;
 	border: 1px solid #d1d7dc;
@@ -1989,9 +1951,7 @@ body.wp-autoplugin-v2-distraction-free {
 	}
 }
 .review-findings,
-.review-tests,
-.review-conversation,
-.release-panel {
+.review-conversation {
 	margin-top: 20px;
 }
 .review-findings {
@@ -2180,54 +2140,67 @@ body.wp-autoplugin-v2-distraction-free {
 	background: rgba(255, 207, 76, 0.32);
 	border-bottom: 1px solid rgba(170, 119, 0, 0.35);
 }
-.review-tests {
-	> h4,
-	> p {
-		margin: 0 0 6px;
-	}
-	> p {
-		color: $muted;
-	}
-	> ol {
-		padding-left: 24px;
-		> li {
-			border-bottom: 1px solid #e0e4e7;
-			padding: 10px 0;
-		}
-		label {
-			align-items: center;
-			display: flex;
-			gap: 8px;
+.review-conversation {
+	border-top: 1px solid #d9dfe4;
+	margin-top: 28px;
+	padding-top: 24px;
+	> header {
+		h4 {
+			font-size: 16px;
+			margin: 0;
 		}
 		p {
-			margin-bottom: 0;
+			color: $muted;
+			margin: 5px 0 0;
 		}
 	}
-}
-.review-conversation {
-	> h4 {
-		margin-top: 0;
+	&__messages {
+		margin-top: 18px;
 	}
 	&__message {
+		margin-bottom: 16px;
+	}
+	&__question,
+	&__answer {
+		border-radius: 7px;
+		padding: 12px 16px;
+		> p {
+			margin: 4px 0 0;
+		}
+	}
+	&__question {
+		background: #e9efff;
+		margin-left: 80px;
+	}
+	&__answer {
 		background: #f7f8fa;
 		border: 1px solid #d9dfe4;
-		border-radius: 6px;
-		margin-bottom: 10px;
-		padding: 12px 14px;
-		> p {
-			margin-top: 0;
+		margin-right: 40px;
+		margin-top: 8px;
+		.job-result {
+			border: 0;
+			margin: 8px 0 0;
+			padding: 0;
 		}
 	}
 	.components-base-control {
-		margin-top: 14px;
+		margin-top: 18px;
 	}
 }
 .release-panel {
+	background: #f7f8fa;
+	border: 1px solid #d5dce2;
+	border-radius: 8px;
+	margin-top: 32px;
+	padding: 20px;
 	> header {
 		align-items: flex-start;
+		border-bottom: 1px solid #d9dfe4;
 		display: flex;
 		gap: 20px;
 		justify-content: space-between;
+		margin-bottom: 18px;
+		padding-bottom: 14px;
 		p {
 			color: $accent;
 			font-size: 11px;
@@ -2260,7 +2233,7 @@ body.wp-autoplugin-v2-distraction-free {
 	}
 	&__fork,
 	&__advanced {
-		background: #f7f8fa;
+		background: #fff;
 		border: 1px solid #d9dfe4;
 		border-radius: 6px;
 		margin-top: 16px;
@@ -2285,7 +2258,7 @@ body.wp-autoplugin-v2-distraction-free {
 		}
 	}
 	&__transform-preview {
-		background: #fff;
+		background: #f7f8fa;
 		border: 1px solid #dfe3e6;
 		border-radius: 5px;
 		margin: 12px 0;
@@ -2306,6 +2279,66 @@ body.wp-autoplugin-v2-distraction-free {
 			min-width: 0;
 			overflow-wrap: anywhere;
 		}
+	}
+	&__testing {
+		background: #fff;
+		border: 1px solid #d9dfe4;
+		border-radius: 6px;
+		margin-top: 18px;
+		padding: 13px 15px;
+		> summary {
+			cursor: pointer;
+			font-weight: 600;
+			> span {
+				display: inline-flex;
+				flex-direction: column;
+				gap: 2px;
+				margin-left: 4px;
+				vertical-align: middle;
+			}
+			small {
+				color: $muted;
+				font-weight: 400;
+			}
+		}
+	}
+	&__testing-content {
+		border-top: 1px solid #e0e4e7;
+		margin-top: 12px;
+		padding-top: 12px;
+		> p:first-child {
+			color: #4c5962;
+			margin-top: 0;
+		}
+		> small {
+			color: $muted;
+			display: block;
+			margin-top: 12px;
+		}
+	}
+	&__test-list {
+		margin-bottom: 0;
+		padding-left: 24px;
+		> li {
+			border-bottom: 1px solid #e0e4e7;
+			padding: 10px 0;
+			&:last-child {
+				border-bottom: 0;
+			}
+		}
+		label {
+			align-items: center;
+			display: flex;
+			gap: 8px;
+		}
+		p {
+			margin-bottom: 0;
+		}
+	}
+	&__testing-empty {
+		background: #f7f8fa;
+		border-radius: 5px;
+		padding: 12px;
 	}
 	&__jobs {
 		border-top: 1px solid #d9dfe4;
@@ -2347,9 +2380,6 @@ body.wp-autoplugin-v2-distraction-free {
 	.review-stage__header-actions {
 		justify-content: space-between;
 	}
-	.review-subnav button {
-		padding-inline: 10px;
-	}
 	.review-findings__heading,
 	.review-finding__footer {
 		align-items: stretch;
@@ -2364,6 +2394,14 @@ body.wp-autoplugin-v2-distraction-free {
 	}
 	.review-finding__footer > .components-button {
 		max-width: 100%;
+	}
+	.review-conversation__question,
+	.review-conversation__answer {
+		margin-left: 0;
+		margin-right: 0;
+	}
+	.release-panel {
+		padding: 16px;
 	}
 	.release-panel__jobs li {
 		align-items: flex-start;
