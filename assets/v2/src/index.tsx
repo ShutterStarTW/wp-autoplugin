@@ -961,7 +961,8 @@ function App() {
 	const [ jobsLoading, setJobsLoading ] = useState( false );
 	const [ activeTab, setActiveTab ] = useState( 'plan' );
 	const [ error, setError ] = useState( '' );
-	const [ busy, setBusy ] = useState( true );
+	const [ initializing, setInitializing ] = useState( true );
+	const [ busy, setBusy ] = useState( false );
 	const [ allProjectsOpen, setAllProjectsOpen ] = useState( false );
 	const [ distractionFree, setDistractionFree ] = useState(
 		() => 'true' === window.localStorage.getItem( DISTRACTION_FREE_KEY )
@@ -1016,7 +1017,7 @@ function App() {
 				);
 			} )
 			.catch( ( reason ) => setError( reason.message ) )
-			.finally( () => setBusy( false ) );
+			.finally( () => setInitializing( false ) );
 	}, [ refreshBootstrap ] );
 
 	const activeWorkspace = useMemo(
@@ -1444,7 +1445,7 @@ function App() {
 		}
 	}
 
-	if ( busy && ! bootstrap ) {
+	if ( initializing ) {
 		return <WorkspaceLoader />;
 	}
 
