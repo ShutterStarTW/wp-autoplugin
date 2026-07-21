@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
  * Creates and upgrades v2 operational tables.
  */
 final class Installer {
-	public const SCHEMA_VERSION = '10';
+	public const SCHEMA_VERSION = '11';
 	private const OPTION_NAME   = 'wp_autoplugin_v2_schema_version';
 
 	/**
@@ -56,6 +56,8 @@ final class Installer {
 			'release_packages',
 			'promotions',
 			'promotion_files',
+			'prompt_attachments',
+			'job_prompt_attachments',
 		];
 
 		if ( ! in_array( $suffix, $allowed, true ) ) {
@@ -185,6 +187,33 @@ final class Installer {
 			created_at datetime NOT NULL,
 			PRIMARY KEY  (id),
 			UNIQUE KEY job_sequence (job_id,sequence)
+		) $charset;";
+
+		$sql[] = 'CREATE TABLE ' . self::table( 'prompt_attachments' ) . " (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			workspace_id bigint(20) unsigned NOT NULL,
+			created_by bigint(20) unsigned NOT NULL,
+			filename varchar(255) NOT NULL,
+			mime_type varchar(50) NOT NULL,
+			byte_size bigint(20) unsigned NOT NULL,
+			width int(10) unsigned NOT NULL,
+			height int(10) unsigned NOT NULL,
+			sha256 char(64) NOT NULL,
+			content longblob NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			KEY workspace_id (workspace_id),
+			KEY created_by (created_by),
+			KEY workspace_hash (workspace_id,sha256)
+		) $charset;";
+
+		$sql[] = 'CREATE TABLE ' . self::table( 'job_prompt_attachments' ) . " (
+			job_id bigint(20) unsigned NOT NULL,
+			attachment_id bigint(20) unsigned NOT NULL,
+			sequence smallint(5) unsigned NOT NULL,
+			PRIMARY KEY  (job_id,attachment_id),
+			UNIQUE KEY job_sequence (job_id,sequence),
+			KEY attachment_id (attachment_id)
 		) $charset;";
 
 		$sql[] = 'CREATE TABLE ' . self::table( 'usage' ) . " (
@@ -562,7 +591,8 @@ final class Installer {
 			$review_release_tables,
 			static fn( string $table ): bool => ! self::table_exists( self::table( $table ) )
 		);
-		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && $revision_file_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) && $review_release_ready && $release_package_ready ) {
+		$prompt_attachment_ready = self::table_exists( self::table( 'prompt_attachments' ) ) && self::table_exists( self::table( 'job_prompt_attachments' ) );
+		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && $revision_file_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) && $review_release_ready && $release_package_ready && $prompt_attachment_ready ) {
 			update_option( self::OPTION_NAME, self::SCHEMA_VERSION, false );
 		}
 	}

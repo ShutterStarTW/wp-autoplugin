@@ -146,4 +146,36 @@ final class SchemaUpgradeTest extends WP_UnitTestCase {
 		$this->assertSame( 'header_transforms', $wpdb->get_var( "SHOW COLUMNS FROM $packages LIKE 'header_transforms'" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
 		$wpdb->delete( $revisions, [ 'id' => $revision_id ] );
 	}
+
+	public function test_version_ten_upgrade_preserves_existing_data_and_adds_prompt_attachment_tables(): void {
+		global $wpdb;
+
+		Installer::activate();
+		$revisions = Installer::table( 'revisions' );
+		$wpdb->insert(
+			$revisions,
+			[
+				'workspace_id'    => 987657,
+				'revision_number' => 1,
+				'status'          => 'staged',
+				'summary'         => 'Version ten fixture',
+				'origin'          => 'ai',
+				'created_by'      => 1,
+				'created_at'      => current_time( 'mysql', true ),
+			]
+		);
+		$revision_id = (int) $wpdb->insert_id;
+		$wpdb->query( 'DROP TABLE ' . Installer::table( 'job_prompt_attachments' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Internal allow-listed test table.
+		$wpdb->query( 'DROP TABLE ' . Installer::table( 'prompt_attachments' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Internal allow-listed test table.
+		update_option( 'wp_autoplugin_v2_schema_version', '10', false );
+
+		Installer::maybe_upgrade();
+
+		$this->assertSame( Installer::SCHEMA_VERSION, get_option( 'wp_autoplugin_v2_schema_version' ) );
+		$this->assertSame( 'Version ten fixture', $wpdb->get_var( $wpdb->prepare( "SELECT summary FROM $revisions WHERE id = %d", $revision_id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		foreach ( [ 'prompt_attachments', 'job_prompt_attachments' ] as $table ) {
+			$this->assertSame( Installer::table( $table ), $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', Installer::table( $table ) ) ) );
+		}
+		$wpdb->delete( $revisions, [ 'id' => $revision_id ] );
+	}
 }

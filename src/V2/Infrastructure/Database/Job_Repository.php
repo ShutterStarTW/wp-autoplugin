@@ -374,6 +374,7 @@ final class Job_Repository extends Repository {
 		}
 		$row['payload'] = $this->decode( $row['payload'] );
 		$row['result']  = $this->decode( $row['result'] );
+		$row['prompt_attachments'] = ( new Prompt_Attachment_Repository( $this->wpdb ) )->for_job( (int) $row['id'] );
 
 		return $row;
 	}

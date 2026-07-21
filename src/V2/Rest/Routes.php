@@ -16,6 +16,8 @@ use WP_Autoplugin\V2\Infrastructure\Database\Code_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Review_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Release_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
+use WP_Autoplugin\V2\Domain\AI\Prompt_Image_Validator;
 
 /**
  * Capability-checked REST interface for the v2 admin application.
@@ -139,8 +141,15 @@ final class Routes {
 			'args'                => [
 				'workspace_id' => [ 'required' => true, 'type' => 'integer', 'minimum' => 1 ],
 				'task'         => [ 'required' => true, 'type' => 'string', 'enum' => self::TASKS ],
-				'payload'      => [ 'type' => 'object', 'default' => [] ],
+				'payload'      => [ 'default' => [] ],
+				'prompt_attachment_ids' => [ 'default' => [] ],
 			],
+		] );
+		register_rest_route( self::NAMESPACE, '/prompt-attachments/(?P<id>\d+)', [
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => [ $this, 'prompt_attachment' ],
+			'permission_callback' => $permission,
+			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
 		] );
 		register_rest_route( self::NAMESPACE, '/jobs/(?P<id>\d+)', [
 			'methods'             => \WP_REST_Server::READABLE,
@@ -410,7 +419,26 @@ final class Routes {
 
 		$jobs    = new Job_Repository();
 		$task    = (string) $request['task'];
-		$payload = (array) $request['payload'];
+		$payload = $this->normalize_job_payload( $request['payload'] );
+		if ( is_wp_error( $payload ) ) {
+			return $payload;
+		}
+		$images = ( new Prompt_Image_Validator() )->uploads( $request->get_file_params() );
+		if ( is_wp_error( $images ) ) {
+			return $images;
+		}
+		$reuse_ids  = $this->normalize_attachment_ids( $request['prompt_attachment_ids'] );
+		if ( is_wp_error( $reuse_ids ) ) {
+			return $reuse_ids;
+		}
+		$reuse_valid = $this->validate_attachment_reuse( $reuse_ids, $images, $workspace_id, get_current_user_id() );
+		if ( is_wp_error( $reuse_valid ) ) {
+			return $reuse_valid;
+		}
+		$has_images = ! empty( $images ) || ! empty( $reuse_ids );
+		if ( $has_images && ! in_array( $task, [ 'plan', 'explain', 'conversation' ], true ) ) {
+			return new \WP_Error( 'wp_autoplugin_prompt_images_unavailable', __( 'Prompt images are only accepted by actions with a free-form message.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		}
 		if ( 'code' === $task ) {
 			$payload = $this->code_payload( $payload, $workspace, $jobs );
 			if ( is_wp_error( $payload ) ) {
@@ -430,10 +458,20 @@ final class Routes {
 			}
 		}
 		if ( 'conversation' === $task ) {
-			$payload = $this->conversation_payload( $payload, $workspace, $jobs );
+			$payload = $this->conversation_payload( $payload, $workspace, $jobs, $has_images );
 			if ( is_wp_error( $payload ) ) {
 				return $payload;
 			}
+		}
+		if ( in_array( $task, [ 'plan', 'explain' ], true ) && '' === trim( (string) $workspace['request'] ) && ! $has_images ) {
+			return new \WP_Error( 'wp_autoplugin_prompt_required', __( 'Enter a message or attach at least one image.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		}
+		if ( $has_images ) {
+			$capability = $this->prompt_image_capability( $task, $payload, $workspace );
+			if ( ! $capability['available'] || empty( $capability['images'] ) ) {
+				return new \WP_Error( 'wp_autoplugin_prompt_images_unsupported', __( 'The selected model does not support prompt images for this stage.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+			}
+			$payload['prompt_model'] = [ 'provider' => $capability['provider'], 'model' => $capability['model'], 'effort' => $capability['effort'] ?? '' ];
 		}
 		$agent_job = [ 'task' => $task, 'payload' => $payload ];
 		if ( Agent_Task::uses_source_tools( $agent_job, $workspace ) ) {
@@ -461,6 +499,14 @@ final class Routes {
 		$job = null;
 		try {
 			$job    = $jobs->create( $workspace_id, $task, $payload, get_current_user_id() );
+			if ( $has_images ) {
+				$attached = ( new Prompt_Attachment_Repository() )->attach( (int) $job['id'], $workspace_id, get_current_user_id(), $images, $reuse_ids );
+				if ( is_wp_error( $attached ) ) {
+					$jobs->update( (int) $job['id'], [ 'status' => 'failed', 'error_message' => $attached->get_error_message(), 'finished_at' => current_time( 'mysql', true ) ] );
+					return $attached;
+				}
+				$job = $jobs->find( (int) $job['id'] );
+			}
 			$runner = ( new Queue() )->dispatch( $job['id'] );
 			$jobs->update( $job['id'], [ 'runner' => $runner ] );
 
@@ -479,6 +525,21 @@ final class Routes {
 			}
 			return new \WP_Error( 'wp_autoplugin_job_error', $error->getMessage(), [ 'status' => 409 === $error->getCode() ? 409 : 500 ] );
 		}
+	}
+
+	/** Prepare an authorized private prompt image for binary streaming. */
+	public function prompt_attachment( \WP_REST_Request $request ) {
+		$attachment = ( new Prompt_Attachment_Repository() )->find( (int) $request['id'], false );
+		if ( ! $attachment || (int) $attachment['created_by'] !== get_current_user_id() || ! $this->workspace_for_current_user( (int) $attachment['workspace_id'] ) ) {
+			return new \WP_Error( 'wp_autoplugin_prompt_attachment_not_found', __( 'Prompt image not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+		$response = new \WP_REST_Response( [ 'wp_autoplugin_prompt_attachment' => (int) $attachment['id'] ] );
+		$response->header( 'Content-Type', (string) $attachment['mime_type'] );
+		$response->header( 'Content-Disposition', 'inline; filename="' . sanitize_file_name( (string) $attachment['filename'] ) . '"' );
+		$response->header( 'Content-Length', (string) (int) $attachment['byte_size'] );
+		$response->header( 'X-Content-Type-Options', 'nosniff' );
+		$response->header( 'Cache-Control', 'private, no-store, max-age=0' );
+		return $response;
 	}
 
 	/**
@@ -825,12 +886,28 @@ final class Routes {
 		return $response;
 	}
 
-	/** Stream only a package marker that passed the normal REST permission callback. */
+	/** Stream only a binary marker that passed the normal REST permission callback. */
 	public function serve_package_download( bool $served, $result, \WP_REST_Request $request, $server ): bool {
 		if ( $served || ! $result instanceof \WP_HTTP_Response ) {
 			return $served;
 		}
 		$data = $result->get_data();
+		$attachment_id = is_array( $data ) ? absint( $data['wp_autoplugin_prompt_attachment'] ?? 0 ) : 0;
+		if ( $attachment_id ) {
+			$attachment = ( new Prompt_Attachment_Repository() )->find( $attachment_id );
+			if ( ! $attachment || (int) $attachment['created_by'] !== get_current_user_id() || ! $this->workspace_for_current_user( (int) $attachment['workspace_id'] ) ) {
+				return $served;
+			}
+			if ( ! headers_sent() ) {
+				header( 'Content-Type: ' . (string) $attachment['mime_type'] );
+				header( 'Content-Disposition: inline; filename="' . sanitize_file_name( (string) $attachment['filename'] ) . '"' );
+				header( 'Content-Length: ' . (int) $attachment['byte_size'] );
+				header( 'X-Content-Type-Options: nosniff' );
+				header( 'Cache-Control: private, no-store, max-age=0' );
+			}
+			echo (string) $attachment['content']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Authorized validated binary image response.
+			return true;
+		}
 		$id   = is_array( $data ) ? absint( $data['wp_autoplugin_package_download'] ?? 0 ) : 0;
 		if ( ! $id ) {
 			return $served;
@@ -983,17 +1060,17 @@ final class Routes {
 	 * @param array<string, mixed> $payload Raw REST payload.
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function conversation_payload( array $payload, array $workspace, Job_Repository $jobs ) {
+	private function conversation_payload( array $payload, array $workspace, Job_Repository $jobs, bool $has_images = false ) {
 		$stage   = sanitize_key( (string) ( $payload['stage'] ?? '' ) );
 		$raw_message = (string) ( $payload['message'] ?? '' );
 		$message = sanitize_textarea_field( $raw_message );
 		$parent  = absint( $payload['artifact_job_id'] ?? 0 );
 
 		if ( ! in_array( $stage, self::CONVERSATION_STAGES, true ) ) {
-			return new \WP_Error( 'wp_autoplugin_conversation_stage_unavailable', __( 'Follow-up messages are currently available for Plan, Code, and Explain.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+			return new \WP_Error( 'wp_autoplugin_conversation_stage_unavailable', __( 'Follow-up messages are currently available for Plan, Code, Review, and Explain.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
-		if ( '' === $message ) {
-			return new \WP_Error( 'wp_autoplugin_conversation_message_required', __( 'A follow-up message is required.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		if ( '' === $message && ! $has_images ) {
+			return new \WP_Error( 'wp_autoplugin_conversation_message_required', __( 'Enter a follow-up message or attach at least one image.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
 		if ( strlen( $raw_message ) > 8192 ) {
 			return new \WP_Error( 'wp_autoplugin_conversation_message_large', __( 'The follow-up message exceeds the 8 KiB limit.', 'wp-autoplugin' ), [ 'status' => 400 ] );
@@ -1069,6 +1146,65 @@ final class Routes {
 			'message'         => $message,
 			'artifact_job_id' => $parent,
 		];
+	}
+
+	/** @return array<string, mixed>|\WP_Error */
+	private function normalize_job_payload( $raw ) {
+		if ( is_array( $raw ) ) {
+			return $raw;
+		}
+		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
+			$decoded = json_decode( wp_unslash( $raw ), true );
+			if ( is_array( $decoded ) ) {
+				return $decoded;
+			}
+			return new \WP_Error( 'wp_autoplugin_job_payload_invalid', __( 'The job payload is invalid.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		}
+		return [];
+	}
+
+	/** @return array<int, int>|\WP_Error */
+	private function normalize_attachment_ids( $raw ) {
+		if ( is_string( $raw ) ) {
+			$decoded = json_decode( wp_unslash( $raw ), true );
+			if ( ! is_array( $decoded ) ) {
+				return new \WP_Error( 'wp_autoplugin_prompt_attachment_ids_invalid', __( 'The reusable prompt image IDs are invalid.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+			}
+			$raw = $decoded;
+		}
+		if ( ! is_array( $raw ) ) {
+			return new \WP_Error( 'wp_autoplugin_prompt_attachment_ids_invalid', __( 'The reusable prompt image IDs are invalid.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		}
+		return array_values( array_unique( array_filter( array_map( 'absint', $raw ) ) ) );
+	}
+
+	/** @param array<int, int> $reuse_ids @param array<int, array<string, mixed>> $images */
+	private function validate_attachment_reuse( array $reuse_ids, array $images, int $workspace_id, int $user_id ) {
+		if ( count( $reuse_ids ) + count( $images ) > Prompt_Image_Validator::MAX_IMAGES ) {
+			return new \WP_Error( 'wp_autoplugin_prompt_images_count', __( 'Attach no more than six images to one message.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		}
+		$total      = array_sum( array_map( static fn( array $image ): int => (int) $image['byte_size'], $images ) );
+		$repository = new Prompt_Attachment_Repository();
+		foreach ( $reuse_ids as $id ) {
+			$attachment = $repository->find( $id, false );
+			if ( ! $attachment || (int) $attachment['workspace_id'] !== $workspace_id || (int) $attachment['created_by'] !== $user_id ) {
+				return new \WP_Error( 'wp_autoplugin_prompt_attachment_invalid', __( 'A reused prompt image is unavailable in this workspace.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+			}
+			$total += (int) $attachment['byte_size'];
+		}
+		if ( $total > Prompt_Image_Validator::MAX_TOTAL_BYTES ) {
+			return new \WP_Error( 'wp_autoplugin_prompt_images_total', __( 'Prompt images may use at most 20 MiB in total.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		}
+		return true;
+	}
+
+	/** @return array<string, mixed> */
+	private function prompt_image_capability( string $task, array $payload, array $workspace ): array {
+		$stage = 'conversation' === $task ? sanitize_key( (string) ( $payload['stage'] ?? '' ) ) : $task;
+		if ( ( 'plan' === $stage && 'new_plugin' !== ( $workspace['target_kind'] ?? '' ) ) || 'explain' === $stage ) {
+			return ( new Agent_Transport_Factory() )->capability( $stage );
+		}
+		return ( new Direct_Transport_Factory() )->capability( in_array( $stage, [ 'code', 'review' ], true ) ? $stage : 'plan' );
 	}
 
 	/** Validate an explicit latest-revision Review request and snapshot its reviewer. */

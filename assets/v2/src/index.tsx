@@ -108,6 +108,18 @@ type Job = {
 		sequence: number;
 	} | null;
 	code_progress?: CodeProgress | null;
+	prompt_attachments: PromptAttachment[];
+};
+
+type PromptAttachment = {
+	id: number;
+	filename: string;
+	mime_type: string;
+	byte_size: number;
+	width: number;
+	height: number;
+	sha256: string;
+	preview_path: string;
 };
 
 type CodeProgress = {
@@ -334,6 +346,7 @@ type AgentCapability = {
 	provider: string;
 	model: string;
 	message: string;
+	images: boolean;
 };
 
 declare global {
@@ -440,6 +453,378 @@ const DISTRACTION_FREE_KEY = 'wp-autoplugin-v2-distraction-free';
 const DISTRACTION_FREE_CLASS = 'wp-autoplugin-v2-distraction-free';
 const PROJECTS_PAGE_SIZE = 20;
 const PROJECT_SEARCH_DELAY = 300;
+const MAX_PROMPT_IMAGES = 6;
+const MAX_PROMPT_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_PROMPT_IMAGE_TOTAL = 20 * 1024 * 1024;
+const PROMPT_IMAGE_TYPES = [ 'image/jpeg', 'image/png', 'image/webp' ];
+let promptComposerSequence = 0;
+
+async function postJob(
+	workspaceId: number,
+	task: string,
+	payload: object,
+	images: File[] = [],
+	attachmentIds: number[] = []
+): Promise< Job > {
+	if ( ! images.length && ! attachmentIds.length ) {
+		return apiFetch< Job >( {
+			path: `${ rest }/jobs`,
+			method: 'POST',
+			data: { workspace_id: workspaceId, task, payload },
+		} );
+	}
+
+	const body = new FormData();
+	body.append( 'workspace_id', String( workspaceId ) );
+	body.append( 'task', task );
+	body.append( 'payload', JSON.stringify( payload ) );
+	body.append( 'prompt_attachment_ids', JSON.stringify( attachmentIds ) );
+	images.forEach( ( file ) =>
+		body.append( 'prompt_images[]', file, file.name )
+	);
+	return apiFetch< Job >( {
+		path: `${ rest }/jobs`,
+		method: 'POST',
+		body,
+	} );
+}
+
+function StoredPromptImages( {
+	attachments,
+}: {
+	attachments?: PromptAttachment[];
+} ) {
+	if ( ! attachments?.length ) {
+		return null;
+	}
+	return (
+		<div className="prompt-attachments prompt-attachments--stored">
+			{ attachments.map( ( attachment ) => (
+				<StoredPromptImage
+					attachment={ attachment }
+					key={ attachment.id }
+				/>
+			) ) }
+		</div>
+	);
+}
+
+function StoredPromptImage( { attachment }: { attachment: PromptAttachment } ) {
+	const [ source, setSource ] = useState( '' );
+	const [ failed, setFailed ] = useState( false );
+	useEffect( () => {
+		let current = true;
+		let objectUrl = '';
+		setSource( '' );
+		setFailed( false );
+		apiFetch< Response >( { path: attachment.preview_path, parse: false } )
+			.then( ( response ) => response.blob() )
+			.then( ( blob ) => {
+				if ( current ) {
+					objectUrl = URL.createObjectURL( blob );
+					setSource( objectUrl );
+				}
+			} )
+			.catch( () => {
+				if ( current ) {
+					setFailed( true );
+				}
+			} );
+		return () => {
+			current = false;
+			if ( objectUrl ) {
+				URL.revokeObjectURL( objectUrl );
+			}
+		};
+	}, [ attachment.preview_path ] );
+	let preview = <Spinner />;
+	if ( source ) {
+		preview = <img src={ source } alt={ attachment.filename } />;
+	} else if ( failed ) {
+		preview = (
+			<span className="prompt-attachment__preview-error">
+				{ __( 'Preview unavailable', 'wp-autoplugin' ) }
+			</span>
+		);
+	}
+	return (
+		<div className="prompt-attachment prompt-attachment--stored">
+			{ preview }
+			<div className="prompt-attachment__metadata">
+				<small title={ attachment.filename }>
+					{ attachment.filename }
+				</small>
+				<small>
+					{ attachment.width }×{ attachment.height } ·{ ' ' }
+					{ formatBytes( attachment.byte_size ) }
+				</small>
+			</div>
+		</div>
+	);
+}
+
+function PromptComposerField( {
+	label,
+	value,
+	files,
+	onChange,
+	onFilesChange,
+	imageEnabled,
+	action,
+	disabled = false,
+	hideLabelFromVision = false,
+	placeholder,
+	help,
+	onKeyDown,
+}: {
+	label: string;
+	value: string;
+	files: File[];
+	onChange: ( value: string ) => void;
+	onFilesChange: ( files: File[] ) => void;
+	imageEnabled: boolean;
+	action?: React.ReactNode;
+	disabled?: boolean;
+	hideLabelFromVision?: boolean;
+	placeholder?: string;
+	help?: string;
+	onKeyDown?: ( event: any ) => void;
+} ) {
+	const input = useRef< HTMLInputElement | null >( null );
+	const textarea = useRef< HTMLTextAreaElement | null >( null );
+	const dragDepth = useRef( 0 );
+	const [ id ] = useState(
+		() => `wp-autoplugin-prompt-${ ++promptComposerSequence }`
+	);
+	const [ error, setError ] = useState( '' );
+	const [ dragging, setDragging ] = useState( false );
+	const resize = useCallback( () => {
+		const field = textarea.current;
+		if ( ! field ) {
+			return;
+		}
+		field.style.height = 'auto';
+		field.style.height = `${ Math.min( field.scrollHeight, 160 ) }px`;
+		field.style.overflowY = field.scrollHeight > 160 ? 'auto' : 'hidden';
+	}, [] );
+	useEffect( resize, [ resize, value ] );
+	const addFiles = ( incoming: File[] ) => {
+		if ( ! imageEnabled ) {
+			setError(
+				__(
+					'The selected model does not accept image prompts.',
+					'wp-autoplugin'
+				)
+			);
+			return;
+		}
+		const next = [ ...files ];
+		for ( const file of incoming ) {
+			if ( next.length >= MAX_PROMPT_IMAGES ) {
+				setError(
+					__( 'Attach no more than six images.', 'wp-autoplugin' )
+				);
+				return;
+			}
+			if ( ! PROMPT_IMAGE_TYPES.includes( file.type ) ) {
+				setError(
+					__( 'Use JPEG, PNG, or WebP images.', 'wp-autoplugin' )
+				);
+				return;
+			}
+			if ( file.size > MAX_PROMPT_IMAGE_BYTES ) {
+				setError(
+					__(
+						'Each image must be 5 MiB or smaller.',
+						'wp-autoplugin'
+					)
+				);
+				return;
+			}
+			if (
+				next.reduce( ( total, item ) => total + item.size, 0 ) +
+					file.size >
+				MAX_PROMPT_IMAGE_TOTAL
+			) {
+				setError(
+					__(
+						'Images may use at most 20 MiB in total.',
+						'wp-autoplugin'
+					)
+				);
+				return;
+			}
+			next.push( file );
+		}
+		setError( '' );
+		onFilesChange( next );
+	};
+	return (
+		<div className="prompt-composer-field">
+			<label
+				htmlFor={ id }
+				className={ hideLabelFromVision ? 'screen-reader-text' : '' }
+			>
+				{ label }
+			</label>
+			<div className="prompt-composer-field__row">
+				<div
+					className={ `prompt-composer-field__control ${
+						dragging ? 'is-dragging' : ''
+					} ${ disabled ? 'is-disabled' : '' } ${
+						imageEnabled ? 'has-image-control' : ''
+					}` }
+					onDragEnter={ ( event ) => {
+						event.preventDefault();
+						dragDepth.current += 1;
+						if (
+							! disabled &&
+							imageEnabled &&
+							Array.from( event.dataTransfer.types ).includes(
+								'Files'
+							)
+						) {
+							setDragging( true );
+						}
+					} }
+					onDragOver={ ( event ) => event.preventDefault() }
+					onDragLeave={ ( event ) => {
+						event.preventDefault();
+						dragDepth.current = Math.max(
+							0,
+							dragDepth.current - 1
+						);
+						if ( 0 === dragDepth.current ) {
+							setDragging( false );
+						}
+					} }
+					onDrop={ ( event ) => {
+						event.preventDefault();
+						dragDepth.current = 0;
+						setDragging( false );
+						if ( ! disabled ) {
+							addFiles( Array.from( event.dataTransfer.files ) );
+						}
+					} }
+				>
+					<textarea
+						id={ id }
+						ref={ textarea }
+						rows={ 1 }
+						value={ value }
+						placeholder={ placeholder }
+						disabled={ disabled }
+						onChange={ ( event ) =>
+							onChange( event.currentTarget.value )
+						}
+						onInput={ resize }
+						onKeyDown={ onKeyDown }
+					/>
+					<input
+						ref={ input }
+						type="file"
+						accept={ PROMPT_IMAGE_TYPES.join( ',' ) }
+						multiple
+						hidden
+						disabled={ disabled || ! imageEnabled }
+						onChange={ ( event ) => {
+							addFiles(
+								Array.from( event.currentTarget.files || [] )
+							);
+							event.currentTarget.value = '';
+						} }
+					/>
+					{ imageEnabled && (
+						<button
+							type="button"
+							className="prompt-composer-field__attach"
+							disabled={ disabled }
+							onClick={ () => input.current?.click() }
+							aria-label={ __(
+								'Attach images',
+								'wp-autoplugin'
+							) }
+							title={ __( 'Attach images', 'wp-autoplugin' ) }
+						>
+							<svg
+								viewBox="0 0 24 24"
+								aria-hidden="true"
+								focusable="false"
+							>
+								<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13Zm1.5 0v10.6l3.7-3.7a1 1 0 0 1 1.4 0l2.1 2.1 1.7-1.7a1 1 0 0 1 1.4 0l2.7 2.7v-10h-13Zm9.25 5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z" />
+							</svg>
+						</button>
+					) }
+					{ files.length > 0 && (
+						<div className="prompt-attachments prompt-attachments--pending">
+							{ files.map( ( file, index ) => (
+								<PendingPromptImage
+									file={ file }
+									key={ `${ file.name }:${ file.size }:${ file.lastModified }:${ index }` }
+									onRemove={ () => {
+										setError( '' );
+										onFilesChange(
+											files.filter(
+												( _, itemIndex ) =>
+													itemIndex !== index
+											)
+										);
+									} }
+								/>
+							) ) }
+						</div>
+					) }
+				</div>
+				{ action }
+			</div>
+			{ error && (
+				<p className="prompt-composer-field__error" role="alert">
+					{ error }
+				</p>
+			) }
+			{ files.length > 0 && ! imageEnabled && (
+				<p className="prompt-composer-field__error" role="alert">
+					{ __(
+						'The selected model does not accept image prompts. Remove the selected images or choose another model.',
+						'wp-autoplugin'
+					) }
+				</p>
+			) }
+			{ help && <p className="prompt-composer-field__help">{ help }</p> }
+		</div>
+	);
+}
+
+function PendingPromptImage( {
+	file,
+	onRemove,
+}: {
+	file: File;
+	onRemove: () => void;
+} ) {
+	const source = useMemo( () => URL.createObjectURL( file ), [ file ] );
+	useEffect( () => () => URL.revokeObjectURL( source ), [ source ] );
+	return (
+		<div className="prompt-attachment prompt-attachment--pending">
+			<img src={ source } alt={ file.name } />
+			<button
+				type="button"
+				onClick={ onRemove }
+				aria-label={ sprintf(
+					/* translators: %s: attached image filename. */
+					__( 'Remove %s', 'wp-autoplugin' ),
+					file.name
+				) }
+			>
+				×
+			</button>
+			<div className="prompt-attachment__metadata">
+				<small title={ file.name }>{ file.name }</small>
+				<small>{ formatBytes( file.size ) }</small>
+			</div>
+		</div>
+	);
+}
 
 function workspaceStages( operation?: string ): string[] {
 	return operation === 'explain'
@@ -769,9 +1154,9 @@ function App() {
 		}
 	}
 
-	async function start() {
-		if ( ! target || ! request.trim() ) {
-			return;
+	async function start( images: File[] = [] ): Promise< boolean > {
+		if ( ! target || ( ! request.trim() && ! images.length ) ) {
+			return false;
 		}
 		setBusy( true );
 		setError( '' );
@@ -787,16 +1172,12 @@ function App() {
 				},
 			} );
 			const workspaceId = workspace.id || workspace.workspace_id;
-			const created = await apiFetch< Job >( {
-				path: `${ rest }/jobs`,
-				method: 'POST',
-				data: {
-					workspace_id: workspaceId,
-					task: operation === 'explain' ? 'explain' : 'plan',
-					payload:
-						operation === 'explain' ? { message: request } : {},
-				},
-			} );
+			const created = await postJob(
+				workspaceId as number,
+				operation === 'explain' ? 'explain' : 'plan',
+				operation === 'explain' ? { message: request } : {},
+				images
+			);
 			const openedWorkspace: Workspace = {
 				...workspace,
 				id: workspaceId as number,
@@ -811,8 +1192,10 @@ function App() {
 			setJobs( [ created ] );
 			setRequest( '' );
 			setActiveTab( operation === 'explain' ? 'explain' : 'plan' );
+			return true;
 		} catch ( reason: any ) {
 			setError( reason.message );
+			return false;
 		} finally {
 			setBusy( false );
 		}
@@ -889,18 +1272,22 @@ function App() {
 			| 'review_fix'
 			| 'explain'
 			| 'conversation',
-		payload = {}
+		payload = {},
+		images: File[] = [],
+		attachmentIds: number[] = []
 	) {
 		if ( ! activeWorkspace ) {
 			return null;
 		}
 		setError( '' );
 		try {
-			const created = await apiFetch< Job >( {
-				path: `${ rest }/jobs`,
-				method: 'POST',
-				data: { workspace_id: activeWorkspace.id, task, payload },
-			} );
+			const created = await postJob(
+				activeWorkspace.id,
+				task,
+				payload,
+				images,
+				attachmentIds
+			);
 			setJobs( ( items ) => [ ...items, created ] );
 			setWorkspaces( ( items ) =>
 				items.map( ( item ) =>
@@ -1008,6 +1395,9 @@ function App() {
 				jobsLoading={ jobsLoading }
 				codeCapability={ bootstrap?.direct_code ?? null }
 				reviewCapability={ bootstrap?.direct_review ?? null }
+				planCapability={ bootstrap?.plan_agent ?? null }
+				directPlanCapability={ bootstrap?.direct_plan ?? null }
+				explainCapability={ bootstrap?.explain_agent ?? null }
 				releaseCapability={ bootstrap?.release ?? null }
 				activeTab={ activeTab }
 				onTabSelect={ selectWorkspaceStage }
@@ -1102,7 +1492,7 @@ function WorkspaceTabBar( {
 							+
 						</span>
 						<strong>
-							{ __( 'New workspace', 'wp-autoplugin' ) }
+							{ __( 'New project', 'wp-autoplugin' ) }
 						</strong>
 					</button>
 				) }
@@ -1155,8 +1545,8 @@ function WorkspaceTabBar( {
 					type="button"
 					className="workspace-new-tab"
 					onClick={ onNew }
-					aria-label={ __( 'Open a new workspace', 'wp-autoplugin' ) }
-					title={ __( 'New workspace', 'wp-autoplugin' ) }
+					aria-label={ __( 'Start a new project', 'wp-autoplugin' ) }
+					title={ __( 'New project', 'wp-autoplugin' ) }
 				>
 					+
 				</button>
@@ -1661,17 +2051,25 @@ function WorkspaceLauncher( {
 	onTargetKindSelect: ( value: string ) => void;
 	onOperationSelect: ( value: string ) => void;
 	onRequestChange: ( value: string ) => void;
-	onStart: () => void;
+	onStart: ( images: File[] ) => Promise< boolean >;
 } ) {
+	const [ images, setImages ] = useState< File[] >( [] );
 	const requiresPlan = !! target && operation !== 'explain';
 	const effectivePlanCapability =
 		target?.kind === 'new_plugin' ? directPlanCapability : planCapability;
+	const imageCapability =
+		operation === 'explain' ? explainCapability : effectivePlanCapability;
+	const submit = async () => {
+		if ( await onStart( images ) ) {
+			setImages( [] );
+		}
+	};
 	return (
 		<div className="workspace-new-canvas">
 			<Card className="workspace-launcher">
 				<CardBody>
 					<div className="workspace-launcher__heading">
-						<p>{ __( 'New workspace', 'wp-autoplugin' ) }</p>
+						<p>{ __( 'New project', 'wp-autoplugin' ) }</p>
 						<h2>
 							{ __(
 								'What would you like to work on?',
@@ -1709,7 +2107,7 @@ function WorkspaceLauncher( {
 							</Notice>
 						) }
 					<div className="workspace-request">
-						<TextareaControl
+						<PromptComposerField
 							label={
 								operations.find(
 									( item ) => item.value === operation
@@ -1717,8 +2115,11 @@ function WorkspaceLauncher( {
 								__( 'What should the AI do?', 'wp-autoplugin' )
 							}
 							value={ request }
-							rows={ 2 }
+							files={ images }
 							onChange={ onRequestChange }
+							onFilesChange={ setImages }
+							imageEnabled={ !! imageCapability?.images }
+							disabled={ busy }
 							help={
 								target?.kind === 'new_plugin'
 									? __(
@@ -1736,14 +2137,16 @@ function WorkspaceLauncher( {
 						variant="primary"
 						disabled={
 							busy ||
-							! request.trim() ||
+							( ! request.trim() && ! images.length ) ||
+							( images.length > 0 &&
+								! imageCapability?.images ) ||
 							( operation === 'explain' &&
 								! explainCapability?.available ) ||
 							( requiresPlan &&
 								! effectivePlanCapability?.available )
 						}
 						isBusy={ busy }
-						onClick={ onStart }
+						onClick={ submit }
 					>
 						{ operation === 'explain'
 							? __( 'Explain', 'wp-autoplugin' )
@@ -1761,6 +2164,9 @@ function WorkspaceView( {
 	jobsLoading,
 	codeCapability,
 	reviewCapability,
+	planCapability,
+	directPlanCapability,
+	explainCapability,
 	releaseCapability,
 	activeTab,
 	onTabSelect,
@@ -1774,6 +2180,9 @@ function WorkspaceView( {
 	jobsLoading: boolean;
 	codeCapability: AgentCapability | null;
 	reviewCapability: AgentCapability | null;
+	planCapability: AgentCapability | null;
+	directPlanCapability: AgentCapability | null;
+	explainCapability: AgentCapability | null;
 	releaseCapability: ReleaseCapability | null;
 	activeTab: string;
 	onTabSelect: ( tab: string ) => void;
@@ -1786,7 +2195,9 @@ function WorkspaceView( {
 			| 'review_fix'
 			| 'explain'
 			| 'conversation',
-		payload?: object
+		payload?: object,
+		images?: File[],
+		attachmentIds?: number[]
 	) => Promise< Job | null >;
 	onQueueEndpoint: ( path: string, data: object ) => Promise< Job | null >;
 	onSavePlan: ( job: Job, content: string ) => Promise< boolean >;
@@ -1814,6 +2225,13 @@ function WorkspaceView( {
 	const reviewConversationJobs = jobs.filter(
 		( job ) => job.task === 'conversation' && job.payload.stage === 'review'
 	);
+	const initialPromptJob = jobs.find( ( job ) =>
+		[ 'plan', 'explain' ].includes( job.task )
+	);
+	const effectivePlanCapability =
+		workspace.target_kind === 'new_plugin'
+			? directPlanCapability
+			: planCapability;
 	return (
 		<section className="workspace-editor">
 			<header className="workspace-editor__header">
@@ -1840,7 +2258,13 @@ function WorkspaceView( {
 			</header>
 			<div className="workspace-editor__request">
 				<strong>{ __( 'Request', 'wp-autoplugin' ) }</strong>
-				<p>{ workspace.request }</p>
+				<p>
+					{ workspace.request ||
+						__( 'Image-only request', 'wp-autoplugin' ) }
+				</p>
+				<StoredPromptImages
+					attachments={ initialPromptJob?.prompt_attachments }
+				/>
 			</div>
 			<div className="workspace-stage-flow">
 				<nav
@@ -1895,16 +2319,29 @@ function WorkspaceView( {
 							latestRun={ latestPlanRun }
 							regenerationJob={ latestStructureRun }
 							conversationJobs={ planConversationJobs }
+							capability={ effectivePlanCapability }
 							onCancel={ onCancel }
-							onCreate={ () => onCreateJob( 'plan' ) }
+							onCreate={ ( attachmentIds = [] ) =>
+								onCreateJob( 'plan', {}, [], attachmentIds )
+							}
 							onSave={ onSavePlan }
 							onContinue={ () => onTabSelect( 'code' ) }
-							onFollowUp={ ( message, artifactJobId ) =>
-								onCreateJob( 'conversation', {
-									stage: 'plan',
-									message,
-									artifact_job_id: artifactJobId,
-								} )
+							onFollowUp={ (
+								message,
+								artifactJobId,
+								images,
+								attachmentIds
+							) =>
+								onCreateJob(
+									'conversation',
+									{
+										stage: 'plan',
+										message,
+										artifact_job_id: artifactJobId,
+									},
+									images,
+									attachmentIds
+								)
 							}
 						/>
 					) }
@@ -1919,14 +2356,25 @@ function WorkspaceView( {
 							onCreateCode={ ( payload ) =>
 								onCreateJob( 'code', payload )
 							}
-							onFollowUp={ ( message, revisionId, focusedPath ) =>
-								onCreateJob( 'conversation', {
-									stage: 'code',
-									message,
-									revision_id: revisionId,
-									expected_latest_revision_id: revisionId,
-									focused_path: focusedPath || undefined,
-								} )
+							onFollowUp={ (
+								message,
+								revisionId,
+								focusedPath,
+								images,
+								attachmentIds
+							) =>
+								onCreateJob(
+									'conversation',
+									{
+										stage: 'code',
+										message,
+										revision_id: revisionId,
+										expected_latest_revision_id: revisionId,
+										focused_path: focusedPath || undefined,
+									},
+									images,
+									attachmentIds
+								)
 							}
 							onContinue={ () => onTabSelect( 'review' ) }
 						/>
@@ -1947,12 +2395,18 @@ function WorkspaceView( {
 						<ExplainStage
 							jobs={ explainConversationJobs }
 							initialMessage={ workspace.request }
+							capability={ explainCapability }
 							onCancel={ onCancel }
-							onFollowUp={ ( message ) =>
-								onCreateJob( 'conversation', {
-									stage: 'explain',
-									message,
-								} )
+							onFollowUp={ ( message, images, attachmentIds ) =>
+								onCreateJob(
+									'conversation',
+									{
+										stage: 'explain',
+										message,
+									},
+									images,
+									attachmentIds
+								)
 							}
 						/>
 					) }
@@ -2237,6 +2691,7 @@ function PlanStage( {
 	latestRun,
 	regenerationJob,
 	conversationJobs,
+	capability,
 	onCancel,
 	onCreate,
 	onSave,
@@ -2247,11 +2702,17 @@ function PlanStage( {
 	latestRun: Job | null;
 	regenerationJob: Job | null;
 	conversationJobs: Job[];
+	capability: AgentCapability | null;
 	onCancel: ( job: Job ) => void;
-	onCreate: () => void;
+	onCreate: ( attachmentIds?: number[] ) => void;
 	onSave: ( job: Job, content: string ) => Promise< boolean >;
 	onContinue: () => void;
-	onFollowUp: ( message: string, artifactJobId: number ) => void;
+	onFollowUp: (
+		message: string,
+		artifactJobId: number,
+		images?: File[],
+		attachmentIds?: number[]
+	) => Promise< Job | null >;
 } ) {
 	if ( ! job ) {
 		if ( latestRun ) {
@@ -2264,7 +2725,16 @@ function PlanStage( {
 					{ [ 'failed', 'cancelled' ].includes(
 						latestRun.status
 					) && (
-						<Button variant="secondary" onClick={ onCreate }>
+						<Button
+							variant="secondary"
+							onClick={ () =>
+								onCreate(
+									latestRun.prompt_attachments?.map(
+										( item ) => item.id
+									)
+								)
+							}
+						>
 							{ __( 'Retry plan', 'wp-autoplugin' ) }
 						</Button>
 					) }
@@ -2295,6 +2765,7 @@ function PlanStage( {
 		<PlanEditor
 			job={ job }
 			conversationJobs={ conversationJobs }
+			capability={ capability }
 			regenerationJob={ regenerationJob }
 			onCancel={ onCancel }
 			onSave={ onSave }
@@ -2308,6 +2779,7 @@ function PlanStage( {
 function PlanEditor( {
 	job,
 	conversationJobs,
+	capability,
 	regenerationJob,
 	onCancel,
 	onSave,
@@ -2317,12 +2789,18 @@ function PlanEditor( {
 }: {
 	job: Job;
 	conversationJobs: Job[];
+	capability: AgentCapability | null;
 	regenerationJob: Job | null;
 	onCancel: ( job: Job ) => void;
 	onSave: ( job: Job, content: string ) => Promise< boolean >;
-	onRetry: () => void;
+	onRetry: ( attachmentIds?: number[] ) => void;
 	onContinue: () => void;
-	onFollowUp: ( message: string, artifactJobId: number ) => void;
+	onFollowUp: (
+		message: string,
+		artifactJobId: number,
+		images?: File[],
+		attachmentIds?: number[]
+	) => Promise< Job | null >;
 } ) {
 	const structure = planArtifactStructure( job );
 	const currentContent = planMarkdown(
@@ -2398,7 +2876,16 @@ function PlanEditor( {
 						</>
 					) : (
 						<>
-							<Button variant="secondary" onClick={ onRetry }>
+							<Button
+								variant="secondary"
+								onClick={ () =>
+									onRetry(
+										job.prompt_attachments?.map(
+											( item ) => item.id
+										)
+									)
+								}
+							>
 								{ __( 'Retry plan', 'wp-autoplugin' ) }
 							</Button>
 							<Button
@@ -2457,8 +2944,14 @@ function PlanEditor( {
 				stage="plan"
 				jobs={ conversationJobs }
 				artifactJobId={ job.id }
+				capability={ capability }
 				onCancel={ onCancel }
-				onFollowUp={ ( message ) => onFollowUp( message, job.id ) }
+				onFollowUp={ (
+					message,
+					_artifactJobId,
+					images,
+					attachmentIds
+				) => onFollowUp( message, job.id, images, attachmentIds ) }
 			/>
 		</div>
 	);
@@ -2560,7 +3053,9 @@ function CodeStage( {
 	onFollowUp: (
 		message: string,
 		revisionId: number,
-		focusedPath?: string
+		focusedPath?: string,
+		images?: File[],
+		attachmentIds?: number[]
 	) => Promise< Job | null >;
 	onContinue: () => void;
 } ) {
@@ -3471,10 +3966,13 @@ function CodeConversation( {
 	onFollowUp: (
 		message: string,
 		revisionId: number,
-		focusedPath?: string
+		focusedPath?: string,
+		images?: File[],
+		attachmentIds?: number[]
 	) => Promise< Job | null >;
 } ) {
 	const [ message, setMessage ] = useState( '' );
+	const [ images, setImages ] = useState< File[] >( [] );
 	const [ submitting, setSubmitting ] = useState( false );
 	const historical = selectedRevisionId !== latestRevisionId;
 	const disabled =
@@ -3521,19 +4019,32 @@ function CodeConversation( {
 			  );
 	};
 
-	const send = async ( value = message, contextPath = focusedPath ) => {
-		if ( disabled || ! value.trim() ) {
+	const send = async (
+		value = message,
+		contextPath = focusedPath,
+		promptImages = images,
+		attachmentIds: number[] = []
+	) => {
+		if (
+			disabled ||
+			( ! value.trim() &&
+				! promptImages.length &&
+				! attachmentIds.length )
+		) {
 			return;
 		}
 		setSubmitting( true );
 		const created = await onFollowUp(
 			value.trim(),
 			latestRevisionId,
-			contextPath || undefined
+			contextPath || undefined,
+			promptImages,
+			attachmentIds
 		);
 		setSubmitting( false );
-		if ( created && value === message ) {
+		if ( created && value === message && promptImages === images ) {
 			setMessage( '' );
+			setImages( [] );
 		}
 	};
 
@@ -3593,7 +4104,16 @@ function CodeConversation( {
 											</small>
 										) }
 									</div>
-									<p>{ job.payload.message }</p>
+									<p>
+										{ job.payload.message ||
+											__(
+												'Image-only message',
+												'wp-autoplugin'
+											) }
+									</p>
+									<StoredPromptImages
+										attachments={ job.prompt_attachments }
+									/>
 								</div>
 								<div className="code-conversation__answer">
 									<strong>
@@ -3626,7 +4146,12 @@ function CodeConversation( {
 																.message || '',
 															job.payload
 																.focused_path ||
-																''
+																'',
+															[],
+															job.prompt_attachments.map(
+																( item ) =>
+																	item.id
+															)
 														)
 													}
 												>
@@ -3704,7 +4229,11 @@ function CodeConversation( {
 														job.payload.message ||
 															'',
 														job.payload
-															.focused_path || ''
+															.focused_path || '',
+														[],
+														job.prompt_attachments.map(
+															( item ) => item.id
+														)
 													)
 												}
 											>
@@ -3731,9 +4260,25 @@ function CodeConversation( {
 						) }
 					</p>
 				) }
-				<TextareaControl
+				<PromptComposerField
 					label={ __( 'Message', 'wp-autoplugin' ) }
 					value={ message }
+					files={ images }
+					onFilesChange={ setImages }
+					imageEnabled={ !! capability?.images }
+					action={
+						<Button
+							variant="primary"
+							isBusy={ submitting }
+							disabled={
+								disabled ||
+								( ! message.trim() && ! images.length )
+							}
+							onClick={ () => send() }
+						>
+							{ __( 'Send', 'wp-autoplugin' ) }
+						</Button>
+					}
 					disabled={ disabled }
 					help={
 						disabledCopy ||
@@ -3754,14 +4299,6 @@ function CodeConversation( {
 						}
 					} }
 				/>
-				<Button
-					variant="primary"
-					isBusy={ submitting }
-					disabled={ disabled || ! message.trim() }
-					onClick={ () => send() }
-				>
-					{ __( 'Send', 'wp-autoplugin' ) }
-				</Button>
 			</div>
 		</section>
 	);
@@ -4562,7 +5099,9 @@ function ReviewStage( {
 	onCancel: ( job: Job ) => void;
 	onCreateJob: (
 		task: 'review' | 'review_fix' | 'conversation',
-		payload?: object
+		payload?: object,
+		images?: File[],
+		attachmentIds?: number[]
 	) => Promise< Job | null >;
 	onQueueEndpoint: ( path: string, data: object ) => Promise< Job | null >;
 } ) {
@@ -4574,6 +5113,8 @@ function ReviewStage( {
 	const [ revisions, setRevisions ] = useState< RevisionSummary[] >( [] );
 	const [ selected, setSelected ] = useState< Set< number > >( new Set() );
 	const [ message, setMessage ] = useState( '' );
+	const [ images, setImages ] = useState< File[] >( [] );
+	const [ submitting, setSubmitting ] = useState( false );
 	const [ historyFinding, setHistoryFinding ] =
 		useState< ReviewFinding | null >( null );
 	const [ showReportHistory, setShowReportHistory ] = useState( false );
@@ -4838,18 +5379,39 @@ function ReviewStage( {
 		}
 	}
 
-	async function sendMessage() {
-		if ( ! report || ! message.trim() || ! currentReport ) {
+	async function sendMessage(
+		value = message,
+		promptImages = images,
+		attachmentIds: number[] = []
+	) {
+		if (
+			! report ||
+			! capability?.available ||
+			( ! value.trim() &&
+				! promptImages.length &&
+				! attachmentIds.length ) ||
+			! currentReport
+		) {
 			return;
 		}
-		await onCreateJob( 'conversation', {
-			stage: 'review',
-			message,
-			revision_id: report.revision_id,
-			expected_latest_revision_id: report.revision_id,
-			review_report_id: report.id,
-		} );
-		setMessage( '' );
+		setSubmitting( true );
+		const created = await onCreateJob(
+			'conversation',
+			{
+				stage: 'review',
+				message: value.trim(),
+				revision_id: report.revision_id,
+				expected_latest_revision_id: report.revision_id,
+				review_report_id: report.id,
+			},
+			promptImages,
+			attachmentIds
+		);
+		setSubmitting( false );
+		if ( created && value === message && promptImages === images ) {
+			setMessage( '' );
+			setImages( [] );
+		}
 	}
 
 	function reviewOverride(): boolean | null {
@@ -5347,7 +5909,18 @@ function ReviewStage( {
 													</small>
 												) }
 											</div>
-											<p>{ job.payload.message }</p>
+											<p>
+												{ job.payload.message ||
+													__(
+														'Image-only question',
+														'wp-autoplugin'
+													) }
+											</p>
+											<StoredPromptImages
+												attachments={
+													job.prompt_attachments
+												}
+											/>
 										</div>
 										<div className="review-conversation__answer">
 											<strong>
@@ -5380,58 +5953,112 @@ function ReviewStage( {
 													/>
 												) }
 											{ job.status !== 'completed' && (
-												<JobStatus
-													job={ job }
-													onCancel={ onCancel }
-												/>
+												<>
+													<JobStatus
+														job={ job }
+														onCancel={ onCancel }
+													/>
+													{ [
+														'failed',
+														'cancelled',
+													].includes(
+														job.status
+													) && (
+														<Button
+															variant="secondary"
+															disabled={
+																!! activeArtifactJob ||
+																submitting
+															}
+															onClick={ () =>
+																sendMessage(
+																	job.payload
+																		.message ||
+																		'',
+																	[],
+																	job.prompt_attachments.map(
+																		(
+																			item
+																		) =>
+																			item.id
+																	)
+																)
+															}
+														>
+															{ __(
+																'Retry',
+																'wp-autoplugin'
+															) }
+														</Button>
+													) }
+												</>
 											) }
 										</div>
 									</article>
 								) ) }
 							</div>
 						) }
-						<TextareaControl
-							label={ __( 'Ask a follow-up', 'wp-autoplugin' ) }
-							placeholder={ __(
-								'Ask a question, request reconsideration, or ask for another area to be inspected…',
-								'wp-autoplugin'
-							) }
-							value={ message }
-							onChange={ setMessage }
-							onKeyDown={ ( event ) => {
-								if (
-									'Enter' === event.key &&
-									! event.shiftKey &&
-									! event.nativeEvent.isComposing
-								) {
-									event.preventDefault();
-									sendMessage();
+						<div className="review-conversation__composer">
+							<PromptComposerField
+								label={ __(
+									'Ask a follow-up',
+									'wp-autoplugin'
+								) }
+								placeholder={ __(
+									'Ask a question, request reconsideration, or ask for another area to be inspected…',
+									'wp-autoplugin'
+								) }
+								value={ message }
+								files={ images }
+								onChange={ setMessage }
+								onFilesChange={ setImages }
+								imageEnabled={ !! capability?.images }
+								action={
+									<Button
+										variant="primary"
+										isBusy={ submitting }
+										disabled={
+											( ! message.trim() &&
+												! images.length ) ||
+											! currentReport ||
+											!! activeArtifactJob ||
+											! capability?.available ||
+											submitting
+										}
+										onClick={ () => sendMessage() }
+									>
+										{ __( 'Send', 'wp-autoplugin' ) }
+									</Button>
 								}
-							} }
-							disabled={ ! currentReport || !! activeArtifactJob }
-							help={
-								currentReport
-									? __(
-											'To change code, use Fix on an issue.',
-											'wp-autoplugin'
-									  )
-									: __(
-											'Review latest before asking another question.',
-											'wp-autoplugin'
-									  )
-							}
-						/>
-						<Button
-							variant="primary"
-							disabled={
-								! message.trim() ||
-								! currentReport ||
-								!! activeArtifactJob
-							}
-							onClick={ sendMessage }
-						>
-							{ __( 'Send', 'wp-autoplugin' ) }
-						</Button>
+								onKeyDown={ ( event ) => {
+									if (
+										'Enter' === event.key &&
+										! event.shiftKey &&
+										! event.nativeEvent.isComposing
+									) {
+										event.preventDefault();
+										sendMessage();
+									}
+								} }
+								disabled={
+									! currentReport ||
+									!! activeArtifactJob ||
+									! capability?.available ||
+									submitting
+								}
+								help={
+									currentReport
+										? __(
+												'To change code, use Fix on an issue.',
+												'wp-autoplugin'
+										  )
+										: __(
+												'Review latest before asking another question.',
+												'wp-autoplugin'
+										  )
+								}
+							/>
+						</div>
 					</section>
 				</>
 			) }
@@ -6175,19 +6802,26 @@ function manualTestingEmptyLabel(
 function ExplainStage( {
 	jobs,
 	initialMessage,
+	capability,
 	onCancel,
 	onFollowUp,
 }: {
 	jobs: Job[];
 	initialMessage: string;
+	capability: AgentCapability | null;
 	onCancel: ( job: Job ) => void;
-	onFollowUp: ( message: string ) => void;
+	onFollowUp: (
+		message: string,
+		images?: File[],
+		attachmentIds?: number[]
+	) => Promise< Job | null >;
 } ) {
 	return (
 		<StageConversation
 			stage="explain"
 			jobs={ jobs }
 			initialMessage={ initialMessage }
+			capability={ capability }
 			onCancel={ onCancel }
 			onFollowUp={ onFollowUp }
 		/>
@@ -6199,6 +6833,7 @@ function StageConversation( {
 	jobs,
 	initialMessage = '',
 	artifactJobId,
+	capability,
 	onCancel,
 	onFollowUp,
 }: {
@@ -6206,17 +6841,35 @@ function StageConversation( {
 	jobs: Job[];
 	initialMessage?: string;
 	artifactJobId?: number;
+	capability: AgentCapability | null;
 	onCancel: ( job: Job ) => void;
-	onFollowUp: ( message: string, artifactJobId?: number ) => void;
+	onFollowUp: (
+		message: string,
+		artifactJobId?: number,
+		images?: File[],
+		attachmentIds?: number[]
+	) => Promise< Job | null >;
 } ) {
 	const [ message, setMessage ] = useState( '' );
+	const [ images, setImages ] = useState< File[] >( [] );
+	const [ submitting, setSubmitting ] = useState( false );
 	const isPlan = stage === 'plan';
-	const submitMessage = () => {
-		if ( ! message.trim() ) {
+	const disabled = submitting || ! capability?.available;
+	const submitMessage = async () => {
+		if ( disabled || ( ! message.trim() && ! images.length ) ) {
 			return;
 		}
-		onFollowUp( message, artifactJobId );
-		setMessage( '' );
+		setSubmitting( true );
+		const created = await onFollowUp(
+			message.trim(),
+			artifactJobId,
+			images
+		);
+		setSubmitting( false );
+		if ( created ) {
+			setMessage( '' );
+			setImages( [] );
+		}
 	};
 	return (
 		<div
@@ -6232,8 +6885,14 @@ function StageConversation( {
 							<p>
 								{ job.payload.message ||
 									initialMessage ||
-									__( 'Initial question', 'wp-autoplugin' ) }
+									__(
+										'Image-only question',
+										'wp-autoplugin'
+									) }
 							</p>
+							<StoredPromptImages
+								attachments={ job.prompt_attachments }
+							/>
 						</div>
 						<div className="explain-message__answer">
 							<strong>
@@ -6263,7 +6922,11 @@ function StageConversation( {
 										onClick={ () =>
 											onFollowUp(
 												job.payload.message || '',
-												artifactJobId
+												artifactJobId,
+												[],
+												job.prompt_attachments.map(
+													( item ) => item.id
+												)
 											)
 										}
 									>
@@ -6287,7 +6950,11 @@ function StageConversation( {
 											onClick={ () =>
 												onFollowUp(
 													job.payload.message || '',
-													artifactJobId
+													artifactJobId,
+													[],
+													job.prompt_attachments.map(
+														( item ) => item.id
+													)
 												)
 											}
 										>
@@ -6306,8 +6973,13 @@ function StageConversation( {
 					</div>
 				) ) }
 			</div>
+			{ capability && ! capability.available && (
+				<Notice status="warning" isDismissible={ false }>
+					{ capability.message }
+				</Notice>
+			) }
 			<div className="explain-stage__composer">
-				<TextareaControl
+				<PromptComposerField
 					hideLabelFromVision
 					label={
 						isPlan
@@ -6326,7 +6998,26 @@ function StageConversation( {
 							: __( 'Ask a follow-up question…', 'wp-autoplugin' )
 					}
 					value={ message }
+					files={ images }
+					disabled={ disabled }
 					onChange={ setMessage }
+					onFilesChange={ setImages }
+					imageEnabled={ !! capability?.images }
+					action={
+						<Button
+							variant="primary"
+							isBusy={ submitting }
+							disabled={
+								disabled ||
+								( ! message.trim() && ! images.length )
+							}
+							onClick={ submitMessage }
+						>
+							{ isPlan
+								? __( 'Send', 'wp-autoplugin' )
+								: __( 'Ask', 'wp-autoplugin' ) }
+						</Button>
+					}
 					onKeyDown={ ( event ) => {
 						if (
 							'Enter' === event.key &&
@@ -6337,17 +7028,7 @@ function StageConversation( {
 							submitMessage();
 						}
 					} }
-					rows={ 3 }
 				/>
-				<Button
-					variant="primary"
-					disabled={ ! message.trim() }
-					onClick={ submitMessage }
-				>
-					{ isPlan
-						? __( 'Send', 'wp-autoplugin' )
-						: __( 'Ask', 'wp-autoplugin' ) }
-				</Button>
 			</div>
 		</div>
 	);

@@ -13,15 +13,30 @@ final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transpo
 	public function effort(): string { return $this->selected_effort; }
 
 	public function complete( string $instructions, string $input, array $options = [] ) {
-		return $this->send( $instructions, [ [ 'role' => 'user', 'content' => $input ] ], [], $options );
+		return $this->send( $instructions, [ [ 'role' => 'user', 'content' => $input, 'prompt_images' => (array) ( $options['prompt_images'] ?? [] ) ] ], [], $options );
 	}
 
 	public function send( string $instructions, array $transcript, array $tools, array $options = [] ) {
-		$messages = [];
+		$messages   = [];
+		$has_images = false;
 		foreach ( $transcript as $item ) {
 			$role = (string) ( $item['role'] ?? '' );
 			if ( 'user' === $role ) {
-				$messages[] = [ 'role' => 'user', 'content' => [ [ 'type' => 'text', 'text' => (string) $item['content'] ] ] ];
+				$content = [];
+				foreach ( (array) ( $item['prompt_images'] ?? [] ) as $image ) {
+					if ( empty( $image['content'] ) || empty( $image['mime_type'] ) ) {
+						continue;
+					}
+					$has_images = true;
+					$content[] = [ 'type' => 'image', 'source' => [ 'type' => 'base64', 'media_type' => (string) $image['mime_type'], 'data' => base64_encode( (string) $image['content'] ) ] ]; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Provider-required private image block.
+				}
+				if ( '' !== (string) ( $item['content'] ?? '' ) ) {
+					$content[] = [ 'type' => 'text', 'text' => (string) $item['content'] ];
+				}
+				if ( ! $content ) {
+					$content[] = [ 'type' => 'text', 'text' => '' ];
+				}
+				$messages[] = [ 'role' => 'user', 'content' => $content ];
 			} elseif ( 'assistant' === $role ) {
 				$content = [];
 				if ( ! empty( $item['content'] ) ) {
@@ -59,14 +74,15 @@ final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transpo
 			]
 		);
 		if ( is_wp_error( $response ) ) {
-			$message   = $response->get_error_message();
-			$ambiguous = false !== stripos( $message, 'timed out' ) || false !== stripos( $message, 'timeout' );
+			$raw_message = $response->get_error_message();
+			$message     = $has_images ? __( 'The Anthropic image request failed.', 'wp-autoplugin' ) : $raw_message;
+			$ambiguous   = false !== stripos( $raw_message, 'timed out' ) || false !== stripos( $raw_message, 'timeout' );
 			return new \WP_Error( 'agent_provider_network', $message, [ 'retryable' => ! $ambiguous, 'ambiguous' => $ambiguous ] );
 		}
 		$status = wp_remote_retrieve_response_code( $response );
 		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 || ! is_array( $data ) ) {
-			$message = is_array( $data ) ? (string) ( $data['error']['message'] ?? __( 'The Anthropic request failed.', 'wp-autoplugin' ) ) : __( 'The Anthropic request failed.', 'wp-autoplugin' );
+			$message = $has_images ? __( 'The Anthropic image request failed.', 'wp-autoplugin' ) : ( is_array( $data ) ? (string) ( $data['error']['message'] ?? __( 'The Anthropic request failed.', 'wp-autoplugin' ) ) : __( 'The Anthropic request failed.', 'wp-autoplugin' ) );
 			return new \WP_Error( 'agent_provider_http', $message, [ 'retryable' => 429 === $status || $status >= 500, 'ambiguous' => false, 'status' => $status ] );
 		}
 		if ( 'max_tokens' === ( $data['stop_reason'] ?? '' ) ) {

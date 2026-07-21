@@ -5,10 +5,11 @@ namespace WP_Autoplugin\V2\Infrastructure\AI;
 use WP_Autoplugin\Admin\Admin;
 use WP_Autoplugin\V2\Domain\AI\Direct_Transport;
 use WP_Autoplugin\V2\Domain\AI\Model_Effort;
+use WP_Autoplugin\V2\Domain\AI\Capability_Matrix;
 
 /** Selects a v2 transport for a direct request without source tools. */
 final class Direct_Transport_Factory {
-	/** @return array{available:bool,provider:string,model:string,effort:string,message:string} */
+	/** @return array{available:bool,provider:string,model:string,effort:string,message:string,images:bool} */
 	public function capability( string $stage = 'plan' ): array {
 		$role   = 'code' === $stage ? 'coder' : ( in_array( $stage, [ 'explain', 'review' ], true ) ? 'reviewer' : 'planner' );
 		$model  = Model_Effort::selected_model( $role );
@@ -24,6 +25,9 @@ final class Direct_Transport_Factory {
 					'model'     => $resolved_model,
 					'effort'    => '',
 					'message'   => $available ? __( 'Direct v2 generation is available.', 'wp-autoplugin' ) : __( 'Complete the selected custom model configuration.', 'wp-autoplugin' ),
+					// Use the configured endpoint name for opt-in so two custom endpoints
+					// sharing a model parameter can declare different capabilities.
+					'images'    => (bool) ( new Capability_Matrix() )->for_model( 'custom', $model )['images'],
 				];
 			}
 		}
@@ -44,6 +48,7 @@ final class Direct_Transport_Factory {
 					'message'   => $available
 						? __( 'Direct v2 generation is available.', 'wp-autoplugin' )
 						: __( 'Configure the API key for the selected model role.', 'wp-autoplugin' ),
+					'images'    => (bool) ( new Capability_Matrix() )->for_model( $provider, $model )['images'],
 				];
 			}
 		}
@@ -53,6 +58,7 @@ final class Direct_Transport_Factory {
 			'model'     => $model,
 			'effort'    => '',
 			'message'   => __( 'The selected model is not available for this direct v2 task.', 'wp-autoplugin' ),
+			'images'    => false,
 		];
 	}
 

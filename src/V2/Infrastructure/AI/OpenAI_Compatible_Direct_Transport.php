@@ -20,6 +20,20 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 	public function effort(): string { return ''; }
 
 	public function complete( string $instructions, string $input, array $options = [] ) {
+		$user_content = $input;
+		$has_images   = ! empty( $options['prompt_images'] );
+		if ( $has_images ) {
+			$user_content = [];
+			foreach ( (array) $options['prompt_images'] as $image ) {
+				if ( empty( $image['content'] ) || empty( $image['mime_type'] ) ) {
+					continue;
+				}
+				$user_content[] = [ 'type' => 'image_url', 'image_url' => [ 'url' => 'data:' . $image['mime_type'] . ';base64,' . base64_encode( (string) $image['content'] ), 'detail' => 'auto' ] ]; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Provider-required private image data URI.
+			}
+			if ( '' !== $input ) {
+				$user_content[] = [ 'type' => 'text', 'text' => $input ];
+			}
+		}
 		$response = wp_remote_post(
 			$this->endpoint,
 			[
@@ -34,7 +48,7 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 							'model'       => $this->selected_model,
 							'messages'    => [
 								[ 'role' => 'system', 'content' => $instructions ],
-								[ 'role' => 'user', 'content' => $input ],
+								[ 'role' => 'user', 'content' => $user_content ],
 							],
 							'temperature' => 0.2,
 							'max_tokens'  => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 8192 ) ) ),
@@ -46,15 +60,16 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 			]
 		);
 		if ( is_wp_error( $response ) ) {
-			$message   = $response->get_error_message();
-			$ambiguous = false !== stripos( $message, 'timed out' ) || false !== stripos( $message, 'timeout' );
+			$raw_message = $response->get_error_message();
+			$message     = $has_images ? __( 'The image request to the selected provider failed.', 'wp-autoplugin' ) : $raw_message;
+			$ambiguous   = false !== stripos( $raw_message, 'timed out' ) || false !== stripos( $raw_message, 'timeout' );
 			return new \WP_Error( 'direct_provider_network', $message, [ 'retryable' => ! $ambiguous, 'ambiguous' => $ambiguous ] );
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
 		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 || ! is_array( $data ) ) {
-			$message = is_array( $data ) ? (string) ( $data['error']['message'] ?? __( 'The direct provider request failed.', 'wp-autoplugin' ) ) : __( 'The direct provider request failed.', 'wp-autoplugin' );
+			$message = $has_images ? __( 'The image request to the selected provider failed.', 'wp-autoplugin' ) : ( is_array( $data ) ? (string) ( $data['error']['message'] ?? __( 'The direct provider request failed.', 'wp-autoplugin' ) ) : __( 'The direct provider request failed.', 'wp-autoplugin' ) );
 			return new \WP_Error( 'direct_provider_http', $message, [ 'status' => $status, 'retryable' => 429 === $status || $status >= 500, 'ambiguous' => false ] );
 		}
 

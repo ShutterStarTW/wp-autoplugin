@@ -6,19 +6,28 @@ namespace WP_Autoplugin\V2\Domain\AI;
  * Declares orchestration features separately from provider transports.
  */
 final class Capability_Matrix {
+	private const IMAGE_MODEL_PATTERNS = [
+		'openai'    => '/^(?:gpt-(?:4\.1|4o|5(?:\.\d+)?)|o3)(?:$|-)/',
+		'anthropic' => '/^claude-/',
+		'google'    => '/^gemini-/',
+		'xai'       => '/^grok-/',
+	];
+
 	/**
 	 * Return conservative capabilities for the currently bundled transports.
 	 *
 	 * @return array<string, bool|int|string>
 	 */
 	public function for_model( string $provider, string $model ): array {
+		$provider = sanitize_key( $provider );
+		$image_pattern = self::IMAGE_MODEL_PATTERNS[ $provider ] ?? '';
 		$capabilities = [
-			'provider'            => sanitize_key( $provider ),
+			'provider'            => $provider,
 			'model'               => sanitize_text_field( $model ),
 			'direct_mode'         => true,
 			'native_read_tools'   => in_array( sanitize_key( $provider ), [ 'openai', 'anthropic' ], true ),
 			'unified_patch'       => false,
-			'images'              => in_array( $model, \WP_Autoplugin\AI_Utils::get_supported_image_models(), true ),
+			'images'              => '' !== $image_pattern && 1 === preg_match( $image_pattern, $model ),
 			'max_tool_iterations' => in_array( sanitize_key( $provider ), [ 'openai', 'anthropic' ], true ) ? 8 : 0,
 		];
 

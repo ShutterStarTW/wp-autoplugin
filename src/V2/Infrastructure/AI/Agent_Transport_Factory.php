@@ -5,10 +5,11 @@ namespace WP_Autoplugin\V2\Infrastructure\AI;
 use WP_Autoplugin\Admin\Admin;
 use WP_Autoplugin\V2\Domain\AI\Agent_Transport;
 use WP_Autoplugin\V2\Domain\AI\Model_Effort;
+use WP_Autoplugin\V2\Domain\AI\Capability_Matrix;
 
 /** Selects only v2 transports with validated native read-tool support. */
 final class Agent_Transport_Factory {
-	/** @return array{available:bool,provider:string,model:string,effort:string,message:string} */
+	/** @return array{available:bool,provider:string,model:string,effort:string,message:string,images:bool} */
 	public function capability( string $stage = 'explain' ): array {
 		$is_plan = 'plan' === $stage;
 		$role    = $is_plan ? 'planner' : 'reviewer';
@@ -25,6 +26,7 @@ final class Agent_Transport_Factory {
 				'message'   => $available
 					? sprintf( /* translators: %s: workspace stage. */ __( 'Agentic %s is available.', 'wp-autoplugin' ), $is_plan ? __( 'Plan', 'wp-autoplugin' ) : __( 'Explain', 'wp-autoplugin' ) )
 					: sprintf( /* translators: %s: configured model role. */ __( 'Configure the OpenAI API key for the selected %s model.', 'wp-autoplugin' ), $is_plan ? __( 'planner', 'wp-autoplugin' ) : __( 'reviewer', 'wp-autoplugin' ) ),
+				'images'    => (bool) ( new Capability_Matrix() )->for_model( 'openai', $model )['images'],
 			];
 		}
 		if ( isset( $models['Anthropic'][ $model ] ) ) {
@@ -37,6 +39,7 @@ final class Agent_Transport_Factory {
 				'message'   => $available
 					? sprintf( /* translators: %s: workspace stage. */ __( 'Agentic %s is available.', 'wp-autoplugin' ), $is_plan ? __( 'Plan', 'wp-autoplugin' ) : __( 'Explain', 'wp-autoplugin' ) )
 					: sprintf( /* translators: %s: configured model role. */ __( 'Configure the Anthropic API key for the selected %s model.', 'wp-autoplugin' ), $is_plan ? __( 'planner', 'wp-autoplugin' ) : __( 'reviewer', 'wp-autoplugin' ) ),
+				'images'    => (bool) ( new Capability_Matrix() )->for_model( 'anthropic', $model )['images'],
 			];
 		}
 		return [
@@ -47,6 +50,7 @@ final class Agent_Transport_Factory {
 			'message'   => $is_plan
 				? __( 'The selected planner model does not support v2 agentic Plan yet. Choose an OpenAI or Anthropic model.', 'wp-autoplugin' )
 				: __( 'The selected reviewer model does not support v2 agentic Explain yet. Choose an OpenAI or Anthropic model.', 'wp-autoplugin' ),
+			'images'    => false,
 		];
 	}
 

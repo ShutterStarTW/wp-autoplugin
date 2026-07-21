@@ -106,6 +106,226 @@ body.wp-autoplugin-v2-distraction-free {
 		margin: 3px 0 22px;
 	}
 }
+.prompt-composer-field {
+	flex: 1 1 360px;
+	min-width: 0;
+	> label {
+		display: block;
+		font-size: 11px;
+		font-weight: 600;
+		margin-bottom: 6px;
+	}
+	&__row {
+		align-items: flex-end;
+		display: flex;
+		gap: 12px;
+		> .components-button {
+			flex: 0 0 auto;
+			height: 42px;
+		}
+	}
+	&__control {
+		background: $surface;
+		border: 1px solid #949494;
+		border-radius: 3px;
+		box-sizing: border-box;
+		flex: 1;
+		min-width: 0;
+		position: relative;
+		transition:
+			border-color 0.12s ease,
+			box-shadow 0.12s ease,
+			background 0.12s ease;
+		&:focus-within {
+			border-color: $accent;
+			box-shadow: 0 0 0 1px $accent;
+		}
+		&.is-dragging {
+			background: #edf2ff;
+			border-color: $accent;
+			border-style: dashed;
+			box-shadow: 0 0 0 2px rgba(51, 88, 220, 0.16);
+		}
+		&.is-disabled {
+			background: #f1f1f1;
+			cursor: not-allowed;
+		}
+		&.has-image-control textarea {
+			padding-right: 42px;
+		}
+		textarea {
+			background: transparent;
+			border: 0;
+			border-radius: 3px;
+			box-shadow: none;
+			box-sizing: border-box;
+			display: block;
+			font: inherit;
+			height: 40px;
+			line-height: 22px;
+			max-height: 160px;
+			min-height: 40px;
+			overflow-y: hidden;
+			padding: 8px 10px;
+			resize: none;
+			width: 100%;
+			&:focus {
+				box-shadow: none;
+				outline: 0;
+			}
+		}
+	}
+	&__attach {
+		align-items: center;
+		background: transparent;
+		border: 0;
+		border-radius: 3px;
+		color: #526069;
+		cursor: pointer;
+		display: flex;
+		height: 30px;
+		justify-content: center;
+		padding: 0;
+		position: absolute;
+		right: 4px;
+		top: 4px;
+		width: 30px;
+		&:hover {
+			background: #eef0f2;
+			color: $ink;
+		}
+		&:focus-visible {
+			box-shadow: 0 0 0 2px $accent;
+			outline: 0;
+		}
+		&:disabled {
+			cursor: not-allowed;
+			opacity: 0.45;
+		}
+		svg {
+			fill: currentColor;
+			height: 18px;
+			width: 18px;
+		}
+	}
+	&__error,
+	&__help {
+		font-size: 11px;
+		line-height: 1.4;
+		margin: 5px 0 0;
+	}
+	&__error {
+		color: #8b1a24;
+	}
+	&__help {
+		color: $muted;
+	}
+}
+.prompt-attachments {
+	display: flex;
+	flex-basis: 100%;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 5px;
+	min-width: 0;
+	&--stored {
+		margin-top: 8px;
+	}
+	&--pending {
+		gap: 6px;
+		margin: 0;
+		padding: 0 8px 8px;
+	}
+}
+.prompt-attachment {
+	align-items: center;
+	background: #fff;
+	border: 1px solid #cdd3d8;
+	border-radius: 5px;
+	display: flex;
+	flex: 0 0 88px;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+	padding: 4px;
+	position: relative;
+	width: 88px;
+	img {
+		border-radius: 3px;
+		display: block;
+		height: 64px;
+		object-fit: cover;
+		width: 100%;
+	}
+	&__preview-error {
+		align-items: center;
+		background: #f0f2f4;
+		border-radius: 3px;
+		box-sizing: border-box;
+		color: $muted;
+		display: flex;
+		font-size: 9px;
+		height: 64px;
+		justify-content: center;
+		padding: 4px;
+		text-align: center;
+		width: 100%;
+	}
+	&__metadata {
+		min-width: 0;
+		width: 100%;
+	}
+	small {
+		display: block;
+		font-size: 9px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		width: 100%;
+	}
+	> button {
+		align-items: center;
+		background: #172026;
+		border: 0;
+		border-radius: 50%;
+		color: #fff;
+		cursor: pointer;
+		display: flex;
+		font-size: 15px;
+		height: 20px;
+		justify-content: center;
+		line-height: 1;
+		padding: 0 0 2px;
+		position: absolute;
+		right: -6px;
+		top: -6px;
+		width: 20px;
+	}
+	.components-spinner {
+		margin: 23px 0;
+	}
+	&--pending {
+		flex: 0 1 170px;
+		flex-direction: row;
+		max-width: 190px;
+		padding: 3px 24px 3px 3px;
+		width: auto;
+		img {
+			flex: 0 0 32px;
+			height: 32px;
+			width: 32px;
+		}
+		.prompt-attachment__metadata {
+			min-width: 0;
+		}
+		> button {
+			height: 18px;
+			right: 3px;
+			top: 10px;
+			width: 18px;
+		}
+	}
+}
 .workspace-launcher__heading {
 	> p {
 		color: $accent;
@@ -572,6 +792,7 @@ body.wp-autoplugin-v2-distraction-free {
 		background: #f7f8f9;
 		border-bottom: 1px solid #e0e4e7;
 		display: flex;
+		flex-wrap: wrap;
 		gap: 12px;
 		padding: 10px 24px;
 		strong {
@@ -580,12 +801,16 @@ body.wp-autoplugin-v2-distraction-free {
 			text-transform: uppercase;
 		}
 		p {
+			flex: 1;
 			display: -webkit-box;
 			line-height: 1.4;
 			margin: 0;
 			overflow: hidden;
 			-webkit-box-orient: vertical;
 			-webkit-line-clamp: 2;
+		}
+		.prompt-attachments {
+			padding-left: 62px;
 		}
 	}
 	&__panel.components-card {
@@ -1005,10 +1230,6 @@ body.wp-autoplugin-v2-distraction-free {
 .workspace-request {
 	border-top: 1px solid #e1e5e8;
 	padding-top: 16px;
-	textarea {
-		min-height: 62px;
-		resize: vertical;
-	}
 }
 .empty-stage {
 	display: grid;
@@ -1805,12 +2026,6 @@ body.wp-autoplugin-v2-distraction-free {
 		flex-wrap: wrap;
 		gap: 12px;
 		padding: 16px 20px;
-		.components-base-control {
-			flex: 1;
-		}
-		.components-base-control__field {
-			margin-bottom: 0;
-		}
 	}
 	&__focus {
 		color: $muted;
@@ -2191,7 +2406,11 @@ body.wp-autoplugin-v2-distraction-free {
 			padding: 0;
 		}
 	}
-	.components-base-control {
+	&__composer {
+		align-items: flex-end;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 12px;
 		margin-top: 18px;
 	}
 }
@@ -2428,14 +2647,9 @@ body.wp-autoplugin-v2-distraction-free {
 		align-items: flex-end;
 		border-top: 1px solid #d9dfe4;
 		display: flex;
+		flex-wrap: wrap;
 		gap: 12px;
 		padding: 16px 24px;
-		.components-base-control {
-			flex: 1;
-		}
-		.components-base-control__field {
-			margin-bottom: 0;
-		}
 	}
 }
 .stage-conversation--plan {
@@ -2451,14 +2665,9 @@ body.wp-autoplugin-v2-distraction-free {
 	.explain-stage__composer {
 		align-items: flex-end;
 		display: flex;
+		flex-wrap: wrap;
 		gap: 12px;
 		padding-top: 16px;
-		.components-base-control {
-			flex: 1;
-		}
-		.components-base-control__field {
-			margin-bottom: 0;
-		}
 	}
 }
 .explain-message {
@@ -2730,6 +2939,14 @@ body.wp-autoplugin-v2-distraction-free {
 	}
 }
 @media (max-width: 500px) {
+	.prompt-composer-field__row {
+		align-items: stretch;
+		flex-direction: column;
+		> .components-button {
+			justify-content: center;
+			width: 100%;
+		}
+	}
 	.wp-autoplugin-v2-loading {
 		padding: 20px;
 		&__canvas {

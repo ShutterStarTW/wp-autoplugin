@@ -14,6 +14,7 @@ use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 
 /** Runs a durable question-or-change conversation against the latest staged Code. */
@@ -52,7 +53,12 @@ final class Code_Follow_Up_Orchestrator {
 			if ( $revisions->latest_id( (int) $workspace['id'] ) !== $base_id ) {
 				return $this->conflict();
 			}
-			$capability = ( new Direct_Transport_Factory() )->capability( 'code' );
+			$capability = (array) ( $job['payload']['prompt_model'] ?? [] );
+			if ( empty( $capability['provider'] ) || empty( $capability['model'] ) ) {
+				$capability = ( new Direct_Transport_Factory() )->capability( 'code' );
+			} else {
+				$capability['available'] = true;
+			}
 			if ( ! $capability['available'] ) {
 				return new \WP_Error( 'code_follow_up_transport', $capability['message'] );
 			}
@@ -116,7 +122,7 @@ final class Code_Follow_Up_Orchestrator {
 		$response = $transport->complete(
 			$prompt['instructions'],
 			$prompt['input'],
-			[ 'max_output_tokens' => 8192, 'json' => true ]
+			[ 'max_output_tokens' => 8192, 'json' => true, 'prompt_images' => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ) ]
 		);
 
 		$latest = $jobs->find( (int) $job['id'] );
@@ -221,7 +227,7 @@ final class Code_Follow_Up_Orchestrator {
 		$response = $transport->complete(
 			$prompt['instructions'],
 			$prompt['input'],
-			[ 'max_output_tokens' => 16384, 'json' => true ]
+			[ 'max_output_tokens' => 16384, 'json' => true, 'prompt_images' => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ) ]
 		);
 
 		$latest = $jobs->find( (int) $job['id'] );

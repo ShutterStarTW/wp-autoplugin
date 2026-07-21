@@ -11,6 +11,7 @@ use WP_Autoplugin\V2\Infrastructure\Database\Review_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 use WP_Autoplugin\V2\Release\Package_Builder;
 
@@ -134,7 +135,7 @@ final class Review_Orchestrator {
 			if ( ! $latest_job || $latest_job['cancel_requested'] ) {
 				return $this->cancel( $job, $jobs );
 			}
-			$response = $transport->complete( $instructions, $input, [ 'json' => true, 'max_output_tokens' => 16384 ] );
+			$response = $transport->complete( $instructions, $input, [ 'json' => true, 'max_output_tokens' => 16384, 'prompt_images' => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ) ] );
 			if ( ! is_wp_error( $response ) ) {
 				$attempt_usage = (array) ( $response['usage'] ?? [] );
 				$usage['input_tokens']  += (int) ( $attempt_usage['input_tokens'] ?? 0 );

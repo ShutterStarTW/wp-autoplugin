@@ -8,6 +8,7 @@ use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
 
 /** Executes direct v2 Plan requests for workspaces that have no source target. */
 final class Direct_Planner {
@@ -33,7 +34,11 @@ final class Direct_Planner {
 			return $result;
 		}
 
-		$transport = ( new Direct_Transport_Factory() )->create( 'plan' );
+		$model     = (array) ( $job['payload']['prompt_model'] ?? [] );
+		$factory   = new Direct_Transport_Factory();
+		$transport = ! empty( $model['provider'] ) && ! empty( $model['model'] )
+			? $factory->create_for( (string) $model['provider'], (string) $model['model'], (string) ( $model['effort'] ?? '' ) )
+			: $factory->create( 'plan' );
 		if ( is_wp_error( $transport ) ) {
 			return $transport;
 		}
@@ -59,31 +64,42 @@ final class Direct_Planner {
 			return $prepared;
 		}
 
-		$response = $transport->complete( $prepared['instructions'], $prepared['input'] );
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-		if ( 'final' !== ( $response['type'] ?? '' ) || ! is_string( $response['content'] ?? null ) ) {
-			return new \WP_Error( 'direct_plan_response_invalid', __( 'The provider did not return a final Plan response.', 'wp-autoplugin' ) );
-		}
+		$input   = $prepared['input'];
+		$images  = ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true );
+		$parsed  = null;
+		$usage   = [ 'input_tokens' => 0, 'output_tokens' => 0 ];
+		for ( $attempt = 1; $attempt <= 3; $attempt++ ) {
+			$response = $transport->complete( $prepared['instructions'], $input, [ 'prompt_images' => $images ] );
+			if ( is_wp_error( $response ) ) {
+				return $response;
+			}
+			$attempt_usage = (array) ( $response['usage'] ?? [] );
+			$usage['input_tokens']  += (int) ( $attempt_usage['input_tokens'] ?? 0 );
+			$usage['output_tokens'] += (int) ( $attempt_usage['output_tokens'] ?? 0 );
+			( new Usage_Repository() )->record( (int) $job['id'], $transport->provider(), $transport->model(), 'plan', $attempt_usage );
 
-		$parsed = ( new Plan_Response() )->parse(
-			$response['content'],
-			'plan' !== $job['task'],
-			(int) ( $prepared['artifact_job_id'] ?? 0 ),
-			'create'
-		);
-		if ( is_wp_error( $parsed ) ) {
-			return $parsed;
+			$parsed = 'final' === ( $response['type'] ?? '' ) && is_string( $response['content'] ?? null )
+				? ( new Plan_Response() )->parse(
+					$response['content'],
+					'plan' !== $job['task'],
+					(int) ( $prepared['artifact_job_id'] ?? 0 ),
+					'create'
+				)
+				: new \WP_Error( 'direct_plan_response_invalid', __( 'The provider did not return a final Plan response.', 'wp-autoplugin' ) );
+			if ( ! is_wp_error( $parsed ) ) {
+				break;
+			}
+			if ( 3 === $attempt ) {
+				return $parsed;
+			}
+			$jobs->event( (int) $job['id'], 'plan_retry', __( 'The Plan response failed validation; retrying.', 'wp-autoplugin' ), [ 'attempt' => $attempt + 1 ], 'warning' );
+			$input .= "\n\nThe previous response failed strict validation. Return the complete exact Plan JSON contract again.";
 		}
 
 		if ( 'plan_structure' === $job['task'] ) {
 			$parsed['content']             = $prepared['artifact_content'];
 			$parsed['artifact']['content'] = $prepared['artifact_content'];
 		}
-
-		$usage = (array) ( $response['usage'] ?? [] );
-		( new Usage_Repository() )->record( (int) $job['id'], $transport->provider(), $transport->model(), 'plan', $usage );
 
 		return array_merge(
 			$parsed,

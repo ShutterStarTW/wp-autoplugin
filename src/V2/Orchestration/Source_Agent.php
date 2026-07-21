@@ -11,6 +11,7 @@ use WP_Autoplugin\V2\Infrastructure\Database\Agent_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 
 /** Executes one durable, read-only Plan or Explain agent turn per callback. */
@@ -46,7 +47,12 @@ final class Source_Agent {
 		$runs      = new Agent_Run_Repository();
 		$run       = $runs->find_by_job( (int) $job['id'] );
 		$factory   = new Agent_Transport_Factory();
-		$transport = $run ? $factory->create_for( (string) $run['provider'], (string) $run['model'], (string) $run['effort'] ) : $factory->create( $stage );
+		$model = (array) ( $job['payload']['prompt_model'] ?? [] );
+		$transport = $run
+			? $factory->create_for( (string) $run['provider'], (string) $run['model'], (string) $run['effort'] )
+			: ( ! empty( $model['provider'] ) && ! empty( $model['model'] )
+				? $factory->create_for( (string) $model['provider'], (string) $model['model'], (string) ( $model['effort'] ?? '' ) )
+				: $factory->create( $stage ) );
 		if ( is_wp_error( $transport ) ) {
 			return $transport;
 		}
@@ -113,7 +119,12 @@ final class Source_Agent {
 			}
 
 			$jobs->event( (int) $job['id'], 'agent_turn', sprintf( /* translators: 1: workspace stage, 2: agent model turn. */ __( 'Running %1$s agent turn %2$d.', 'wp-autoplugin' ), $this->label( $stage ), (int) $run['model_turns'] + 1 ), [ 'turn' => (int) $run['model_turns'] + 1, 'model' => $transport->model(), 'effort' => $transport->effort(), 'stage' => $stage ] );
-			$response = $transport->send( $this->instructions( $run, $stage, 'conversation' === $job['task'], (string) $workspace['operation'] ), (array) $run['transcript'], $tools->definitions() );
+			$transcript = (array) $run['transcript'];
+			$images     = ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true );
+			if ( $images && isset( $transcript[0] ) && 'user' === ( $transcript[0]['role'] ?? '' ) ) {
+				$transcript[0]['prompt_images'] = $images;
+			}
+			$response = $transport->send( $this->instructions( $run, $stage, 'conversation' === $job['task'], (string) $workspace['operation'] ), $transcript, $tools->definitions() );
 			if ( is_wp_error( $response ) ) {
 				return $this->provider_failure( $response, $job, $run, $token, $runs );
 			}
