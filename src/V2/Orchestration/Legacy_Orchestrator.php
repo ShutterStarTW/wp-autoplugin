@@ -53,13 +53,19 @@ final class Legacy_Orchestrator {
 			return new \WP_Error( 'conversation_stage_unavailable', __( 'This workspace stage does not support follow-up messages yet.', 'wp-autoplugin' ) );
 		}
 
-		$handler = new Api_Handler();
-		$api     = 'explain' === $stage ? $handler->get_reviewer_api() : $handler->get_planner_api();
-		$model   = 'explain' === $stage ? $handler->get_reviewer_model() : $handler->get_planner_model();
+		$handler       = new Api_Handler();
+		$model_snapshot = (array) ( $job['payload']['prompt_model'] ?? [] );
+		$model         = sanitize_text_field( (string) ( $model_snapshot['model'] ?? '' ) );
+		if ( '' === $model ) {
+			$model = 'explain' === $stage ? $handler->get_reviewer_model() : $handler->get_planner_model();
+		}
+		$api = $handler->get_api( $model );
 		if ( ! $api ) {
 			return new \WP_Error( 'provider_not_configured', __( 'Configure an API key and model for this task before starting the job.', 'wp-autoplugin' ) );
 		}
-		$effort = Model_Effort::for_role( 'explain' === $stage ? 'reviewer' : 'planner' );
+		$effort = array_key_exists( 'effort', $model_snapshot )
+			? Model_Effort::normalize( $model, (string) $model_snapshot['effort'] )
+			: Model_Effort::for_role( 'explain' === $stage ? 'reviewer' : 'planner' );
 		if ( '' !== $effort && $api instanceof OpenAI_API ) {
 			$api->set_reasoning_effort( $effort );
 		} elseif ( '' !== $effort && $api instanceof Anthropic_API ) {

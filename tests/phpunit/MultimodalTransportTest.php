@@ -89,7 +89,7 @@ final class MultimodalTransportTest extends WP_UnitTestCase {
 			);
 			$capability = ( new Direct_Transport_Factory() )->capability( 'plan' );
 			$this->assertTrue( $capability['images'] );
-			$this->assertSame( 'shared-remote-model', $capability['model'] );
+			$this->assertSame( 'private-model', $capability['model'] );
 		} finally {
 			if ( null === $previous_planner ) {
 				delete_option( 'wp_autoplugin_planner_model' );

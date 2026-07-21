@@ -1231,6 +1231,97 @@ body.wp-autoplugin-v2-distraction-free {
 	border-top: 1px solid #e1e5e8;
 	padding-top: 16px;
 }
+.workspace-launcher__actions {
+	align-items: center;
+	display: flex;
+	gap: 12px;
+	justify-content: space-between;
+	margin-top: 16px;
+}
+.stage-model-bar {
+	align-items: center;
+	display: flex;
+	justify-content: flex-end;
+	margin: -6px 0 18px;
+}
+.stage-model-control {
+	align-items: center;
+	display: inline-flex;
+	gap: 8px;
+	max-width: 100%;
+	&__role {
+		color: $muted;
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+	}
+	&__dropdown {
+		max-width: 100%;
+	}
+	&__chip.components-button {
+		border-radius: 999px;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+			monospace;
+		font-size: 11px;
+		height: 32px;
+		max-width: min(460px, 70vw);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		&.has-warning {
+			background: #fff2dd;
+			border-color: #d6a84e;
+			color: #704700;
+		}
+	}
+}
+.stage-model-popover .components-popover__content {
+	width: min(390px, calc(100vw - 32px));
+}
+.stage-model-popover__body {
+	box-sizing: border-box;
+	padding: 18px;
+	width: 100%;
+	h3 {
+		font-size: 15px;
+		margin: 0 0 16px;
+	}
+	> label {
+		display: block;
+		font-size: 11px;
+		font-weight: 700;
+		margin: 12px 0 5px;
+	}
+	> select {
+		max-width: none;
+		width: 100%;
+	}
+	.components-notice {
+		margin: 12px 0 0;
+	}
+	> a {
+		display: inline-block;
+		margin-top: 8px;
+	}
+}
+.stage-model-popover__help {
+	color: $muted;
+	font-size: 11px;
+	line-height: 1.45;
+	margin: 10px 0 0;
+}
+.stage-model-popover__error {
+	color: #b32d2e;
+	font-size: 12px;
+	margin: 10px 0 0;
+}
+.stage-model-popover__actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 16px;
+}
 .empty-stage {
 	display: grid;
 	place-content: center;
@@ -1265,6 +1356,14 @@ body.wp-autoplugin-v2-distraction-free {
 		width: 100%;
 		accent-color: $accent;
 	}
+}
+.job-model-meta {
+	color: $muted;
+	display: block;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+		monospace;
+	font-size: 11px;
+	margin-top: 5px;
 }
 .job-result {
 	border-top: 1px solid #d9dfe4;
@@ -2991,6 +3090,27 @@ body.wp-autoplugin-v2-distraction-free {
 	.stage-conversation--plan .explain-stage__composer {
 		align-items: stretch;
 		flex-direction: column;
+	}
+	.workspace-launcher__actions {
+		align-items: stretch;
+		flex-direction: column;
+		> .components-button {
+			justify-content: center;
+			width: 100%;
+		}
+	}
+	.stage-model-bar {
+		justify-content: stretch;
+	}
+	.stage-model-control {
+		align-items: stretch;
+		flex-direction: column;
+		width: 100%;
+		&__chip.components-button {
+			justify-content: center;
+			max-width: 100%;
+			width: 100%;
+		}
 	}
 	.code-conversation {
 		&__messages {

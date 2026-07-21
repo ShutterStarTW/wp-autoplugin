@@ -2,22 +2,22 @@
 # This file is distributed under the same license as the WP-Autoplugin plugin.
 msgid ""
 msgstr ""
-"Project-Id-Version: WP AutoPlugin 1.7.1\n"
+"Project-Id-Version: WP-Autoplugin 2.0.0-dev\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/wp-autoplugin\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-01-13T16:53:21+00:00\n"
+"POT-Creation-Date: 2026-07-21T12:27:05+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"X-Generator: WP-CLI 2.12.0\n"
+"X-Generator: WP-CLI 2.11.0\n"
 "X-Domain: wp-autoplugin\n"
 
 #. Plugin Name of the plugin
 #: wp-autoplugin.php
-#: includes/admin/class-menu.php:41
-#: includes/admin/class-menu.php:42
+#: includes/admin/class-menu.php:43
+#: includes/admin/class-menu.php:44
 msgid "WP-Autoplugin"
 msgstr ""
 
@@ -42,30 +42,28 @@ msgid "Modify (Patch)"
 msgstr ""
 
 #: includes/admin/class-action-links.php:46
-#: includes/admin/class-menu.php:98
-#: includes/admin/class-menu.php:99
+#: includes/admin/class-menu.php:91
+#: includes/admin/class-menu.php:92
 msgid "Create Extension"
 msgstr ""
 
 #: includes/admin/class-action-links.php:63
-#: includes/admin/class-menu.php:107
-#: includes/admin/class-menu.php:108
+#: includes/admin/class-menu.php:100
+#: includes/admin/class-menu.php:101
 msgid "Extend Theme"
 msgstr ""
 
-#: includes/admin/class-action-links.php:88
+#: includes/admin/class-action-links.php:89
 msgid "Extend"
 msgstr ""
 
 #. translators: %s: version number.
 #: includes/admin/class-admin.php:75
-#, php-format
 msgid "WP-Autoplugin v%s"
 msgstr ""
 
 #. translators: %s: model name.
 #: includes/admin/class-admin.php:86
-#, php-format
 msgid "Model: %s"
 msgstr ""
 
@@ -78,9 +76,9 @@ msgid "Click for token usage breakdown"
 msgstr ""
 
 #: includes/admin/class-bulk-actions.php:47
-#: includes/admin/class-menu.php:189
-#: includes/admin/class-menu.php:231
-#: includes/admin/class-menu.php:259
+#: includes/admin/class-menu.php:195
+#: includes/admin/class-menu.php:237
+#: includes/admin/class-menu.php:265
 #: includes/ajax/class-ajax.php:115
 #: includes/ajax/class-model.php:41
 #: includes/ajax/class-model.php:82
@@ -90,56 +88,50 @@ msgid "Security check failed."
 msgstr ""
 
 #: includes/admin/class-bulk-actions.php:51
-#: includes/admin/class-menu.php:180
-#: includes/admin/class-menu.php:223
-#: includes/admin/class-menu.php:251
+#: includes/admin/class-menu.php:115
+#: includes/admin/class-menu.php:186
+#: includes/admin/class-menu.php:229
+#: includes/admin/class-menu.php:257
 msgid "You do not have sufficient permissions to access this page."
 msgstr ""
 
-#: includes/admin/class-menu.php:52
-#: includes/admin/class-menu.php:53
-#: views/page-list-plugins.php:30
-#: views/page-list-plugins.php:39
-msgid "Generate New Plugin"
-msgstr ""
-
-#: includes/admin/class-menu.php:61
-#: includes/admin/class-menu.php:62
+#: includes/admin/class-menu.php:54
+#: includes/admin/class-menu.php:55
 msgid "Settings"
 msgstr ""
 
-#: includes/admin/class-menu.php:71
-#: includes/admin/class-menu.php:72
+#: includes/admin/class-menu.php:64
+#: includes/admin/class-menu.php:65
 msgid "Extend Plugin"
 msgstr ""
 
-#: includes/admin/class-menu.php:80
-#: includes/admin/class-menu.php:81
+#: includes/admin/class-menu.php:73
+#: includes/admin/class-menu.php:74
 #: views/page-fix-plugin.php:53
 msgid "Fix Plugin"
 msgstr ""
 
-#: includes/admin/class-menu.php:89
-#: includes/admin/class-menu.php:90
+#: includes/admin/class-menu.php:82
+#: includes/admin/class-menu.php:83
 #: views/page-explain-plugin.php:67
 msgid "Explain Plugin"
 msgstr ""
 
-#: includes/admin/class-menu.php:185
-#: includes/admin/class-menu.php:227
+#: includes/admin/class-menu.php:191
+#: includes/admin/class-menu.php:233
 msgid "No plugin specified."
 msgstr ""
 
-#: includes/admin/class-menu.php:198
-#: includes/admin/class-menu.php:239
+#: includes/admin/class-menu.php:204
+#: includes/admin/class-menu.php:245
 msgid "The specified plugin does not exist."
 msgstr ""
 
-#: includes/admin/class-menu.php:255
+#: includes/admin/class-menu.php:261
 msgid "No theme specified."
 msgstr ""
 
-#: includes/admin/class-menu.php:265
+#: includes/admin/class-menu.php:271
 msgid "The specified theme does not exist."
 msgstr ""
 
@@ -153,11 +145,11 @@ msgstr ""
 
 #. translators: 1: fix link start tag, 2: fix link end tag
 #: includes/admin/class-notices.php:74
-#, php-format
 msgid "You can %1$sfix the error automatically%2$s."
 msgstr ""
 
 #: includes/admin/class-plugin-list-table.php:46
+#: assets/v2/build/index.tsx.js:42
 msgid "Plugin"
 msgstr ""
 
@@ -166,18 +158,27 @@ msgid "Deactivate"
 msgstr ""
 
 #: includes/admin/class-plugin-list-table.php:87
+#: assets/v2/build/index.tsx.js:41
 msgid "Activate"
 msgstr ""
 
 #: includes/admin/class-plugin-list-table.php:90
+#: assets/v2/build/index.tsx.js:40
 msgid "Fix"
 msgstr ""
 
 #: includes/admin/class-plugin-list-table.php:91
+#: assets/v2/build/index.tsx.js:1
 msgid "Modify"
 msgstr ""
 
+#. translators: %s: workspace stage.
 #: includes/admin/class-plugin-list-table.php:92
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:24
+#: src/V2/Orchestration/Source_Agent.php:364
+#: assets/v2/build/index.tsx.js:1
+#: assets/v2/build/index.tsx.js:12
+#: assets/v2/build/index.tsx.js:42
 msgid "Explain"
 msgstr ""
 
@@ -194,6 +195,7 @@ msgid "All"
 msgstr ""
 
 #: includes/admin/class-plugin-list-table.php:223
+#: assets/v2/build/index.tsx.js:43
 msgid "Active"
 msgstr ""
 
@@ -346,7 +348,6 @@ msgstr ""
 
 #. translators: 1: File name.
 #: includes/admin/class-scripts.php:71
-#, php-format
 msgid "Error generating %s:"
 msgstr ""
 
@@ -372,7 +373,6 @@ msgstr ""
 
 #. translators: 1: File name.
 #: includes/admin/class-scripts.php:78
-#, php-format
 msgid "Please add your %s code here"
 msgstr ""
 
@@ -391,7 +391,6 @@ msgstr ""
 
 #. translators: %d: Total number of hooks found.
 #: includes/admin/class-scripts.php:84
-#, php-format
 msgid "%d hooks found in the theme code"
 msgstr ""
 
@@ -413,13 +412,11 @@ msgstr ""
 
 #. translators: 1: Plugin/Theme name, 2: Current item number, 3: Total number of items.
 #: includes/admin/class-scripts.php:90
-#, php-format
 msgid "Generating %1$s (%2$d of %3$d)..."
 msgstr ""
 
 #. translators: %d: Total number of hooks found.
 #: includes/admin/class-scripts.php:93
-#, php-format
 msgid "%d hooks found in the plugin code"
 msgstr ""
 
@@ -427,88 +424,227 @@ msgstr ""
 msgid "No hooks found in the plugin code. Cannot proceed with extension."
 msgstr ""
 
-#: includes/admin/class-scripts.php:130
+#: includes/admin/class-scripts.php:133
+#: assets/v2/build/index.tsx.js:41
 msgid "Plugin Name"
 msgstr ""
 
-#: includes/admin/class-scripts.php:131
+#: includes/admin/class-scripts.php:134
 msgid "Design And Architecture"
 msgstr ""
 
-#: includes/admin/class-scripts.php:132
+#: includes/admin/class-scripts.php:135
 msgid "Detailed Feature Description"
 msgstr ""
 
-#: includes/admin/class-scripts.php:133
+#: includes/admin/class-scripts.php:136
 msgid "User Interface"
 msgstr ""
 
-#: includes/admin/class-scripts.php:134
+#: includes/admin/class-scripts.php:137
 msgid "User Flows"
 msgstr ""
 
-#: includes/admin/class-scripts.php:135
+#: includes/admin/class-scripts.php:138
 msgid "Security Considerations"
 msgstr ""
 
-#: includes/admin/class-scripts.php:136
+#: includes/admin/class-scripts.php:139
 msgid "Testing Plan"
 msgstr ""
 
-#: includes/admin/class-scripts.php:137
+#: includes/admin/class-scripts.php:140
 msgid "Project Structure"
 msgstr ""
 
-#: includes/admin/class-scripts.php:138
+#: includes/admin/class-scripts.php:141
 msgid "Technically Feasible"
 msgstr ""
 
-#: includes/admin/class-scripts.php:139
+#: includes/admin/class-scripts.php:142
 msgid "Explanation"
 msgstr ""
 
-#: includes/admin/class-scripts.php:140
+#: includes/admin/class-scripts.php:143
+#: assets/v2/build/index.tsx.js:43
 msgid "Hooks"
 msgstr ""
 
-#: includes/admin/class-scripts.php:141
+#. translators: %s: workspace stage.
+#: includes/admin/class-scripts.php:144
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:24
+#: src/V2/Orchestration/Source_Agent.php:364
+#: assets/v2/build/index.tsx.js:18
+#: assets/v2/build/index.tsx.js:42
 msgid "Plan"
 msgstr ""
 
-#: includes/admin/class-scripts.php:180
-msgid "A simple contact form with honeypot spam protection."
-msgstr ""
-
-#: includes/admin/class-scripts.php:181
-msgid "A custom post type for testimonials."
-msgstr ""
-
-#: includes/admin/class-scripts.php:182
-msgid "A widget that displays recent posts."
-msgstr ""
-
 #: includes/admin/class-scripts.php:183
-msgid "A simple image compression tool."
+msgid "A simple contact form with honeypot spam protection"
 msgstr ""
 
-#: includes/admin/class-scripts.php:431
-#: views/footer-modal.php:161
+#: includes/admin/class-scripts.php:184
+msgid "A custom post type for testimonials"
+msgstr ""
+
+#: includes/admin/class-scripts.php:185
+msgid "A widget that displays recent posts"
+msgstr ""
+
+#: includes/admin/class-scripts.php:186
+msgid "A shortcode that shows a random quote"
+msgstr ""
+
+#: includes/admin/class-scripts.php:187
+msgid "A user profile widget displaying avatar, bio, and website link"
+msgstr ""
+
+#: includes/admin/class-scripts.php:188
+msgid "A custom post type for managing FAQs"
+msgstr ""
+
+#: includes/admin/class-scripts.php:189
+msgid "A post views counter that tracks and displays view counts"
+msgstr ""
+
+#: includes/admin/class-scripts.php:190
+msgid "Maintenance mode with a countdown timer to site return"
+msgstr ""
+
+#: includes/admin/class-scripts.php:191
+msgid "An admin quick links widget for the dashboard"
+msgstr ""
+
+#: includes/admin/class-scripts.php:192
+msgid "Hide the admin bar for non-admin users"
+msgstr ""
+
+#: includes/admin/class-scripts.php:193
+msgid "Hide specific menu items in the admin area"
+msgstr ""
+
+#: includes/admin/class-scripts.php:194
+msgid "A social media share buttons plugin for posts"
+msgstr ""
+
+#: includes/admin/class-scripts.php:195
+msgid "A custom footer credit remover"
+msgstr ""
+
+#: includes/admin/class-scripts.php:196
+msgid "A plugin to add custom CSS to the WordPress login page"
+msgstr ""
+
+#: includes/admin/class-scripts.php:197
+msgid "A related posts display below single post content"
+msgstr ""
+
+#: includes/admin/class-scripts.php:198
+msgid "A custom excerpt length controller"
+msgstr ""
+
+#: includes/admin/class-scripts.php:199
+msgid "A \"Back to Top\" button for long pages"
+msgstr ""
+
+#: includes/admin/class-scripts.php:200
+msgid "A plugin to disable comments on specific post types"
+msgstr ""
+
+#: includes/admin/class-scripts.php:201
+msgid "A simple Google Analytics integration"
+msgstr ""
+
+#: includes/admin/class-scripts.php:202
+msgid "An author box display below posts"
+msgstr ""
+
+#: includes/admin/class-scripts.php:203
+msgid "A custom breadcrumb generator"
+msgstr ""
+
+#: includes/admin/class-scripts.php:204
+msgid "A plugin to add nofollow to external links"
+msgstr ""
+
+#: includes/admin/class-scripts.php:205
+msgid "A simple cookie consent banner"
+msgstr ""
+
+#: includes/admin/class-scripts.php:206
+msgid "A post expiration date setter"
+msgstr ""
+
+#: includes/admin/class-scripts.php:207
+msgid "A basic XML sitemap generator"
+msgstr ""
+
+#: includes/admin/class-scripts.php:208
+msgid "A custom login URL creator for added security"
+msgstr ""
+
+#: includes/admin/class-scripts.php:209
+msgid "A simple contact information display shortcode"
+msgstr ""
+
+#: includes/admin/class-scripts.php:210
+msgid "A plugin to add estimated reading time to posts"
+msgstr ""
+
+#: includes/admin/class-scripts.php:211
+msgid "A custom RSS feed footer"
+msgstr ""
+
+#: includes/admin/class-scripts.php:212
+msgid "A simple post duplication tool"
+msgstr ""
+
+#: includes/admin/class-scripts.php:213
+msgid "A basic schema markup generator"
+msgstr ""
+
+#: includes/admin/class-scripts.php:214
+msgid "A plugin to add custom admin footer text"
+msgstr ""
+
+#: includes/admin/class-scripts.php:215
+msgid "A plugin to add custom taxonomies easily"
+msgstr ""
+
+#: includes/admin/class-scripts.php:216
+msgid "A simple email obfuscator to prevent spam"
+msgstr ""
+
+#: includes/admin/class-scripts.php:217
+msgid "A basic redirection manager"
+msgstr ""
+
+#: includes/admin/class-scripts.php:218
+msgid "A plugin to add custom fields to user profiles"
+msgstr ""
+
+#: includes/admin/class-scripts.php:219
+msgid "A simple image compression tool"
+msgstr ""
+
+#: includes/admin/class-scripts.php:467
+#: views/footer-modal.php:169
 msgid "No token usage data available yet."
 msgstr ""
 
-#: includes/admin/class-scripts.php:432
+#: includes/admin/class-scripts.php:468
 msgid "Total Usage"
 msgstr ""
 
-#: includes/admin/class-scripts.php:433
+#: includes/admin/class-scripts.php:469
 msgid "Step Breakdown"
 msgstr ""
 
-#: includes/admin/class-scripts.php:434
+#: includes/admin/class-scripts.php:470
 msgid "Failed to save models."
 msgstr ""
 
-#: includes/admin/class-scripts.php:435
+#: includes/admin/class-scripts.php:471
 msgid "An error occurred while saving models."
 msgstr ""
 
@@ -530,33 +666,33 @@ msgstr ""
 msgid "Invalid AJAX action."
 msgstr ""
 
-#: includes/ajax/class-extender.php:203
-#: includes/ajax/class-fixer.php:254
-#: includes/ajax/class-generator.php:122
-#: includes/ajax/class-generator.php:210
-#: includes/ajax/class-generator.php:243
+#: includes/ajax/class-extender.php:211
+#: includes/ajax/class-fixer.php:262
+#: includes/ajax/class-generator.php:124
+#: includes/ajax/class-generator.php:212
+#: includes/ajax/class-generator.php:245
 #: includes/ajax/class-hooks-extender.php:172
 #: includes/ajax/class-theme-extender.php:192
 msgid "Invalid input data."
 msgstr ""
 
-#: includes/ajax/class-extender.php:208
-#: includes/ajax/class-fixer.php:259
-#: includes/ajax/class-generator.php:127
+#: includes/ajax/class-extender.php:216
+#: includes/ajax/class-fixer.php:267
+#: includes/ajax/class-generator.php:129
 #: includes/ajax/class-hooks-extender.php:177
 #: includes/ajax/class-theme-extender.php:197
 msgid "File index out of range."
 msgstr ""
 
-#: includes/ajax/class-fixer.php:202
+#: includes/ajax/class-fixer.php:210
 msgid "Invalid plugin path."
 msgstr ""
 
-#: includes/ajax/class-generator.php:60
+#: includes/ajax/class-generator.php:62
 msgid "Failed to decode the generated plan: "
 msgstr ""
 
-#: includes/ajax/class-generator.php:258
+#: includes/ajax/class-generator.php:260
 msgid "Failed to decode the review result."
 msgstr ""
 
@@ -614,7 +750,6 @@ msgstr ""
 
 #. Translators: %s: model name.
 #: includes/ajax/class-model.php:209
-#, php-format
 msgid "Invalid model specified: %s"
 msgstr ""
 
@@ -630,8 +765,8 @@ msgstr ""
 msgid "No hooks found in the theme."
 msgstr ""
 
-#: includes/api/class-custom-api.php:121
-#: includes/api/class-openai-responses-api.php:111
+#: includes/api/class-custom-api.php:118
+#: includes/api/class-openai-responses-api.php:108
 msgid "Error communicating with the API."
 msgstr ""
 
@@ -655,7 +790,7 @@ msgstr ""
 msgid "Plugin reactivated successfully."
 msgstr ""
 
-#: includes/class-hooks-extender.php:191
+#: includes/class-hooks-extender.php:193
 msgid "(No custom hooks found in the theme code.)"
 msgstr ""
 
@@ -688,13 +823,11 @@ msgstr ""
 
 #. Translators: %s: file path.
 #: includes/class-plugin-installer.php:228
-#, php-format
 msgid "Missing content for file: %s"
 msgstr ""
 
 #. Translators: %s: file path.
 #: includes/class-plugin-installer.php:240
-#, php-format
 msgid "Error creating file: %s"
 msgstr ""
 
@@ -712,13 +845,11 @@ msgstr ""
 
 #. Translators: %s: file path.
 #: includes/class-plugin-installer.php:323
-#, php-format
 msgid "Unsupported file type for update: %s"
 msgstr ""
 
 #. Translators: %s: file path.
 #: includes/class-plugin-installer.php:335
-#, php-format
 msgid "Failed to write file: %s"
 msgstr ""
 
@@ -738,7 +869,6 @@ msgstr ""
 
 #. Translators: %s: error message.
 #: includes/class-plugin-installer.php:452
-#, php-format
 msgid "Error deleting plugin: %s"
 msgstr ""
 
@@ -746,57 +876,2024 @@ msgstr ""
 msgid "Plugin deleted successfully."
 msgstr ""
 
-#: views/footer-modal.php:5
-msgid "Select Models"
+#: src/V2/Admin/Model_Settings.php:36
+msgid "Reasoning:"
 msgstr ""
 
-#: views/footer-modal.php:10
-msgid "Default Model:"
+#: src/V2/Admin/Model_Settings.php:37
+msgid "Model effort"
 msgstr ""
 
-#: views/footer-modal.php:28
-#: views/footer-modal.php:62
-#: views/footer-modal.php:96
-#: views/footer-modal.php:130
-#: views/page-settings.php:64
-#: views/page-settings.php:88
-#: views/page-settings.php:181
-#: views/page-settings.php:271
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:19
+msgid "The Code follow-up response must be JSON without Markdown fences."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:23
+msgid "The Code follow-up analysis must be a valid JSON object."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:29
+msgid "The Code follow-up response requires bounded non-empty Markdown content."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:35
+msgid "The Code follow-up response must classify as answer or provide a complete changes manifest."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:41
+msgid "The current revision manifest is invalid."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:69
+msgid "Every change instruction must be bounded, unique, and identify a desired file."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:75
+msgid "The Code follow-up instructions exceed the safe limit."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:86
+msgid "The new file %s requires a generation instruction."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:91
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:183
+msgid "The proposed Code follow-up does not contain a material change."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:101
+msgid "Every retained PHP file whose plugin-header role changes must be regenerated."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:158
+msgid "A staged deletion must not request generated replacement content."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:161
+msgid "AI Code follow-ups can generate only PHP, JavaScript, and CSS target files."
+msgstr ""
+
+#: src/V2/Domain/AI/Code_Follow_Up_Response.php:166
+msgid "The target change for %s requires a generation instruction."
+msgstr ""
+
+#: src/V2/Domain/AI/Model_Catalog.php:123
+msgid "The selected model role is invalid."
+msgstr ""
+
+#: src/V2/Domain/AI/Model_Catalog.php:134
+msgid "The selected model is not available in the configured catalog."
+msgstr ""
+
+#: src/V2/Domain/AI/Model_Catalog.php:206
+#: views/footer-modal.php:36
+#: views/footer-modal.php:70
+#: views/footer-modal.php:104
+#: views/footer-modal.php:138
+#: views/page-settings.php:73
+#: views/page-settings.php:98
+#: views/page-settings.php:204
+#: views/page-settings.php:352
 msgid "Custom Models"
 msgstr ""
 
-#: views/footer-modal.php:44
+#: src/V2/Domain/AI/Plan_Response.php:18
+msgid "The provider returned an invalid Plan response. No Plan artifact was changed."
+msgstr ""
+
+#: src/V2/Domain/AI/Plan_Response.php:99
+msgid "The provider returned an invalid new-plugin Plan. No Plan artifact was changed."
+msgstr ""
+
+#: src/V2/Domain/AI/Plan_Response.php:156
+msgid "The provider returned an invalid extension Plan. No Plan artifact was changed."
+msgstr ""
+
+#: src/V2/Domain/AI/Plan_Response.php:165
+#: src/V2/Domain/AI/Plan_Response.php:172
+#: src/V2/Domain/AI/Plan_Response.php:181
+#: src/V2/Domain/AI/Plan_Response.php:188
+msgid "The provider returned an invalid Plan file map. No Plan artifact was changed."
+msgstr ""
+
+#: src/V2/Domain/AI/Prompt_Image_Validator.php:27
+#: src/V2/Infrastructure/Database/Prompt_Attachment_Repository.php:19
+#: src/V2/Rest/Routes.php:1190
+msgid "Attach no more than six images to one message."
+msgstr ""
+
+#: src/V2/Domain/AI/Prompt_Image_Validator.php:44
+#: src/V2/Infrastructure/Database/Prompt_Attachment_Repository.php:38
+#: src/V2/Infrastructure/Database/Prompt_Attachment_Repository.php:45
+#: src/V2/Rest/Routes.php:1202
+msgid "Prompt images may use at most 20 MiB in total."
+msgstr ""
+
+#: src/V2/Domain/AI/Prompt_Image_Validator.php:55
+msgid "One of the prompt images could not be uploaded."
+msgstr ""
+
+#: src/V2/Domain/AI/Prompt_Image_Validator.php:59
+msgid "One of the prompt images is unreadable."
+msgstr ""
+
+#: src/V2/Domain/AI/Prompt_Image_Validator.php:63
+msgid "Prompt images cannot be empty."
+msgstr ""
+
+#: src/V2/Domain/AI/Prompt_Image_Validator.php:67
+msgid "Each prompt image must be 5 MiB or smaller."
+msgstr ""
+
+#: src/V2/Domain/AI/Prompt_Image_Validator.php:73
+msgid "Prompt images must be JPEG, PNG, or WebP files."
+msgstr ""
+
+#: src/V2/Domain/AI/Prompt_Image_Validator.php:77
+msgid "A prompt image does not match its declared file type."
+msgstr ""
+
+#: src/V2/Domain/AI/Prompt_Image_Validator.php:82
+msgid "Prompt images must be no larger than 8000 by 8000 pixels."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:20
+msgid "The Review response must be JSON without Markdown code fences."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:24
+msgid "The reviewer returned an invalid response shape."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:29
+msgid "The reviewer returned an invalid answer."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:33
+msgid "The Review answer is empty or too large."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:38
+msgid "The reviewer must return an answer or a complete Review report."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:41
+msgid "The Review report fields are invalid."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:46
+msgid "The Review summary is empty or too large."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:56
+msgid "A prior Review finding has an invalid disposition."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:61
+msgid "Every prior open finding must be accounted for exactly once."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:78
+msgid "The Review update omitted a prior open finding."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:93
+msgid "A new Review finding is invalid."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:101
+msgid "The Review report contains a duplicate finding."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:108
+msgid "A Review report may contain at most %d open findings."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:129
+msgid "A Review finding contains unsupported fields."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:137
+msgid "A Review finding has an invalid priority, category, title, or description."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:142
+msgid "A project-level Review finding must use null source location fields."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:155
+msgid "A Review finding must reference a staged file or the project summary."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:159
+msgid "A Review finding references an unavailable side of the staged change."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:167
+msgid "A Review finding references an invalid source line range."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:187
+msgid "The Review testing checklist is too large."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:192
+#: src/V2/Domain/AI/Review_Response.php:204
+msgid "A Review testing instruction is invalid."
+msgstr ""
+
+#: src/V2/Domain/AI/Review_Response.php:199
+msgid "A Review testing step is invalid."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:29
+msgid "This extension Plan is not technically feasible and cannot generate Code."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:44
+msgid "Code generation requires between 1 and %d planned files."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:51
+#: src/V2/Domain/Revision/Code_Validator.php:84
+msgid "The Plan file map is invalid. Regenerate the Plan before generating Code."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:69
+msgid "This Plan does not identify its main plugin file. Regenerate the Plan before generating Code."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:107
+msgid "The project manifest requires between 1 and %d files and a plugin name."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:119
+msgid "The project manifest contains an unsafe, duplicate, unsupported, or undescribed file."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:128
+msgid "The project main_file must identify a root-level PHP file in the manifest."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:161
+#: src/V2/Domain/Revision/Code_Validator.php:201
+msgid "The response must be JSON without Markdown code fences."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:165
+msgid "The provider response must contain only path and complete content."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:168
+#: src/V2/Domain/Revision/Code_Validator.php:216
+msgid "The provider returned a different file path than requested."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:213
+msgid "The provider response must contain only the requested path and 1–20 exact search/replace operations."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:233
+msgid "Each replacement must contain only a non-empty search string and a replacement string."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:240
+msgid "Each search block must be unique within the response."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:245
+msgid "A replacement must change its matched source block."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:249
+msgid "An Update must use targeted replacements and cannot replace the entire file."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:254
+msgid "Each search block must occur exactly once in the original target file."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:261
+msgid "The targeted replacement response exceeds the 256 KiB limit."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:266
+msgid "Search blocks must not overlap in the original target file."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:312
+msgid "The staged revision contains a duplicate file path."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:319
+msgid "The staged revision contains a file that is not in the Plan."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:328
+msgid "A planned file is missing from the staged revision."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:332
+msgid "The staged revision exceeds the 256 KiB limit."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:345
+msgid "Code changes require an installed plugin or theme target."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:376
+msgid "The change manifest requires between 1 and %d valid plugin or theme file actions."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:388
+msgid "The change manifest contains an unsafe, duplicate, unsupported, or undescribed file action."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:397
+msgid "The target plugin main file could not be identified safely."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:401
+msgid "A staged change set cannot delete the target plugin main file."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:445
+msgid "The file path does not match the Plan."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:448
+msgid "The file type does not match the planned extension."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:451
+msgid "The staged file action does not match the Plan."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:455
+msgid "A deleted file must not contain replacement content."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:460
+msgid "File content cannot be empty."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:463
+msgid "File content cannot contain NUL bytes."
+msgstr ""
+
+#. translators: %d: maximum file size in KiB.
+#: src/V2/Domain/Revision/Code_Validator.php:472
+msgid "File content exceeds the %d KiB limit."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:478
+msgid "File content cannot contain Markdown code fences."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:483
+msgid "PHP files must contain a PHP opening tag."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:494
+msgid "The main file must contain exactly one Plugin Name header with a value."
+msgstr ""
+
+#: src/V2/Domain/Revision/Code_Validator.php:497
+msgid "Supporting PHP files must not contain a Plugin Name header."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:200
+msgid "The requested target file is not available for revision editing."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:205
+msgid "The requested target file could not be read."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:258
+msgid "The approved Code change set contains an unsupported target file."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:263
+msgid "%s now exists in the target. Regenerate the Plan before generating Code."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:266
+msgid "%s cannot be added safely within the target. Regenerate the Plan before generating Code."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:271
+msgid "%s is no longer a readable target file. Regenerate the Plan before generating Code."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:274
+msgid "The planned target files exceed the 64 KiB per-file or 256 KiB aggregate Code limit."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:279
+msgid "%s could not be read from the target."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:333
+#: src/V2/Domain/Target/Source_Tools.php:348
+msgid "The model requested an unsupported source tool."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:351
+msgid "The model returned unsupported source-tool arguments."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:355
+msgid "The model returned malformed source-tool arguments."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:361
+msgid "The model omitted a required source-tool argument."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:403
+msgid "The requested source file could not be read."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:438
+msgid "Source searches require a query of at most 200 characters."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:443
+msgid "The requested search extension is not supported."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:780
+#: src/V2/Domain/Target/Source_Tools.php:788
+msgid "The requested source path is not readable."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:813
+msgid "The requested source path is invalid."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:867
+msgid "The source target is no longer available."
+msgstr ""
+
+#: src/V2/Domain/Target/Source_Tools.php:885
+msgid "There is no readable source in this target."
+msgstr ""
+
+#: src/V2/Domain/Target/Target_Scanner.php:190
+#: assets/v2/build/index.tsx.js:42
+msgid "New plugin"
+msgstr ""
+
+#: src/V2/Domain/Target/Target_Scanner.php:193
+msgid "Start a new local plugin project."
+msgstr ""
+
+#. translators: %s: workspace stage.
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:24
+msgid "Agentic %s is available."
+msgstr ""
+
+#. translators: %s: configured model role.
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:25
+msgid "Configure the provider for the selected %s model."
+msgstr ""
+
+#. translators: %s: configured model role.
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:25
+msgid "planner"
+msgstr ""
+
+#. translators: %s: configured model role.
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:25
+msgid "reviewer"
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:35
+msgid "The selected planner model does not support v2 agentic Plan yet. Choose an OpenAI or Anthropic model."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:36
+msgid "The selected reviewer model does not support v2 agentic Explain yet. Choose an OpenAI or Anthropic model."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:55
+msgid "The OpenAI API key used by this agent job is no longer configured."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:59
+msgid "The Anthropic API key used by this agent job is no longer configured."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Agent_Transport_Factory.php:61
+msgid "This agent job uses a provider that does not support native read tools."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Anthropic_Agent_Transport.php:78
+#: src/V2/Infrastructure/AI/Anthropic_Agent_Transport.php:85
+msgid "The Anthropic image request failed."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Anthropic_Agent_Transport.php:85
+msgid "The Anthropic request failed."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Anthropic_Agent_Transport.php:89
+#: src/V2/Infrastructure/AI/OpenAI_Agent_Transport.php:82
+msgid "The model reached its output limit before completing the agent turn."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Anthropic_Agent_Transport.php:106
+#: src/V2/Infrastructure/AI/OpenAI_Agent_Transport.php:106
+msgid "The model returned neither an answer nor a tool request."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Direct_Transport_Factory.php:22
+msgid "Direct v2 generation is available."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Direct_Transport_Factory.php:23
+msgid "Configure the selected model provider before starting this task."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Direct_Transport_Factory.php:32
+msgid "The selected model is not available for this direct v2 task."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Direct_Transport_Factory.php:47
+#: src/V2/Infrastructure/AI/Direct_Transport_Factory.php:90
+msgid "The selected provider does not support direct v2 requests."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Google_Direct_Transport.php:44
+#: src/V2/Infrastructure/AI/Google_Direct_Transport.php:52
+msgid "The Google Gemini image request failed."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Google_Direct_Transport.php:52
+msgid "The Google Gemini request failed."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/Google_Direct_Transport.php:63
+msgid "Google Gemini returned an empty response."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/OpenAI_Agent_Transport.php:91
+msgid "The model returned malformed tool arguments."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/OpenAI_Agent_Transport.php:113
+#: src/V2/Infrastructure/AI/OpenAI_Agent_Transport.php:119
+msgid "The OpenAI image request failed."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/OpenAI_Agent_Transport.php:119
+msgid "The OpenAI request failed."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/OpenAI_Compatible_Direct_Transport.php:64
+#: src/V2/Infrastructure/AI/OpenAI_Compatible_Direct_Transport.php:72
+msgid "The image request to the selected provider failed."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/OpenAI_Compatible_Direct_Transport.php:72
+msgid "The direct provider request failed."
+msgstr ""
+
+#: src/V2/Infrastructure/AI/OpenAI_Compatible_Direct_Transport.php:78
+msgid "The provider returned an empty response."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Agent_Run_Repository.php:35
+msgid "Could not initialize the source agent."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:36
+msgid "Could not initialize Code generation."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:56
+msgid "Could not initialize a planned Code file."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:67
+msgid "Could not load Code generation state."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:100
+msgid "Could not initialize the Code follow-up."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:104
+msgid "Could not load Code follow-up state."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:210
+msgid "The Code generation lease expired before the file could start."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:230
+msgid "Could not save the generated Code file."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:243
+msgid "The Code generation lease expired before the file could be saved."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:281
+msgid "Could not initialize a Code follow-up file."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:299
+msgid "The Code follow-up lease expired before analysis could be saved."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:352
+msgid "Could not save Code retry state."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Code_Run_Repository.php:362
+msgid "The Code generation lease expired before the retry could be saved."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Job_Repository.php:27
+#: src/V2/Rest/Routes.php:1300
+#: src/V2/Rest/Routes.php:1336
+msgid "Another Code, Review, or Release operation is already active in this workspace."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Job_Repository.php:47
+msgid "Could not create job."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Job_Repository.php:66
+msgid "Job queued."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Job_Repository.php:214
+msgid "Queued job cancelled."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Job_Repository.php:227
+msgid "Cancellation requested."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Job_Repository.php:339
+msgid "Plan edited by an administrator."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Prompt_Attachment_Repository.php:26
+msgid "Prompt images cannot be linked to this job."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Prompt_Attachment_Repository.php:34
+#: src/V2/Rest/Routes.php:1197
+msgid "A reused prompt image is unavailable in this workspace."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Prompt_Attachment_Repository.php:70
+msgid "A prompt image could not be stored."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Prompt_Attachment_Repository.php:81
+msgid "A prompt image could not be linked to its job."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Prompt_Attachment_Repository.php:85
+msgid "Prompt images could not be committed."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Release_Repository.php:20
+msgid "Could not create the release package record."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Release_Repository.php:78
+msgid "Could not create the promotion record."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Release_Repository.php:129
+msgid "Could not persist promotion rollback data."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Review_Repository.php:16
+msgid "Only a complete Review report can be persisted."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Review_Repository.php:28
+#: src/V2/Orchestration/Review_Orchestrator.php:77
+msgid "A newer staged revision exists. Review the latest revision instead."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Review_Repository.php:51
+msgid "Could not persist the Review report."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Review_Repository.php:102
+msgid "Could not finalize the Review verdict."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Review_Repository.php:221
+msgid "A successor revision was staged for this finding."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Review_Repository.php:254
+#: src/V2/Infrastructure/Database/Review_Repository.php:261
+msgid "The Review finding is no longer current."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Review_Repository.php:266
+msgid "The Review finding cannot make that transition."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Review_Repository.php:326
+msgid "Could not persist a Review finding."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Review_Repository.php:351
+msgid "Could not update a Review finding."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Review_Repository.php:373
+msgid "Could not persist the Review finding history."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:59
+msgid "AI-generated target changes."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:60
+msgid "AI-generated extension plugin code."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:60
+msgid "AI-generated plugin code."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:83
+msgid "Could not finalize private Code generation state."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:134
+msgid "Could not finalize private Code follow-up state."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:265
+msgid "The edit session contains invalid or duplicate file changes."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:273
+msgid "No changed file contents were submitted."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:295
+msgid "This Code slice does not allow files to be added, removed, renamed, or moved."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:301
+msgid "The installed target is no longer available for revision editing."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:304
+msgid "The installed target changed after this revision was staged. Regenerate Code before saving edits."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:310
+msgid "An edited target file is no longer available or safe to stage."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:313
+msgid "An edited target file changed after it was loaded. Reload the latest source before saving."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:326
+msgid "Administrator-edited target file."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:333
+msgid "The edited target files could not be added to this revision safely."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:338
+msgid "The edited project did not pass validation."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:344
+msgid "Administrator code edit."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:360
+msgid "Select an older revision to restore as latest."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:375
+msgid "The selected historical revision no longer passes validation."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:380
+msgid "Restored historical revision."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:402
+msgid "A revision requires unique, safe file paths."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:411
+msgid "Wait for active Code, Review, or Release work to finish before changing revision history."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:453
+msgid "Could not create the staged revision."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:470
+msgid "Could not persist a complete revision file."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:475
+msgid "Could not mark the workspace staged."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:504
+msgid "The revision Plan artifact is unavailable."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:556
+msgid "Revision files must use safe paths relative to the target root."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:560
+msgid "Unsupported revision change type."
+msgstr ""
+
+#: src/V2/Infrastructure/Database/Revision_Repository.php:610
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:798
+#: src/V2/Orchestration/Code_Orchestrator.php:49
+msgid "A newer revision exists. Reload the latest revision before retrying."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Job_Runner.php:35
+msgid "Job cancelled before execution."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Job_Runner.php:41
+msgid "Background processing started."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Job_Runner.php:61
+msgid "No v2 orchestration adapter is registered for this task."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Job_Runner.php:72
+msgid "Job cancelled."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Job_Runner.php:97
+msgid "Job completed."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Queue.php:37
+msgid "Recovered a stalled source-agent continuation."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Queue.php:45
+msgid "Recovered a stalled Code generation continuation."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Queue.php:54
+#: src/V2/Infrastructure/Queue/Queue.php:78
+msgid "Action Scheduler is not initialized."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Queue.php:70
+msgid "Action Scheduler could not enqueue the job."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Queue.php:86
+msgid "Action Scheduler could not enqueue the retry."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Queue.php:131
+msgid "Action Scheduler is unavailable."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Queue.php:133
+msgid "Action Scheduler is loaded but its data store is unavailable."
+msgstr ""
+
+#. translators: %d: number of overdue background jobs.
+#: src/V2/Infrastructure/Queue/Queue.php:137
+msgid "%d background job has been pending for more than five minutes."
+msgid_plural "%d background jobs have been pending for more than five minutes."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/V2/Infrastructure/Queue/Queue.php:141
+msgid "Action Scheduler is ready, but WP-Cron is disabled. Configure a real server cron for recovery processing."
+msgstr ""
+
+#: src/V2/Infrastructure/Queue/Queue.php:143
+msgid "Action Scheduler is ready."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:36
+#: src/V2/Rest/Routes.php:1111
+msgid "Code follow-ups are not available for this workspace operation."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:46
+msgid "The Code follow-up must be anchored to the current latest revision."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:49
+msgid "The current revision does not have a usable project manifest."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:79
+msgid "Analyzing the Code follow-up against the latest staged revision."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:105
+msgid "The Code follow-up has an invalid durable phase."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:121
+msgid "Analyzing whether the message is a question or a Code change."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:148
+msgid "The provider did not return a complete Code follow-up analysis."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:165
+msgid "Could not persist the Code answer."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:167
+msgid "Answered without changing the staged revision."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:169
+msgid "Could not reload the completed Code answer."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:185
+msgid "The change was validated and file generation is starting."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:185
+msgid "The change was validated and is ready to stage without file generation."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:190
+msgid "Could not reload Code follow-up state."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:213
+#: src/V2/Orchestration/Code_Orchestrator.php:162
+msgid "Generating %1$d of %2$d: %3$s"
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:253
+msgid "The provider did not return a complete Code file."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:265
+msgid "A file selected for modification was returned unchanged."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:271
+#: src/V2/Orchestration/Code_Orchestrator.php:215
+msgid "Completed %s."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:288
+msgid "Code follow-up cancelled before staging. No partial revision was created."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:293
+msgid "The Code follow-up workspace is unavailable."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:323
+msgid "The successor revision was staged, but the selected Review finding state changed unexpectedly."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:329
+msgid "Created staged revision %d."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:440
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:495
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:598
+msgid "The installed target is unavailable for this Code follow-up."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:461
+msgid "The effective staged target changes exceed the Code follow-up context limit."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:476
+msgid "The selected target file is no longer available for this Code follow-up."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:479
+msgid "The selected target file exceeds the Code follow-up context limit."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:577
+msgid "The staged content for %s is unavailable."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:649
+msgid "The installed target changed after this revision was staged. Regenerate Code before sending another follow-up."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:705
+msgid "Retrying the Code follow-up analysis with bounded feedback."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:727
+msgid "Retrying %s."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:739
+msgid "Code follow-up cancelled. No partial revision was created."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:753
+msgid "The current staged project exceeds the Code follow-up context limit."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Follow_Up_Orchestrator.php:804
+msgid "The provider request timed out before WordPress received a response. It was not retried automatically because its completion and billing state are unknown. Send the Code message again manually."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:35
+#: src/V2/Rest/Routes.php:1412
+msgid "Code generation is not available for this workspace operation."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:54
+msgid "A completed Plan artifact from this workspace is required."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:87
+msgid "The extension integration target is unavailable."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:90
+msgid "The extension integration target identity could not be preserved."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:121
+msgid "Code generation initialized from the approved Plan."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:128
+msgid "The Code run Plan artifact or manifest is unavailable."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:196
+msgid "The provider did not return a complete Code response."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:208
+msgid "The updated file was byte-identical to the target source."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:208
+msgid "Implement the approved change while preserving unrelated code."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:231
+msgid "Code generation cancelled before staging. No partial revision was created."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:275
+msgid "The target changed after Code generation started. No revision was staged; regenerate the Plan before trying again."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:349
+msgid "The provider request timed out before WordPress received a response. It was not retried automatically because its completion and billing state are unknown. Start Code generation again manually."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:366
+msgid "Retrying %s after a bounded validation or provider failure."
+msgstr ""
+
+#: src/V2/Orchestration/Code_Orchestrator.php:378
+msgid "Code generation cancelled. No partial revision was created."
+msgstr ""
+
+#: src/V2/Orchestration/Direct_Planner.php:31
+#: src/V2/Orchestration/Legacy_Orchestrator.php:44
+#: src/V2/Orchestration/Source_Agent.php:42
+#: src/V2/Rest/Routes.php:404
+#: src/V2/Rest/Routes.php:439
+#: src/V2/Rest/Routes.php:553
+#: src/V2/Rest/Routes.php:565
+#: src/V2/Rest/Routes.php:575
+msgid "Workspace not found."
+msgstr ""
+
+#: src/V2/Orchestration/Direct_Planner.php:52
+msgid "Sending a plan request to the selected provider."
+msgstr ""
+
+#: src/V2/Orchestration/Direct_Planner.php:88
+msgid "The provider did not return a final Plan response."
+msgstr ""
+
+#: src/V2/Orchestration/Direct_Planner.php:95
+msgid "The Plan response failed validation; retrying."
+msgstr ""
+
+#: src/V2/Orchestration/Direct_Planner.php:148
+msgid "A completed Plan artifact is required for this request."
+msgstr ""
+
+#: src/V2/Orchestration/Direct_Planner.php:193
+#: src/V2/Orchestration/Legacy_Orchestrator.php:444
+msgid "No earlier messages."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:48
+msgid "This task requires the v2 staged-revision generator, which is not registered."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:53
+msgid "This workspace stage does not support follow-up messages yet."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:64
+msgid "Configure an API key and model for this task before starting the job."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:77
+msgid "Sending a redacted task request to the selected provider."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:103
+#: src/V2/Orchestration/Legacy_Orchestrator.php:323
+msgid "There is no source to explain for this target."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:179
+msgid "A completed Plan artifact is required to regenerate its file structure."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:183
+#: src/V2/Orchestration/Legacy_Orchestrator.php:328
+msgid "No target source is available for this workspace."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:252
+msgid "The provider returned an invalid project structure. The Plan was not changed."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:291
+#: assets/v2/build/index.tsx.js:18
+msgid "Implementation plan"
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:320
+#: src/V2/Orchestration/Source_Agent.php:303
+msgid "A completed Plan artifact is required for this follow-up."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:329
+msgid "current Plan artifact"
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:329
+msgid "current Explain context"
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:374
+msgid "The provider returned an invalid follow-up response. No artifact was changed."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:379
+msgid "This stage cannot create a replacement artifact yet."
+msgstr ""
+
+#: src/V2/Orchestration/Legacy_Orchestrator.php:410
+msgid "No prior artifact is available."
+msgstr ""
+
+#: src/V2/Orchestration/Package_Orchestrator.php:25
+msgid "Only the latest staged revision can be packaged."
+msgstr ""
+
+#: src/V2/Orchestration/Package_Orchestrator.php:37
+msgid "Building a private revision-bound plugin package."
+msgstr ""
+
+#: src/V2/Orchestration/Package_Orchestrator.php:48
+msgid "Package creation was cancelled before publishing the private artifact."
+msgstr ""
+
+#: src/V2/Orchestration/Package_Orchestrator.php:53
+#: src/V2/Orchestration/Package_Orchestrator.php:54
+msgid "The completed package metadata could not be saved."
+msgstr ""
+
+#: src/V2/Orchestration/Package_Orchestrator.php:57
+msgid "The private plugin ZIP is ready for authenticated download."
+msgstr ""
+
+#: src/V2/Orchestration/Promotion_Orchestrator.php:26
+msgid "The promotion for this action is unavailable."
+msgstr ""
+
+#: src/V2/Orchestration/Promotion_Orchestrator.php:29
+msgid "Plugin activation started."
+msgstr ""
+
+#: src/V2/Orchestration/Promotion_Orchestrator.php:29
+msgid "Conflict-safe file rollback started."
+msgstr ""
+
+#: src/V2/Orchestration/Promotion_Orchestrator.php:34
+msgid "Plugin activation completed."
+msgstr ""
+
+#: src/V2/Orchestration/Promotion_Orchestrator.php:34
+msgid "File rollback completed."
+msgstr ""
+
+#: src/V2/Orchestration/Promotion_Orchestrator.php:41
+msgid "Only the latest staged revision can be promoted."
+msgstr ""
+
+#: src/V2/Orchestration/Promotion_Orchestrator.php:45
+msgid "The requested promotion mode is invalid."
+msgstr ""
+
+#: src/V2/Orchestration/Promotion_Orchestrator.php:57
+msgid "The plugin promotion preflight started."
+msgstr ""
+
+#: src/V2/Orchestration/Promotion_Orchestrator.php:77
+msgid "The plugin promotion completed."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:47
+msgid "Incremental Review was queued for the Review-fix revision."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:53
+msgid "The successor revision is intact, but automatic Review could not be queued. Use Verify fixes."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:74
+msgid "The staged revision for this Review is unavailable."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:87
+#: src/V2/Rest/Routes.php:1316
+msgid "The previous Review report is unavailable in this workspace."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:91
+msgid "Review follow-ups require the latest report for the latest revision."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:127
+msgid "Sending the staged revision to the selected reviewer."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:145
+msgid "The reviewer did not return a final Review response."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:156
+msgid "Review failed."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:158
+msgid "The reviewer response was invalid or retryable; retrying."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:163
+msgid "Review did not produce a valid result."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:191
+msgid "The immutable Review report was saved."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:243
+msgid "The installed target could not be read safely for Review."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:280
+msgid "Review was cancelled. No partial report was created."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:291
+msgid "The complete installed plugin changed after Code was staged. Regenerate Code before Review."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:301
+msgid "The inspected integration target is no longer available."
+msgstr ""
+
+#: src/V2/Orchestration/Review_Orchestrator.php:305
+msgid "The inspected target changed after Code was staged. Regenerate Code before Review."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:73
+msgid "The target hooks could not be inspected."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:93
+msgid "Provided target metadata, source structure, main entry file, and discovered hook contexts to the model."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:94
+msgid "Provided target metadata, the source structure, and the main entry file to the model."
+msgstr ""
+
+#. translators: %s: workspace stage.
+#: src/V2/Orchestration/Source_Agent.php:112
+msgid "%s stopped after reaching its model-turn limit."
+msgstr ""
+
+#. translators: %s: workspace stage.
+#: src/V2/Orchestration/Source_Agent.php:115
+msgid "%s stopped after reaching its source-inspection limit."
+msgstr ""
+
+#. translators: %s: workspace stage.
+#: src/V2/Orchestration/Source_Agent.php:118
+msgid "The target changed during inspection. Start %s again to inspect a consistent version."
+msgstr ""
+
+#. translators: 1: workspace stage, 2: agent model turn.
+#: src/V2/Orchestration/Source_Agent.php:121
+msgid "Running %1$s agent turn %2$d."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:167
+msgid "The model returned a tool-call response without any tool calls."
+msgstr ""
+
+#. translators: 1: requested tool count, 2: per-turn tool limit.
+#: src/V2/Orchestration/Source_Agent.php:176
+msgid "The model requested %1$d source tools in one turn; the per-turn limit is %2$d."
+msgstr ""
+
+#. translators: 1: requested tool count, 2: remaining tool count, 3: workspace stage.
+#: src/V2/Orchestration/Source_Agent.php:182
+msgid "The model requested %1$d source tools, but only %2$d remain in this %3$s job."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:202
+msgid "The model returned an invalid source-tool request."
+msgstr ""
+
+#. translators: %s: workspace stage.
+#: src/V2/Orchestration/Source_Agent.php:207
+msgid "%s stopped after reaching its source-inspection byte limit."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:216
+msgid "A source-tool request was rejected; the agent can correct it on the next turn."
+msgstr ""
+
+#. translators: %d: retry number.
+#: src/V2/Orchestration/Source_Agent.php:340
+msgid "Provider request will be retried (attempt %d)."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:346
+msgid "The provider request timed out with an unknown completion state. Retry the job manually to avoid automatic duplicate billing."
+msgstr ""
+
+#. translators: %s: relative source file.
+#: src/V2/Orchestration/Source_Agent.php:353
+msgid "Inspecting %s."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:356
+msgid "Inspecting the target file structure."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:357
+msgid "Searching the target source."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:358
+msgid "Inspecting discovered target hooks and their source context."
+msgstr ""
+
+#: src/V2/Orchestration/Source_Agent.php:359
+msgid "Inspecting target metadata."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:16
+msgid "The requested package mode is invalid."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:19
+msgid "A project ZIP requires a complete plugin revision."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:22
+msgid "Fork and replacement ZIPs require an installed-plugin change revision."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:33
+msgid "A private package workspace could not be created."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:44
+msgid "The selected fork slug is already installed."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:48
+msgid "The private package tree could not be created."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:55
+msgid "A complete plugin project cannot contain a deleted file."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:68
+msgid "The installed plugin is unavailable for packaging."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:71
+#: src/V2/Release/Promotion_Service.php:124
+msgid "The installed plugin changed after this revision was staged."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:79
+#: src/V2/Release/Promotion_Service.php:135
+msgid "The complete installed plugin tree changed after this revision was staged."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:94
+msgid "The installed plugin changed while its package tree was being copied."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:109
+msgid "The package main plugin file could not be read."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:126
+msgid "The package main file does not contain a valid plugin header."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:137
+msgid "The completed package could not be verified."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:154
+msgid "The plugin tree is unavailable."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:164
+#: src/V2/Release/Package_Builder.php:231
+#: src/V2/Release/Package_Builder.php:244
+msgid "Plugin packages cannot contain symbolic links."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:177
+#: src/V2/Release/Package_Builder.php:206
+msgid "The plugin tree exceeds the configured package file or size limit."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:181
+msgid "A plugin file could not be fingerprinted."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:203
+msgid "The single-file plugin could not be fingerprinted."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:216
+msgid "The target plugin path is invalid."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:223
+msgid "The target plugin path is unavailable or unsafe."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:233
+msgid "The installed plugin could not be copied."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:249
+msgid "A plugin package directory could not be created."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:253
+msgid "An installed plugin file could not be copied."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:268
+msgid "%s now exists in the installed plugin."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:274
+#: src/V2/Release/Promotion_Service.php:145
+msgid "%s no longer matches the staged baseline."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:282
+#: assets/v2/build/index.tsx.js:41
+msgid "WP-Autoplugin Fork"
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:285
+msgid "The original Plugin Name header could not be transformed."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:308
+msgid "The ZIP archive could not be created."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:317
+msgid "The ZIP archive could not be finalized."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:323
+msgid "The package must contain exactly one plugin root."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:327
+msgid "WordPress could not create the ZIP archive."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:333
+msgid "A package file could not be written."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:340
+msgid "A deleted revision file could not be removed from the package."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:348
+msgid "A package path escaped its plugin root."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:357
+msgid "A package contains an unsafe relative path."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:367
+msgid "Choose a lowercase plugin slug containing only letters, numbers, and hyphens."
+msgstr ""
+
+#: src/V2/Release/Package_Builder.php:380
+msgid "A private temporary release directory is unavailable."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:14
+msgid "The promotion owner is no longer allowed to install plugins."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:29
+msgid "The destination plugin is already installed."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:32
+msgid "A temporary plugin installation directory could not be created."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:42
+msgid "The installed temporary tree did not match the verified package."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:46
+msgid "The installed package does not contain its verified main plugin header."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:49
+msgid "The verified plugin could not be moved to its final destination."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:54
+msgid "The installed plugin could not be verified at its final destination."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:78
+#: src/V2/Rest/Routes.php:972
+msgid "You are not allowed to activate plugins."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:81
+msgid "This promotion is not waiting for activation."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:96
+msgid "The original plugin also could not be reactivated: %s"
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:104
+msgid "Activation and deactivation may have database or runtime side effects that file rollback cannot undo."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:110
+msgid "The promotion owner is no longer allowed to modify plugins."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:127
+msgid "The installed plugin is unavailable for direct modification."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:154
+msgid "The target main plugin file could not be read."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:180
+msgid "Could not write %s."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:189
+msgid "Could not delete %s."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:202
+msgid "Upstream updates remain enabled and may overwrite these changes. Rollback restores files only."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:208
+msgid "The promotion owner is no longer allowed to roll back plugin files."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:216
+msgid "Only the latest successful direct modification can be rolled back."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:227
+msgid "Rollback was not started because an affected file changed after promotion."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:234
+msgid "One or more promoted files could not be restored."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:244
+msgid "Files were restored. Database and runtime side effects were not reverted."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:249
+#: src/V2/Rest/Routes.php:951
+msgid "Plugin filesystem mutation is not available on multisite yet."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:252
+#: src/V2/Rest/Routes.php:320
+#: src/V2/Rest/Routes.php:951
+msgid "WordPress file modifications are disabled."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:256
+msgid "WordPress could not initialize filesystem access without additional credentials."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:270
+msgid "A promotion file path is unsafe."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:274
+msgid "A single-file plugin cannot write another path."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:280
+msgid "A promotion file path escaped the plugin root."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:286
+msgid "A promotion path traverses a symbolic link."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:304
+msgid "A required plugin directory could not be created."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:316
+msgid "A promoted file presence check failed."
+msgstr ""
+
+#: src/V2/Release/Promotion_Service.php:319
+msgid "A promoted file hash check failed."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:320
+msgid "Plugin installation, activation, direct modification, and rollback are not available on multisite yet."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:368
+msgid "The selected target no longer exists."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:371
+msgid "A new plugin target only supports the create operation."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:374
+msgid "Themes can be modified, fixed, inspected, or extended through hooks."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:387
+msgid "The workspace was created but could not be loaded."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:416
+msgid "Workspace not found or already closed."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:429
+msgid "Workspace not found or already open."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:462
+msgid "Prompt images are only accepted by actions with a free-form message."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:489
+msgid "Enter a message or attach at least one image."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:498
+msgid "The selected model does not support prompt images for this stage."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:536
+msgid "Prompt image not found."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:608
+#: src/V2/Rest/Routes.php:1388
+msgid "Review report not found."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:639
+#: src/V2/Rest/Routes.php:649
+#: src/V2/Rest/Routes.php:662
+#: src/V2/Rest/Routes.php:682
+msgid "Job not found."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:665
+msgid "A finished job cannot be cancelled."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:687
+msgid "Only completed plan artifacts can be edited."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:733
+#: src/V2/Rest/Routes.php:776
+#: src/V2/Rest/Routes.php:790
+#: src/V2/Rest/Routes.php:834
+#: src/V2/Rest/Routes.php:848
+#: src/V2/Rest/Routes.php:990
+msgid "Revision not found."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:742
+msgid "The installed target changed after this revision was staged. Regenerate Code to refresh its complete file tree."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:765
+msgid "The complete target file tree could not be loaded safely."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:781
+msgid "Revision file not found."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:794
+msgid "This revision does not edit an installed target."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:799
+msgid "This file already belongs to the staged revision."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:804
+msgid "The installed target changed after this revision was staged. Regenerate Code before editing its files."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:808
+msgid "The requested target file could not be loaded safely."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:837
+msgid "Wait for active Code, Review, or Release work to finish before saving a revision."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:851
+msgid "Wait for active Code, Review, or Release work to finish before restoring a revision."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:875
+msgid "Release package not found."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:888
+msgid "The private release package is unavailable or expired."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:945
+msgid "You are not allowed to install plugins."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:948
+msgid "You are not allowed to modify plugins."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:954
+msgid "Direct modification requires the exact target plugin reference as confirmation."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:967
+#: src/V2/Rest/Routes.php:1055
+msgid "Promotion not found."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:979
+msgid "You are not allowed to roll back plugin files."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:993
+msgid "Only the latest staged revision can be released."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:996
+msgid "Wait for active Code, Review, or Release work to finish before releasing."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1007
+msgid "Theme release is not available yet."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1008
+msgid "That release action is not valid for this revision artifact."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1020
+msgid "Confirm “Proceed without current all-clear Review” before releasing this revision."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1026
+msgid "The supplied Review report is not the current report for this release."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1058
+msgid "Plugin filesystem mutation is disabled for this site."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1076
+msgid "Follow-up messages are currently available for Plan, Code, Review, and Explain."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1079
+msgid "Enter a follow-up message or attach at least one image."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1082
+msgid "The follow-up message exceeds the 8 KiB limit."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1087
+msgid "Wait for active Code, Review, or Release work to finish before sending a Review follow-up."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1097
+msgid "Review follow-ups require the latest report for the latest staged revision."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1114
+#: src/V2/Rest/Routes.php:1415
+msgid "Another Code job is already active in this workspace."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1121
+msgid "Select the latest staged revision before sending a Code follow-up."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1133
+msgid "The selected Code file path is invalid."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1143
+msgid "The selected conversation artifact is not available in this workspace."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1146
+msgid "Plan follow-ups must reply to a completed Plan artifact."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1167
+msgid "The job payload is invalid."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1177
+#: src/V2/Rest/Routes.php:1182
+msgid "The reusable prompt image IDs are invalid."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1297
+msgid "Review requires a workspace with staged Code."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1306
+msgid "Select the latest staged revision before starting Review."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1310
+msgid "The Review mode is invalid."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1333
+msgid "Review fixes are not available for this workspace."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1346
+msgid "Review fixes require the latest report for the latest staged revision."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1353
+msgid "Select between one and twenty open Review findings to fix."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1359
+msgid "One or more selected Review findings are no longer open in the current report."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1393
+msgid "The Review report is no longer current for the latest revision."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1396
+msgid "Wait for active Code, Review, or Release work to finish before changing a finding."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1419
+msgid "Select generate or regenerate for the Code job."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1424
+msgid "Select a completed Plan artifact from this workspace."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1436
+msgid "A staged revision already exists. Regenerate from the latest revision instead."
+msgstr ""
+
+#: src/V2/Rest/Routes.php:1444
+msgid "Regeneration requires the latest revision and the latest completed Plan."
+msgstr ""
+
+#: views/footer-modal.php:13
+msgid "Select Models"
+msgstr ""
+
+#: views/footer-modal.php:18
+msgid "Default Model:"
+msgstr ""
+
+#: views/footer-modal.php:52
 msgid "Planner Model:"
 msgstr ""
 
-#: views/footer-modal.php:46
-#: views/footer-modal.php:80
-#: views/footer-modal.php:114
-#: views/page-settings.php:53
+#: views/footer-modal.php:54
+#: views/footer-modal.php:88
+#: views/footer-modal.php:122
+#: views/page-settings.php:62
 msgid "Use Default Model"
 msgstr ""
 
-#: views/footer-modal.php:78
+#: views/footer-modal.php:86
 msgid "Coder Model:"
 msgstr ""
 
-#: views/footer-modal.php:112
+#: views/footer-modal.php:120
 msgid "Reviewer Model:"
 msgstr ""
 
-#: views/footer-modal.php:146
+#: views/footer-modal.php:154
 msgid "Save Models"
 msgstr ""
 
-#: views/footer-modal.php:147
+#: views/footer-modal.php:155
+#: assets/v2/build/index.tsx.js:5
+#: assets/v2/build/index.tsx.js:18
+#: assets/v2/build/index.tsx.js:26
 msgid "Cancel"
 msgstr ""
 
-#: views/footer-modal.php:156
+#: views/footer-modal.php:164
 msgid "Token Usage Breakdown"
 msgstr ""
 
-#: views/footer-modal.php:165
+#: views/footer-modal.php:173
 msgid "Close"
 msgstr ""
 
@@ -810,7 +2907,6 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: views/page-explain-plugin.php:37
-#, php-format
 msgid "Explain This Plugin: %s"
 msgstr ""
 
@@ -840,7 +2936,6 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: views/page-explain-plugin.php:77
-#, php-format
 msgid "Explanation for: %s"
 msgstr ""
 
@@ -866,7 +2961,6 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: views/page-extend-hooks.php:24
-#, php-format
 msgid "Create Extension for: %s"
 msgstr ""
 
@@ -916,7 +3010,6 @@ msgstr ""
 #. translators: %s: theme/plugin name.
 #: views/page-extend-hooks.php:64
 #: views/page-extend-theme.php:68
-#, php-format
 msgid "Extension Plugin for: %s"
 msgstr ""
 
@@ -960,13 +3053,11 @@ msgstr ""
 #. translators: %s: error message.
 #: views/page-extend-plugin.php:37
 #: views/page-fix-plugin.php:39
-#, php-format
 msgid "Error while activating the plugin: %s"
 msgstr ""
 
 #. translators: %s: plugin name.
 #: views/page-extend-plugin.php:46
-#, php-format
 msgid "Modify This Plugin: %s"
 msgstr ""
 
@@ -1004,7 +3095,6 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: views/page-extend-plugin.php:71
-#, php-format
 msgid "Extended Plugin: %s"
 msgstr ""
 
@@ -1030,7 +3120,6 @@ msgstr ""
 
 #. translators: %s: theme name.
 #: views/page-extend-theme.php:28
-#, php-format
 msgid "Extend This Theme: %s"
 msgstr ""
 
@@ -1048,7 +3137,6 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: views/page-fix-plugin.php:48
-#, php-format
 msgid "Fix This Plugin: %s"
 msgstr ""
 
@@ -1058,7 +3146,6 @@ msgstr ""
 
 #. translators: %s: plugin name.
 #: views/page-fix-plugin.php:73
-#, php-format
 msgid "Fixed Plugin: %s"
 msgstr ""
 
@@ -1114,6 +3201,11 @@ msgstr ""
 msgid "Autoplugins"
 msgstr ""
 
+#: views/page-list-plugins.php:30
+#: views/page-list-plugins.php:39
+msgid "Generate New Plugin"
+msgstr ""
+
 #: views/page-list-plugins.php:37
 msgid "You don't have any autoplugins yet."
 msgstr ""
@@ -1122,149 +3214,1476 @@ msgstr ""
 msgid "Autoplugins are regular plugins, but they are generated by AI. You can manage them just like any other plugin. They will be listed here for your convenience."
 msgstr ""
 
-#: views/page-settings.php:23
+#: views/page-settings.php:25
 msgid "WP-Autoplugin Settings"
 msgstr ""
 
-#: views/page-settings.php:32
+#: views/page-settings.php:34
 msgid "OpenAI API Key"
 msgstr ""
 
-#: views/page-settings.php:36
+#: views/page-settings.php:38
 msgid "Anthropic API Key"
 msgstr ""
 
-#: views/page-settings.php:40
+#: views/page-settings.php:42
 msgid "Google Gemini API Key"
 msgstr ""
 
-#: views/page-settings.php:44
+#: views/page-settings.php:46
 msgid "xAI API Key"
 msgstr ""
 
-#: views/page-settings.php:75
+#: views/page-settings.php:84
 msgid "Default Model"
 msgstr ""
 
-#: views/page-settings.php:98
-#: views/page-settings.php:220
+#: views/page-settings.php:110
+#: views/page-settings.php:301
 msgid "Show specialized model settings"
 msgstr ""
 
-#: views/page-settings.php:114
+#: views/page-settings.php:126
 msgid "Planner Model"
 msgstr ""
 
-#: views/page-settings.php:117
+#: views/page-settings.php:132
 msgid "Used for planning plugin extensions and analyzing hooks. Falls back to Default Model if not set."
 msgstr ""
 
-#: views/page-settings.php:121
+#: views/page-settings.php:136
 msgid "Coder Model"
 msgstr ""
 
-#: views/page-settings.php:124
+#: views/page-settings.php:142
 msgid "Used for generating and fixing code. Falls back to Default Model if not set."
 msgstr ""
 
-#: views/page-settings.php:128
+#: views/page-settings.php:146
 msgid "Reviewer Model"
 msgstr ""
 
-#: views/page-settings.php:131
+#: views/page-settings.php:152
 msgid "Used for explaining code and reviewing generated plugins. Falls back to Default Model if not set."
 msgstr ""
 
-#: views/page-settings.php:138
+#: views/page-settings.php:159
 msgid "Generate Plugins"
 msgstr ""
 
-#: views/page-settings.php:142
+#: views/page-settings.php:163
 msgid "Simple plugin mode (single-file plugins)"
 msgstr ""
 
-#: views/page-settings.php:143
+#: views/page-settings.php:164
 msgid "Complex plugin mode (multi-file plugins)"
 msgstr ""
 
-#: views/page-settings.php:146
+#: views/page-settings.php:167
 msgid "Complex mode uses more tokens. For best results, use capable models."
 msgstr ""
 
-#: views/page-settings.php:151
+#: views/page-settings.php:172
 msgid "AI Response Language"
 msgstr ""
 
-#: views/page-settings.php:157
+#: views/page-settings.php:178
 msgid "Auto (WordPress language)"
 msgstr ""
 
-#: views/page-settings.php:176
+#: views/page-settings.php:199
 msgid "Language for AI responses. Default uses your WordPress language setting."
 msgstr ""
 
-#: views/page-settings.php:189
+#: views/page-settings.php:212
 msgid "Model Name (User-defined Label)"
 msgstr ""
 
-#: views/page-settings.php:190
+#: views/page-settings.php:213
 msgid "API Endpoint URL"
 msgstr ""
 
-#: views/page-settings.php:191
+#: views/page-settings.php:214
 msgid "\"model\" Parameter Value"
 msgstr ""
 
-#: views/page-settings.php:192
-#: views/page-settings.php:237
+#: views/page-settings.php:215
+#: views/page-settings.php:318
 msgid "API Key"
 msgstr ""
 
-#: views/page-settings.php:193
+#: views/page-settings.php:216
 msgid "Additional Headers (one per line, name=value)"
 msgstr ""
 
-#: views/page-settings.php:194
+#: views/page-settings.php:217
 msgid "Add Custom Model"
 msgstr ""
 
-#: views/page-settings.php:200
+#: views/page-settings.php:223
 msgid "Add any custom models you want to use with WP-Autoplugin. These models will be available in the model selection dropdown. The API must be compatible with the OpenAI API."
 msgstr ""
 
-#: views/page-settings.php:223
-#: views/page-settings.php:229
+#: views/page-settings.php:242
+msgid "None"
+msgstr ""
+
+#: views/page-settings.php:243
+msgid "Minimal"
+msgstr ""
+
+#: views/page-settings.php:244
+msgid "Low"
+msgstr ""
+
+#: views/page-settings.php:245
+msgid "Medium"
+msgstr ""
+
+#: views/page-settings.php:246
+msgid "High"
+msgstr ""
+
+#: views/page-settings.php:247
+msgid "Extra high"
+msgstr ""
+
+#: views/page-settings.php:248
+msgid "Maximum"
+msgstr ""
+
+#: views/page-settings.php:249
+#: assets/v2/build/index.tsx.js:5
+msgid "model default"
+msgstr ""
+
+#: views/page-settings.php:304
+#: views/page-settings.php:310
 msgid "Hide specialized model settings"
 msgstr ""
 
-#: views/page-settings.php:234
+#: views/page-settings.php:315
 msgid "Details"
 msgstr ""
 
-#: views/page-settings.php:235
+#: views/page-settings.php:316
 msgid "URL"
 msgstr ""
 
-#: views/page-settings.php:236
+#: views/page-settings.php:317
 msgid "Model Parameter"
 msgstr ""
 
-#: views/page-settings.php:238
+#: views/page-settings.php:319
 msgid "Headers"
 msgstr ""
 
-#: views/page-settings.php:239
+#: views/page-settings.php:320
 msgid "Remove"
 msgstr ""
 
-#: views/page-settings.php:240
+#: views/page-settings.php:321
 msgid "Please fill out all required fields."
 msgstr ""
 
-#: views/page-settings.php:241
+#: views/page-settings.php:322
 msgid "Are you sure you want to remove this model?"
 msgstr ""
 
-#: views/page-settings.php:242
+#: views/page-settings.php:323
 msgid "Error saving model"
+msgstr ""
+
+#: views/page-workspace.php:18
+msgid "WP-Autoplugin Workspace"
+msgstr ""
+
+#: views/page-workspace.php:35
+#: assets/v2/build/index.tsx.js:2
+msgid "Preparing your workspace"
+msgstr ""
+
+#: views/page-workspace.php:36
+#: assets/v2/build/index.tsx.js:2
+msgid "Restoring your projects, tabs, and recent work…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Create"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Start from a blank plugin."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "What should the plugin do?"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Add or change functionality."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "What would you like to change?"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Fix a bug"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Diagnose and repair a problem."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "What problem should the AI fix?"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Create extension"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Build against discovered hooks."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "What should the extension do?"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Ask questions about the source."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "What would you like to know?"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Preview unavailable"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "The selected model does not accept image prompts."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Attach no more than six images."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Use JPEG, PNG, or WebP images."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Each image must be 5 MiB or smaller."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Images may use at most 20 MiB in total."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "Attach images"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:1
+msgid "The selected model does not accept image prompts. Remove the selected images or choose another model."
+msgstr ""
+
+#. translators: %s: attached image filename.
+#: assets/v2/build/index.tsx.js:2
+msgid "Remove %s"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:2
+#: assets/v2/build/index.tsx.js:5
+msgid "Provider settings"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:2
+msgid "Planner"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:2
+msgid "Coder"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:2
+#: assets/v2/build/index.tsx.js:36
+msgid "Reviewer"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:2
+msgid "Choose model"
+msgstr ""
+
+#. translators: %s: AI model role.
+#: assets/v2/build/index.tsx.js:3
+msgid "%s model"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:3
+msgid "Model"
+msgstr ""
+
+#. translators: %s: Default model ID.
+#: assets/v2/build/index.tsx.js:4
+msgid "Use Default Model (%s)"
+msgstr ""
+
+#. translators: 1: Provider, 2: model, 3: effort.
+#: assets/v2/build/index.tsx.js:5
+msgid "Inherited: %1$s · %2$s%3$s"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:5
+msgid "Effort"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:5
+msgid "This Plan requires a configured OpenAI or Anthropic model with native source tools."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:5
+msgid "Configure this model provider before using it."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:5
+msgid "Changes apply globally to future jobs. Queued, running, and completed jobs keep their saved model."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:5
+msgid "The model setting could not be saved."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:5
+msgid "Apply"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:5
+msgid "Open workspaces"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:5
+#: assets/v2/build/index.tsx.js:6
+#: assets/v2/build/index.tsx.js:12
+msgid "New project"
+msgstr ""
+
+#. translators: %s: Workspace name.
+#: assets/v2/build/index.tsx.js:6
+msgid "Close %s workspace"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:6
+msgid "Start a new project"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:6
+msgid "Workspace options"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:6
+msgid "All projects"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:6
+msgid "Distraction-free mode"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:6
+msgid "Browse every project, switch to an open workspace, or reopen a closed one."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:6
+msgid "Search projects"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:6
+msgid "Search by project, request, or target"
+msgstr ""
+
+#. translators: %d: Number of projects found.
+#: assets/v2/build/index.tsx.js:7
+msgid "%d project"
+msgid_plural "%d projects"
+msgstr[0] ""
+msgstr[1] ""
+
+#: assets/v2/build/index.tsx.js:7
+msgid "Loading projects…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:7
+msgid "No matching projects"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:7
+msgid "No projects yet"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:7
+msgid "Try a different project name, request, or target."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:7
+msgid "Projects will appear here after you create a workspace."
+msgstr ""
+
+#. translators: %s: Project name.
+#: assets/v2/build/index.tsx.js:8
+msgid "Reopen %s"
+msgstr ""
+
+#. translators: %s: Project name.
+#: assets/v2/build/index.tsx.js:9
+msgid "Open %s"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:9
+msgid "Closed"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:9
+msgid "Open"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:9
+msgid "Operation"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:9
+msgid "Target"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:9
+msgid "Updated"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:9
+#: assets/v2/build/index.tsx.js:40
+msgid "Reopen"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:9
+msgid "Loading more projects…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:9
+msgid "Load more projects"
+msgstr ""
+
+#. translators: %d: Number of durable jobs.
+#: assets/v2/build/index.tsx.js:10
+msgid "%d job total"
+msgid_plural "%d jobs total"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: Number of follow-up conversation jobs.
+#: assets/v2/build/index.tsx.js:11
+msgid "%d follow-up"
+msgid_plural "%d follow-ups"
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: Number of retry attempts.
+#: assets/v2/build/index.tsx.js:12
+msgid "%d retry"
+msgid_plural "%d retries"
+msgstr[0] ""
+msgstr[1] ""
+
+#: assets/v2/build/index.tsx.js:12
+msgid "Project progress"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:12
+msgid "What would you like to work on?"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:12
+msgid "What should the AI do?"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:12
+msgid "No source files are changed until you approve a staged revision."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:12
+msgid "No source files are changed until you approve a staged revision. You can then save it as new or overwrite the existing target."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:12
+#: assets/v2/build/index.tsx.js:18
+msgid "Create plan"
+msgstr ""
+
+#. translators: %d: Number of source files.
+#. translators: %d: number of files.
+#: assets/v2/build/index.tsx.js:13
+#: assets/v2/build/index.tsx.js:21
+msgid "%d files"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:13
+msgid "Request"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:13
+msgid "Image-only request"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:13
+msgid "Workspace stages"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:13
+msgid "Loading job…"
+msgstr ""
+
+#. translators: %s: Stored provider, model, and effort.
+#: assets/v2/build/index.tsx.js:14
+#: assets/v2/build/index.tsx.js:35
+msgid "Used: %s"
+msgstr ""
+
+#. translators: %s: Stored provider, model, and effort.
+#: assets/v2/build/index.tsx.js:15
+msgid "Running: %s"
+msgstr ""
+
+#. translators: %d: Background job ID.
+#: assets/v2/build/index.tsx.js:16
+msgid "Job #%d"
+msgstr ""
+
+#. translators: %d: Job completion percentage.
+#: assets/v2/build/index.tsx.js:17
+msgid "%d%% complete"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:17
+msgid "Cancel job"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:17
+msgid "Agent activity"
+msgstr ""
+
+#. translators: 1: model turns, 2: tool calls, 3: source bytes.
+#: assets/v2/build/index.tsx.js:18
+msgid "%1$d model turns · %2$d tool calls · %3$s inspected"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Loading agent activity…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "No agent activity metadata is available for this job."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "View details"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Retry plan"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Saved with this plan job"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Save plan"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Edit plan"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Updating project structure"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Plan Markdown"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Open Code to explicitly generate a validated staged revision from this Plan."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Continue to Code"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Project structure"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Files proposed by this plan"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Unnamed file"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "This plan does not include a file structure."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Regenerate every file using the latest Plan? This starts new billable model requests and preserves the current revision in history."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Regenerate every planned target change using the latest Plan? This starts new billable model requests and preserves the current revision in history."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "PLANNED FILES"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "TARGET FILES"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "STAGED FILES"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+#: assets/v2/build/index.tsx.js:26
+msgid "Generate again"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Regenerate all code"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Regenerate planned changes"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Discard all unsaved changes in this edit session?"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Cancel edits"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "A newer revision exists. Your buffers are preserved; reload the latest revision before retrying."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Save revision"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Edit revision"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Restore this revision as a new latest revision?"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Restore as latest"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Loading file…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "This staged action deletes the target file. Open Changes to review the removed source."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Loading Code workspace…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "The Plan has changed since this revision."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "This revision’s file structure differs from its Plan. Regenerate all code to return to the latest Plan structure."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "This revision’s change set differs from its Plan. Regenerate the planned changes to return to the latest Plan structure."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Code generation ended without creating a revision. The existing revision remains unchanged."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:18
+msgid "Revision"
+msgstr ""
+
+#. translators: %d: immutable revision number.
+#. translators: %d: Current revision number.
+#. translators: %d: Revision number.
+#: assets/v2/build/index.tsx.js:19
+#: assets/v2/build/index.tsx.js:22
+#: assets/v2/build/index.tsx.js:30
+#: assets/v2/build/index.tsx.js:33
+#: assets/v2/build/index.tsx.js:39
+#: assets/v2/build/index.tsx.js:41
+msgid "Revision %d"
+msgstr ""
+
+#. translators: %d: Plan job ID.
+#: assets/v2/build/index.tsx.js:20
+msgid "Plan job #%d"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:20
+msgid "Valid"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:20
+msgid "Expand project structure"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:20
+msgid "Collapse project structure"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:20
+msgid "Select a file"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:20
+msgid "View"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:20
+msgid "File view"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:20
+#: assets/v2/build/index.tsx.js:42
+msgid "Code"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:20
+msgid "Changes"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:21
+msgid "Validation: valid"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:21
+msgid "Next: revision-bound Review"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:21
+msgid "Continue to Review"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:21
+msgid "Select the latest revision to send a message."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:21
+msgid "Save or cancel the edit session before sending a message."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:21
+msgid "Wait for the active Code work to finish."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:21
+msgid "Configure a coder model to send a message."
+msgstr ""
+
+#. translators: %d: revision record ID.
+#: assets/v2/build/index.tsx.js:23
+#: assets/v2/build/index.tsx.js:31
+msgid "Revision ID %d"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:23
+msgid "Ask about or change the code"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:23
+msgid "Questions use the configured coder. Change requests may use multiple billable calls and create a new staged revision without writing to an installed target."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:23
+#: assets/v2/build/index.tsx.js:36
+#: assets/v2/build/index.tsx.js:42
+msgid "You"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:23
+msgid "Image-only message"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:23
+msgid "Code assistant"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:23
+#: assets/v2/build/index.tsx.js:42
+msgid "Retry answer"
+msgstr ""
+
+#. translators: %s: immutable revision label.
+#: assets/v2/build/index.tsx.js:24
+msgid "Created %s."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:24
+msgid "The Code follow-up was cancelled."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:24
+#: assets/v2/build/index.tsx.js:36
+msgid "Retry"
+msgstr ""
+
+#. translators: %s: selected source file path.
+#: assets/v2/build/index.tsx.js:25
+msgid "Current file context: %s"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:25
+msgid "Message"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:25
+#: assets/v2/build/index.tsx.js:36
+#: assets/v2/build/index.tsx.js:42
+msgid "Send"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:25
+msgid "The selected Coder does not accept image prompts. Remove the images or choose another model."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:25
+msgid "Ask a question or describe the exact change you want."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:25
+msgid "Ready to generate"
+msgstr ""
+
+#. translators: 1: Plan job ID, 2: planned file count.
+#: assets/v2/build/index.tsx.js:26
+msgid "Plan job #%1$d · %2$d planned files"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:26
+msgid "Complete the Plan before generating Code."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:26
+msgid "This Plan needs a valid main plugin file and 1–20 added PHP, JavaScript, or CSS files. Regenerate the Plan structure before generating Code."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:26
+msgid "This Plan needs 1–20 valid Add, Update, or Delete actions for PHP, JavaScript, or CSS files. Regenerate the Plan structure before generating Code."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:26
+msgid "Code generation ended without a revision. The Plan is unchanged and you can generate again."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:26
+msgid "Generate Code"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:26
+msgid "Generating staged revision"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:26
+msgid "Analyzing Code follow-up"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:26
+msgid "Generating Code changes"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:26
+msgid "Preparing generation…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:26
+msgid "Analysis"
+msgstr ""
+
+#. translators: 1: completed file count, 2: total file count.
+#: assets/v2/build/index.tsx.js:27
+msgid "%1$d of %2$d files"
+msgstr ""
+
+#. translators: %d: cumulative token count.
+#: assets/v2/build/index.tsx.js:28
+msgid "%d tokens"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:28
+msgid "Unsaved changes"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:28
+msgid "Validation problem"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:28
+msgid "No changes for this file."
+msgstr ""
+
+#. translators: %d: number of validation problems.
+#: assets/v2/build/index.tsx.js:29
+msgid "%d problem"
+msgid_plural "%d problems"
+msgstr[0] ""
+msgstr[1] ""
+
+#: assets/v2/build/index.tsx.js:29
+msgid "Staged changes"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:29
+msgid "Edited"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:29
+msgid "Restored"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:29
+msgid "Review fix"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:29
+msgid "AI generated"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:31
+msgid "Dismiss this issue? You can reopen it later."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:31
+msgid "Optional dismissal reason"
+msgstr ""
+
+#. translators: 1: Review status. 2: Open finding priority counts.
+#: assets/v2/build/index.tsx.js:32
+msgid "Proceed without current all-clear Review? Status: %1$s. Open findings: %2$s. This override will be recorded."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:32
+msgid "none"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:32
+msgid "Loading Review…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:32
+msgid "Start Review"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:32
+msgid "Verify fixes"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:32
+msgid "Review latest"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:32
+msgid "To change code, use Fix on an issue."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:32
+msgid "Review latest before asking another question."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:32
+msgid "The selected Reviewer does not accept image prompts. Remove the images or choose another model."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:32
+#: assets/v2/build/index.tsx.js:42
+msgid "Review"
+msgstr ""
+
+#. translators: %d: Reviewed revision number.
+#: assets/v2/build/index.tsx.js:34
+msgid "Reviewed revision %d"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+#: assets/v2/build/index.tsx.js:38
+msgid "Previous reviews"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "Complete Code before starting Review."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "This Review is stale because a newer revision exists. Review latest before relying on its verdict."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "No safe material fix was staged"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "The Review fix did not complete. The staged revision was not changed."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "Retry Review"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "Issues"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "Fix actions use the configured Coder model."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "Fix selected"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "More fix options"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "Fix selected without review"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "Fix all issues"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:35
+msgid "No issues to address."
+msgstr ""
+
+#. translators: %d: Historical finding count.
+#: assets/v2/build/index.tsx.js:36
+msgid "Previous issues (%d)"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:36
+msgid "Follow-up questions"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:36
+msgid "Ask the reviewer to explain a finding or reconsider the current Review."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:36
+#: assets/v2/build/index.tsx.js:42
+msgid "Image-only question"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:36
+msgid "The review was updated."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:36
+msgid "Ask a follow-up"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:36
+msgid "Ask a question, request reconsideration, or ask for another area to be inspected…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:36
+msgid "Modify the original plugin directly? Upstream updates remain enabled and may overwrite these changes. Rollback restores files only, not database or runtime side effects, and becomes unavailable if affected files drift."
+msgstr ""
+
+#. translators: %s: Exact plugin reference.
+#: assets/v2/build/index.tsx.js:37
+msgid "Type %s to confirm"
+msgstr ""
+
+#. translators: %s: Issue label.
+#: assets/v2/build/index.tsx.js:38
+msgid "%s history"
+msgstr ""
+
+#. translators: %s: Finding label.
+#: assets/v2/build/index.tsx.js:40
+msgid "Select %s"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:40
+msgid "Suggested fix"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:40
+msgid "Project-level finding"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:40
+msgid "History"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:40
+msgid "Dismiss"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:40
+msgid "Deployment"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:40
+msgid "Release"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Theme release is not available yet. Review and finding fixes remain fully available."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Download theme ZIP"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Install as copy"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Modify theme directly"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Download ZIP"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Install on this site"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Recommended: release as a fork"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "The fork and original share plugin data and must not be active together. A fork does not automatically receive upstream releases."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Fork plugin slug"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Download fork ZIP"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Install as fork"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Fork details"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Update URI"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Version"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Patch version bump"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Advanced: replace or modify the original"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "The replacement ZIP is for manual deployment. Upstream updates remain enabled and may overwrite direct changes. File rollback cannot undo database or runtime side effects and is blocked after affected-file drift."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Download replacement ZIP"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Modify original"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Installed. Click Activate to enable the plugin on this site."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Switch to fork"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "The original plugin files were modified. Rollback remains available only while every affected file matches the promoted state."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Rollback files"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:41
+msgid "Manual testing"
+msgstr ""
+
+#. translators: %d: Number of suggested manual tests.
+#: assets/v2/build/index.tsx.js:42
+msgid "%d suggested checks"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Review-generated checks"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Deploy the changes to a test site with the theme active before working through these checks."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Install this release and activate the plugin on a test site before working through these checks."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "These suggestions belong to an earlier revision. Review latest to refresh them before testing."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Expected:"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Start Review to generate suggested manual checks for this revision."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Suggested manual checks will appear when Review completes."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Retry Review to generate suggested manual checks."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Review latest to generate manual checks for this revision."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "The current Review did not include any manual test cases."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Checklist progress is kept only for this browser session."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Release activity"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Download ready ZIP"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "No actionable issues found"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Cleared with dismissals"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Action required"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Stale"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "In progress"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Failed"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Not started"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Plan assistant"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Plan updated. The new version is now active above."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Ask about or change the plan"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Ask a follow-up question"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Ask a question or request a change…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Ask a follow-up question…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Ask"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "The selected model does not accept image prompts. Remove the images or choose another model."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "No job has been started for this stage yet."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Theme"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Chat"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "History available"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Needs attention"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "No messages"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Complete"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Incomplete"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Define the work"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Build from the Plan"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Assess staged Code"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Plugins"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Themes"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:42
+msgid "Choose a target"
+msgstr ""
+
+#. translators: %d: Number of matching targets.
+#: assets/v2/build/index.tsx.js:43
+msgid "%d item"
+msgid_plural "%d items"
+msgstr[0] ""
+msgstr[1] ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Search plugins"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Search themes"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Search plugins…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Search themes…"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Available targets"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "No matching targets."
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Selected plugin"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Selected theme"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Files"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Lines"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Tokens"
+msgstr ""
+
+#: assets/v2/build/index.tsx.js:43
+msgid "Choose an operation"
+msgstr ""
+
+#. translators: 1: Input token count, 2: Output token count.
+#: assets/v2/build/index.tsx.js:44
+#: assets/v2/build/index.tsx.js:45
+msgid "%1$d input · %2$d output tokens"
 msgstr ""

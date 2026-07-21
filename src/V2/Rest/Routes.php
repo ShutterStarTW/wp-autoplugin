@@ -5,6 +5,7 @@ namespace WP_Autoplugin\V2\Rest;
 use WP_Autoplugin\V2\Domain\Target\Target_Scanner;
 use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 use WP_Autoplugin\V2\Domain\AI\Agent_Task;
+use WP_Autoplugin\V2\Domain\AI\Model_Catalog;
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
@@ -45,6 +46,16 @@ final class Routes {
 			'methods'             => \WP_REST_Server::READABLE,
 			'callback'            => [ $this, 'targets' ],
 			'permission_callback' => $permission,
+		] );
+		register_rest_route( self::NAMESPACE, '/model-settings/(?P<role>planner|coder|reviewer)', [
+			'methods'             => \WP_REST_Server::CREATABLE,
+			'callback'            => [ $this, 'update_model_setting' ],
+			'permission_callback' => $permission,
+			'args'                => [
+				'role'   => [ 'type' => 'string', 'enum' => [ 'planner', 'coder', 'reviewer' ] ],
+				'model'  => [ 'required' => true, 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ],
+				'effort' => [ 'type' => 'string', 'default' => '', 'sanitize_callback' => 'sanitize_key' ],
+			],
 		] );
 		register_rest_route( self::NAMESPACE, '/projects', [
 			'methods'             => \WP_REST_Server::READABLE,
@@ -297,6 +308,7 @@ final class Routes {
 			'direct_plan'   => ( new Direct_Transport_Factory() )->capability( 'plan' ),
 			'direct_code'   => ( new Direct_Transport_Factory() )->capability( 'code' ),
 			'direct_review' => ( new Direct_Transport_Factory() )->capability( 'review' ),
+			'models'        => ( new Model_Catalog() )->state(),
 			'release'       => [
 				'zip'                   => class_exists( '\\ZipArchive' ) || is_readable( ABSPATH . 'wp-admin/includes/class-pclzip.php' ),
 				'file_modifications'    => $file_mods,
@@ -312,6 +324,16 @@ final class Routes {
 
 	public function targets(): \WP_REST_Response {
 		return rest_ensure_response( [ 'items' => ( new Target_Scanner() )->all() ] );
+	}
+
+	/** @return \WP_REST_Response|\WP_Error */
+	public function update_model_setting( \WP_REST_Request $request ) {
+		$selection = ( new Model_Catalog() )->update(
+			(string) $request['role'],
+			(string) $request['model'],
+			(string) $request['effort']
+		);
+		return is_wp_error( $selection ) ? $selection : rest_ensure_response( $selection );
 	}
 
 	public function projects( \WP_REST_Request $request ): \WP_REST_Response {
@@ -466,34 +488,14 @@ final class Routes {
 		if ( in_array( $task, [ 'plan', 'explain' ], true ) && '' === trim( (string) $workspace['request'] ) && ! $has_images ) {
 			return new \WP_Error( 'wp_autoplugin_prompt_required', __( 'Enter a message or attach at least one image.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
+		$payload = $this->snapshot_job_models( $task, $payload, $workspace );
+		if ( is_wp_error( $payload ) ) {
+			return $payload;
+		}
 		if ( $has_images ) {
-			$capability = $this->prompt_image_capability( $task, $payload, $workspace );
+			$capability = $this->prompt_image_capability( $task, $payload );
 			if ( ! $capability['available'] || empty( $capability['images'] ) ) {
 				return new \WP_Error( 'wp_autoplugin_prompt_images_unsupported', __( 'The selected model does not support prompt images for this stage.', 'wp-autoplugin' ), [ 'status' => 409 ] );
-			}
-			$payload['prompt_model'] = [ 'provider' => $capability['provider'], 'model' => $capability['model'], 'effort' => $capability['effort'] ?? '' ];
-		}
-		$agent_job = [ 'task' => $task, 'payload' => $payload ];
-		if ( Agent_Task::uses_source_tools( $agent_job, $workspace ) ) {
-			$stage      = Agent_Task::stage( $agent_job ) ?: 'explain';
-			$capability = ( new Agent_Transport_Factory() )->capability( $stage );
-			if ( ! $capability['available'] ) {
-				return new \WP_Error( 'wp_autoplugin_source_agent_unavailable', $capability['message'], [ 'status' => 409 ] );
-			}
-		} elseif ( Agent_Task::uses_direct_plan( $agent_job, $workspace ) ) {
-			$capability = ( new Direct_Transport_Factory() )->capability( 'plan' );
-			if ( ! $capability['available'] ) {
-				return new \WP_Error( 'wp_autoplugin_direct_plan_unavailable', $capability['message'], [ 'status' => 409 ] );
-			}
-		} elseif ( $this->is_review_work( $agent_job ) ) {
-			$capability = ( new Direct_Transport_Factory() )->capability( 'review' );
-			if ( ! $capability['available'] ) {
-				return new \WP_Error( 'wp_autoplugin_direct_review_unavailable', $capability['message'], [ 'status' => 409 ] );
-			}
-		} elseif ( Job_Repository::is_code_work( $agent_job ) ) {
-			$capability = ( new Direct_Transport_Factory() )->capability( 'code' );
-			if ( ! $capability['available'] ) {
-				return new \WP_Error( 'wp_autoplugin_direct_code_unavailable', $capability['message'], [ 'status' => 409 ] );
 			}
 		}
 		$job = null;
@@ -686,10 +688,14 @@ final class Routes {
 		}
 		$regeneration = null;
 		try {
+			$selection    = ( new Model_Catalog() )->selection( 'planner' );
 			$regeneration = $jobs->create(
 				(int) $successor['workspace_id'],
 				'plan_structure',
-				[ 'artifact_job_id' => (int) $successor['id'] ],
+				[
+					'artifact_job_id' => (int) $successor['id'],
+					'prompt_model'    => [ 'provider' => (string) ( $selection['provider'] ?? '' ), 'model' => (string) ( $selection['model'] ?? '' ), 'effort' => (string) ( $selection['effort'] ?? '' ) ],
+				],
 				get_current_user_id()
 			);
 			$runner = ( new Queue() )->dispatch( (int) $regeneration['id'] );
@@ -1199,12 +1205,89 @@ final class Routes {
 	}
 
 	/** @return array<string, mixed> */
-	private function prompt_image_capability( string $task, array $payload, array $workspace ): array {
+	private function prompt_image_capability( string $task, array $payload ): array {
 		$stage = 'conversation' === $task ? sanitize_key( (string) ( $payload['stage'] ?? '' ) ) : $task;
-		if ( ( 'plan' === $stage && 'new_plugin' !== ( $workspace['target_kind'] ?? '' ) ) || 'explain' === $stage ) {
-			return ( new Agent_Transport_Factory() )->capability( $stage );
+		$snapshot = 'review' === $stage ? (array) ( $payload['reviewer'] ?? [] ) : (array) ( $payload['prompt_model'] ?? [] );
+		$model    = sanitize_text_field( (string) ( $snapshot['model'] ?? '' ) );
+		$provider = sanitize_key( (string) ( $snapshot['provider'] ?? '' ) );
+		$definition = ( new Model_Catalog() )->definition( $model );
+
+		return [
+			'available' => $definition && $provider === (string) $definition['provider'] && ! empty( $definition['configured'] ),
+			'provider'  => $provider,
+			'model'     => $model,
+			'effort'    => sanitize_key( (string) ( $snapshot['effort'] ?? '' ) ),
+			'images'    => (bool) ( $definition['images'] ?? false ),
+		];
+	}
+
+	/**
+	 * Resolve and persist the current role choice before a job enters the queue.
+	 *
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	private function snapshot_job_models( string $task, array $payload, array $workspace ) {
+		$job = [ 'task' => $task, 'payload' => $payload ];
+		if ( 'review_fix' === $task ) {
+			$coder = ( new Direct_Transport_Factory() )->capability( 'code' );
+			if ( ! $coder['available'] ) {
+				return new \WP_Error( 'wp_autoplugin_direct_code_unavailable', $coder['message'], [ 'status' => 409 ] );
+			}
+			$reviewer = ( new Direct_Transport_Factory() )->capability( 'review' );
+			if ( ! empty( $payload['auto_re_review'] ) && ! $reviewer['available'] ) {
+				return new \WP_Error( 'wp_autoplugin_direct_review_unavailable', $reviewer['message'], [ 'status' => 409 ] );
+			}
+			$payload['prompt_model'] = $this->model_snapshot( $coder );
+			$payload['reviewer']     = $this->model_snapshot( $reviewer );
+			return $payload;
 		}
-		return ( new Direct_Transport_Factory() )->capability( in_array( $stage, [ 'code', 'review' ], true ) ? $stage : 'plan' );
+
+		if ( Agent_Task::uses_source_tools( $job, $workspace ) ) {
+			$stage      = Agent_Task::stage( $job ) ?: 'explain';
+			$capability = ( new Agent_Transport_Factory() )->capability( $stage );
+			if ( ! $capability['available'] ) {
+				return new \WP_Error( 'wp_autoplugin_source_agent_unavailable', $capability['message'], [ 'status' => 409 ] );
+			}
+			$payload['prompt_model'] = $this->model_snapshot( $capability );
+			return $payload;
+		}
+
+		if ( Agent_Task::uses_direct_plan( $job, $workspace ) ) {
+			$capability = ( new Direct_Transport_Factory() )->capability( 'plan' );
+			if ( ! $capability['available'] ) {
+				return new \WP_Error( 'wp_autoplugin_direct_plan_unavailable', $capability['message'], [ 'status' => 409 ] );
+			}
+			$payload['prompt_model'] = $this->model_snapshot( $capability );
+			return $payload;
+		}
+
+		if ( $this->is_review_work( $job ) ) {
+			$capability = ( new Direct_Transport_Factory() )->capability( 'review' );
+			if ( ! $capability['available'] ) {
+				return new \WP_Error( 'wp_autoplugin_direct_review_unavailable', $capability['message'], [ 'status' => 409 ] );
+			}
+			$payload['reviewer'] = $this->model_snapshot( $capability );
+			return $payload;
+		}
+
+		if ( Job_Repository::is_code_work( $job ) ) {
+			$capability = ( new Direct_Transport_Factory() )->capability( 'code' );
+			if ( ! $capability['available'] ) {
+				return new \WP_Error( 'wp_autoplugin_direct_code_unavailable', $capability['message'], [ 'status' => 409 ] );
+			}
+			$payload['prompt_model'] = $this->model_snapshot( $capability );
+		}
+
+		return $payload;
+	}
+
+	/** @param array<string, mixed> $capability @return array{provider:string,model:string,effort:string} */
+	private function model_snapshot( array $capability ): array {
+		return [
+			'provider' => sanitize_key( (string) ( $capability['provider'] ?? '' ) ),
+			'model'    => sanitize_text_field( (string) ( $capability['model'] ?? '' ) ),
+			'effort'   => sanitize_key( (string) ( $capability['effort'] ?? '' ) ),
+		];
 	}
 
 	/** Validate an explicit latest-revision Review request and snapshot its reviewer. */

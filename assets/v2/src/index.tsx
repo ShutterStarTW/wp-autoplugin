@@ -3,6 +3,7 @@ import {
 	Button,
 	Card,
 	CardBody,
+	Dropdown,
 	DropdownMenu,
 	Modal,
 	Notice,
@@ -58,6 +59,8 @@ type Job = {
 		auto_re_review?: boolean;
 		action?: 'activate' | 'rollback';
 		promotion_id?: number;
+		prompt_model?: ModelSnapshot;
+		reviewer?: ModelSnapshot;
 	};
 	result?: {
 		content?: string;
@@ -327,8 +330,61 @@ type Bootstrap = {
 	direct_plan: AgentCapability;
 	direct_code: AgentCapability;
 	direct_review: AgentCapability;
+	models: ModelSettings;
 	release: ReleaseCapability;
 };
+
+type ModelSnapshot = {
+	provider: string;
+	model: string;
+	effort: string;
+};
+
+type ModelCatalogItem = {
+	id: string;
+	label: string;
+	provider: string;
+	provider_label: string;
+	configured: boolean;
+	available: boolean;
+	direct: boolean;
+	native_read_tools: boolean;
+	images: boolean;
+	effort_levels: string[];
+	default_effort: string;
+};
+
+type ModelRoleSelection = {
+	role: 'planner' | 'coder' | 'reviewer';
+	configured_model: string;
+	inherits_default: boolean;
+	model: string;
+	label: string;
+	provider: string;
+	configured: boolean;
+	available: boolean;
+	direct: boolean;
+	native_read_tools: boolean;
+	images: boolean;
+	effort: string;
+	effort_levels: string[];
+	default_effort: string;
+};
+
+type ModelSettings = {
+	catalog: ModelCatalogItem[];
+	default: Omit<
+		ModelRoleSelection,
+		'role' | 'configured_model' | 'inherits_default'
+	>;
+	roles: Record< ModelRoleSelection[ 'role' ], ModelRoleSelection >;
+};
+
+type ModelUpdateHandler = (
+	role: ModelRoleSelection[ 'role' ],
+	model: string,
+	effort: string
+) => Promise< boolean >;
 
 type ReleaseCapability = {
 	zip: boolean;
@@ -345,6 +401,7 @@ type AgentCapability = {
 	available: boolean;
 	provider: string;
 	model: string;
+	effort: string;
 	message: string;
 	images: boolean;
 };
@@ -909,6 +966,13 @@ function App() {
 	const [ distractionFree, setDistractionFree ] = useState(
 		() => 'true' === window.localStorage.getItem( DISTRACTION_FREE_KEY )
 	);
+	const refreshBootstrap = useCallback( async () => {
+		const response = await apiFetch< Bootstrap >( {
+			path: `${ rest }/bootstrap`,
+		} );
+		setBootstrap( response );
+		return response;
+	}, [] );
 
 	useEffect( () => {
 		const documentRoots = [ document.documentElement, document.body ];
@@ -928,7 +992,7 @@ function App() {
 
 	useEffect( () => {
 		Promise.all( [
-			apiFetch< Bootstrap >( { path: `${ rest }/bootstrap` } ),
+			refreshBootstrap(),
 			apiFetch< { items: Target[] } >( { path: `${ rest }/targets` } ),
 			apiFetch< { items: Workspace[] } >( {
 				path: `${ rest }/workspaces`,
@@ -953,7 +1017,7 @@ function App() {
 			} )
 			.catch( ( reason ) => setError( reason.message ) )
 			.finally( () => setBusy( false ) );
-	}, [] );
+	}, [ refreshBootstrap ] );
 
 	const activeWorkspace = useMemo(
 		() =>
@@ -1307,6 +1371,26 @@ function App() {
 		}
 	}
 
+	async function updateModelSetting(
+		role: ModelRoleSelection[ 'role' ],
+		model: string,
+		effort: string
+	): Promise< boolean > {
+		setError( '' );
+		try {
+			await apiFetch( {
+				path: `${ rest }/model-settings/${ role }`,
+				method: 'POST',
+				data: { model, effort },
+			} );
+			await refreshBootstrap();
+			return true;
+		} catch ( reason: any ) {
+			setError( reason.message );
+			return false;
+		}
+	}
+
 	async function queueWorkspaceEndpoint( path: string, data: object ) {
 		if ( ! activeWorkspace ) {
 			return null;
@@ -1379,12 +1463,14 @@ function App() {
 				explainCapability={ bootstrap?.explain_agent ?? null }
 				planCapability={ bootstrap?.plan_agent ?? null }
 				directPlanCapability={ bootstrap?.direct_plan ?? null }
+				modelSettings={ bootstrap?.models ?? null }
 				onTargetSearch={ setTargetSearch }
 				onTargetSelect={ setTargetKey }
 				onTargetKindSelect={ selectTargetKind }
 				onOperationSelect={ setOperation }
 				onRequestChange={ setRequest }
 				onStart={ start }
+				onUpdateModel={ updateModelSetting }
 			/>
 		);
 	} else if ( activeWorkspace ) {
@@ -1398,6 +1484,7 @@ function App() {
 				planCapability={ bootstrap?.plan_agent ?? null }
 				directPlanCapability={ bootstrap?.direct_plan ?? null }
 				explainCapability={ bootstrap?.explain_agent ?? null }
+				modelSettings={ bootstrap?.models ?? null }
 				releaseCapability={ bootstrap?.release ?? null }
 				activeTab={ activeTab }
 				onTabSelect={ selectWorkspaceStage }
@@ -1405,6 +1492,7 @@ function App() {
 				onCreateJob={ createJob }
 				onQueueEndpoint={ queueWorkspaceEndpoint }
 				onSavePlan={ savePlan }
+				onUpdateModel={ updateModelSetting }
 			/>
 		);
 	}
@@ -1449,6 +1537,323 @@ function App() {
 			) }
 			{ workspaceContent }
 		</main>
+	);
+}
+
+function modelRoleLabel( role: ModelRoleSelection[ 'role' ] ): string {
+	if ( role === 'planner' ) {
+		return __( 'Planner', 'wp-autoplugin' );
+	}
+	if ( role === 'coder' ) {
+		return __( 'Coder', 'wp-autoplugin' );
+	}
+	return __( 'Reviewer', 'wp-autoplugin' );
+}
+
+function modelIdentity( snapshot?: Partial< ModelSnapshot > | null ): string {
+	if ( ! snapshot?.model ) {
+		return '';
+	}
+	return [ snapshot.provider, snapshot.model, snapshot.effort ]
+		.filter( Boolean )
+		.join( ' · ' );
+}
+
+function modelSupportsContext(
+	model: ModelCatalogItem | undefined,
+	context: 'direct' | 'native'
+): boolean {
+	return Boolean(
+		model?.configured &&
+			model.direct &&
+			( context === 'direct' || model.native_read_tools )
+	);
+}
+
+function StageModelControl( {
+	modelRole: role,
+	context,
+	settings,
+	onUpdate,
+}: {
+	modelRole: ModelRoleSelection[ 'role' ];
+	context: 'direct' | 'native';
+	settings: ModelSettings;
+	onUpdate: ModelUpdateHandler;
+} ) {
+	const selection = settings.roles[ role ];
+	const [ draftModel, setDraftModel ] = useState(
+		selection.configured_model
+	);
+	const [ draftEffort, setDraftEffort ] = useState( selection.effort );
+	const [ saving, setSaving ] = useState( false );
+	const [ error, setError ] = useState( '' );
+	useEffect( () => {
+		setDraftModel( selection.configured_model );
+		setDraftEffort( selection.effort );
+		setSaving( false );
+		setError( '' );
+	}, [ selection.configured_model, selection.effort ] );
+
+	const groups = useMemo( () => {
+		const grouped = new Map< string, ModelCatalogItem[] >();
+		settings.catalog.forEach( ( model ) => {
+			const items = grouped.get( model.provider_label ) ?? [];
+			items.push( model );
+			grouped.set( model.provider_label, items );
+		} );
+		return [ ...grouped.entries() ];
+	}, [ settings.catalog ] );
+	const currentItem = settings.catalog.find(
+		( model ) => model.id === selection.model
+	);
+	const currentAvailable = modelSupportsContext( currentItem, context );
+
+	return (
+		<div className="stage-model-control">
+			<span className="stage-model-control__role">
+				{ modelRoleLabel( role ) }
+			</span>
+			<Dropdown
+				className="stage-model-control__dropdown"
+				contentClassName="stage-model-popover"
+				renderToggle={ ( { isOpen, onToggle } ) => (
+					<Button
+						className={ `stage-model-control__chip ${
+							currentAvailable ? '' : 'has-warning'
+						}` }
+						variant="secondary"
+						aria-expanded={ isOpen }
+						onClick={ () => {
+							if ( ! isOpen ) {
+								setDraftModel( selection.configured_model );
+								setDraftEffort( selection.effort );
+								setError( '' );
+							}
+							onToggle();
+						} }
+					>
+						{ modelIdentity( selection ) ||
+							__( 'Choose model', 'wp-autoplugin' ) }
+					</Button>
+				) }
+				renderContent={ ( { onClose } ) => {
+					const inherited = draftModel === '';
+					const effectiveModel = inherited
+						? settings.default.model
+						: draftModel;
+					const selectedModel = settings.catalog.find(
+						( model ) => model.id === effectiveModel
+					);
+					const canApply = modelSupportsContext(
+						selectedModel,
+						context
+					);
+					const effectiveEffort = inherited
+						? settings.default.effort
+						: draftEffort;
+					return (
+						<div className="stage-model-popover__body">
+							<h3>
+								{ sprintf(
+									/* translators: %s: AI model role. */
+									__( '%s model', 'wp-autoplugin' ),
+									modelRoleLabel( role )
+								) }
+							</h3>
+							<label htmlFor={ `stage-model-${ role }` }>
+								{ __( 'Model', 'wp-autoplugin' ) }
+							</label>
+							<select
+								id={ `stage-model-${ role }` }
+								value={ draftModel }
+								disabled={ saving }
+								onChange={ ( event ) => {
+									const model = event.target.value;
+									setDraftModel( model );
+									const definition = settings.catalog.find(
+										( item ) => item.id === model
+									);
+									setDraftEffort(
+										model
+											? definition?.default_effort || ''
+											: ''
+									);
+								} }
+							>
+								<option
+									value=""
+									disabled={
+										! modelSupportsContext(
+											settings.catalog.find(
+												( model ) =>
+													model.id ===
+													settings.default.model
+											),
+											context
+										)
+									}
+								>
+									{ sprintf(
+										/* translators: %s: Default model ID. */
+										__(
+											'Use Default Model (%s)',
+											'wp-autoplugin'
+										),
+										settings.default.model
+									) }
+								</option>
+								{ groups.map( ( [ provider, models ] ) => (
+									<optgroup
+										label={ provider }
+										key={ provider }
+									>
+										{ models.map( ( model ) => (
+											<option
+												value={ model.id }
+												disabled={
+													! modelSupportsContext(
+														model,
+														context
+													)
+												}
+												key={ model.id }
+											>
+												{ model.label === model.id
+													? model.id
+													: `${ model.label } (${ model.id })` }
+											</option>
+										) ) }
+									</optgroup>
+								) ) }
+							</select>
+							{ inherited ? (
+								<p className="stage-model-popover__help">
+									{ sprintf(
+										/* translators: 1: Provider, 2: model, 3: effort. */
+										__(
+											'Inherited: %1$s · %2$s%3$s',
+											'wp-autoplugin'
+										),
+										settings.default.provider,
+										settings.default.model,
+										settings.default.effort
+											? ` · ${ settings.default.effort }`
+											: ''
+									) }
+								</p>
+							) : (
+								selectedModel &&
+								selectedModel.effort_levels.length > 0 && (
+									<>
+										<label
+											htmlFor={ `stage-effort-${ role }` }
+										>
+											{ __( 'Effort', 'wp-autoplugin' ) }
+										</label>
+										<select
+											id={ `stage-effort-${ role }` }
+											value={ effectiveEffort }
+											disabled={ saving }
+											onChange={ ( event ) =>
+												setDraftEffort(
+													event.target.value
+												)
+											}
+										>
+											{ selectedModel.effort_levels.map(
+												( effort ) => (
+													<option
+														value={ effort }
+														key={ effort }
+													>
+														{ effort }
+														{ effort ===
+														selectedModel.default_effort
+															? ` (${ __(
+																	'model default',
+																	'wp-autoplugin'
+															  ) })`
+															: '' }
+													</option>
+												)
+											) }
+										</select>
+									</>
+								)
+							) }
+							{ ! canApply && (
+								<Notice
+									status="warning"
+									isDismissible={ false }
+								>
+									{ context === 'native'
+										? __(
+												'This Plan requires a configured OpenAI or Anthropic model with native source tools.',
+												'wp-autoplugin'
+										  )
+										: __(
+												'Configure this model provider before using it.',
+												'wp-autoplugin'
+										  ) }
+								</Notice>
+							) }
+							{ error && (
+								<p className="stage-model-popover__error">
+									{ error }
+								</p>
+							) }
+							<p className="stage-model-popover__help">
+								{ __(
+									'Changes apply globally to future jobs. Queued, running, and completed jobs keep their saved model.',
+									'wp-autoplugin'
+								) }
+							</p>
+							<a href={ window.wpAutopluginV2.settingsUrl }>
+								{ __( 'Provider settings', 'wp-autoplugin' ) }
+							</a>
+							<div className="stage-model-popover__actions">
+								<Button
+									variant="tertiary"
+									disabled={ saving }
+									onClick={ onClose }
+								>
+									{ __( 'Cancel', 'wp-autoplugin' ) }
+								</Button>
+								<Button
+									variant="primary"
+									isBusy={ saving }
+									disabled={ saving || ! canApply }
+									onClick={ async () => {
+										setSaving( true );
+										setError( '' );
+										if (
+											await onUpdate(
+												role,
+												draftModel,
+												draftEffort
+											)
+										) {
+											onClose();
+										} else {
+											setError(
+												__(
+													'The model setting could not be saved.',
+													'wp-autoplugin'
+												)
+											);
+											setSaving( false );
+										}
+									} }
+								>
+									{ __( 'Apply', 'wp-autoplugin' ) }
+								</Button>
+							</div>
+						</div>
+					);
+				} }
+			/>
+		</div>
 	);
 }
 
@@ -2028,12 +2433,14 @@ function WorkspaceLauncher( {
 	explainCapability,
 	planCapability,
 	directPlanCapability,
+	modelSettings,
 	onTargetSearch,
 	onTargetSelect,
 	onTargetKindSelect,
 	onOperationSelect,
 	onRequestChange,
 	onStart,
+	onUpdateModel,
 }: {
 	targets: Target[];
 	target: Target | undefined;
@@ -2046,12 +2453,14 @@ function WorkspaceLauncher( {
 	explainCapability: AgentCapability | null;
 	planCapability: AgentCapability | null;
 	directPlanCapability: AgentCapability | null;
+	modelSettings: ModelSettings | null;
 	onTargetSearch: ( value: string ) => void;
 	onTargetSelect: ( value: string ) => void;
 	onTargetKindSelect: ( value: string ) => void;
 	onOperationSelect: ( value: string ) => void;
 	onRequestChange: ( value: string ) => void;
 	onStart: ( images: File[] ) => Promise< boolean >;
+	onUpdateModel: ModelUpdateHandler;
 } ) {
 	const [ images, setImages ] = useState< File[] >( [] );
 	const requiresPlan = !! target && operation !== 'explain';
@@ -2133,25 +2542,39 @@ function WorkspaceLauncher( {
 							}
 						/>
 					</div>
-					<Button
-						variant="primary"
-						disabled={
-							busy ||
-							( ! request.trim() && ! images.length ) ||
-							( images.length > 0 &&
-								! imageCapability?.images ) ||
-							( operation === 'explain' &&
-								! explainCapability?.available ) ||
-							( requiresPlan &&
-								! effectivePlanCapability?.available )
-						}
-						isBusy={ busy }
-						onClick={ submit }
-					>
-						{ operation === 'explain'
-							? __( 'Explain', 'wp-autoplugin' )
-							: __( 'Create plan', 'wp-autoplugin' ) }
-					</Button>
+					<div className="workspace-launcher__actions">
+						{ requiresPlan && modelSettings && (
+							<StageModelControl
+								modelRole="planner"
+								context={
+									target?.kind === 'new_plugin'
+										? 'direct'
+										: 'native'
+								}
+								settings={ modelSettings }
+								onUpdate={ onUpdateModel }
+							/>
+						) }
+						<Button
+							variant="primary"
+							disabled={
+								busy ||
+								( ! request.trim() && ! images.length ) ||
+								( images.length > 0 &&
+									! imageCapability?.images ) ||
+								( operation === 'explain' &&
+									! explainCapability?.available ) ||
+								( requiresPlan &&
+									! effectivePlanCapability?.available )
+							}
+							isBusy={ busy }
+							onClick={ submit }
+						>
+							{ operation === 'explain'
+								? __( 'Explain', 'wp-autoplugin' )
+								: __( 'Create plan', 'wp-autoplugin' ) }
+						</Button>
+					</div>
 				</CardBody>
 			</Card>
 		</div>
@@ -2167,6 +2590,7 @@ function WorkspaceView( {
 	planCapability,
 	directPlanCapability,
 	explainCapability,
+	modelSettings,
 	releaseCapability,
 	activeTab,
 	onTabSelect,
@@ -2174,6 +2598,7 @@ function WorkspaceView( {
 	onCreateJob,
 	onQueueEndpoint,
 	onSavePlan,
+	onUpdateModel,
 }: {
 	workspace: Workspace;
 	jobs: Job[];
@@ -2183,6 +2608,7 @@ function WorkspaceView( {
 	planCapability: AgentCapability | null;
 	directPlanCapability: AgentCapability | null;
 	explainCapability: AgentCapability | null;
+	modelSettings: ModelSettings | null;
 	releaseCapability: ReleaseCapability | null;
 	activeTab: string;
 	onTabSelect: ( tab: string ) => void;
@@ -2201,6 +2627,7 @@ function WorkspaceView( {
 	) => Promise< Job | null >;
 	onQueueEndpoint: ( path: string, data: object ) => Promise< Job | null >;
 	onSavePlan: ( job: Job, content: string ) => Promise< boolean >;
+	onUpdateModel: ModelUpdateHandler;
 } ) {
 	const target = workspace.target_metadata;
 	const tabs =
@@ -2232,6 +2659,18 @@ function WorkspaceView( {
 		workspace.target_kind === 'new_plugin'
 			? directPlanCapability
 			: planCapability;
+	let activeModelRole: ModelRoleSelection[ 'role' ] | null = null;
+	if ( activeTab === 'plan' ) {
+		activeModelRole = 'planner';
+	} else if ( activeTab === 'code' ) {
+		activeModelRole = 'coder';
+	} else if ( activeTab === 'review' ) {
+		activeModelRole = 'reviewer';
+	}
+	const activeModelContext =
+		activeTab === 'plan' && workspace.target_kind !== 'new_plugin'
+			? 'native'
+			: 'direct';
 	return (
 		<section className="workspace-editor">
 			<header className="workspace-editor__header">
@@ -2307,6 +2746,16 @@ function WorkspaceView( {
 			</div>
 			<Card className="workspace-editor__panel">
 				<CardBody>
+					{ activeModelRole && modelSettings && (
+						<div className="stage-model-bar">
+							<StageModelControl
+								modelRole={ activeModelRole }
+								context={ activeModelContext }
+								settings={ modelSettings }
+								onUpdate={ onUpdateModel }
+							/>
+						</div>
+					) }
 					{ jobsLoading && (
 						<div className="workspace-job-loading">
 							<Spinner />{ ' ' }
@@ -2440,6 +2889,52 @@ function latestJobForTask( jobs: Job[], task: string ): Job | null {
 	return [ ...jobs ].reverse().find( ( job ) => job.task === task ) ?? null;
 }
 
+function jobModelSnapshot( job: Job ): ModelSnapshot | null {
+	if (
+		job.task === 'review' ||
+		( job.task === 'conversation' && job.payload.stage === 'review' )
+	) {
+		if ( job.payload.reviewer ) {
+			return job.payload.reviewer;
+		}
+	} else if ( job.payload.prompt_model ) {
+		return job.payload.prompt_model;
+	}
+	if ( job.result?.model ) {
+		return {
+			provider: job.result.provider || '',
+			model: job.result.model,
+			effort: job.result.effort || '',
+		};
+	}
+	return null;
+}
+
+function JobModelMeta( { job }: { job: Job } ) {
+	const identity = modelIdentity( jobModelSnapshot( job ) );
+	if ( ! identity ) {
+		return null;
+	}
+	const terminal = [ 'completed', 'failed', 'cancelled' ].includes(
+		job.status
+	);
+	return (
+		<small className="job-model-meta">
+			{ terminal
+				? sprintf(
+						/* translators: %s: Stored provider, model, and effort. */
+						__( 'Used: %s', 'wp-autoplugin' ),
+						identity
+				  )
+				: sprintf(
+						/* translators: %s: Stored provider, model, and effort. */
+						__( 'Running: %s', 'wp-autoplugin' ),
+						identity
+				  ) }
+		</small>
+	);
+}
+
 function planArtifactContent( job: Job ): string {
 	return job.result?.artifact?.content || job.result?.content || '';
 }
@@ -2522,6 +3017,7 @@ function JobStatus( {
 					job.progress
 				) }
 			</p>
+			<JobModelMeta job={ job } />
 			{ ! terminal && job.latest_event?.message && (
 				<p className="job-status__event">
 					{ job.latest_event.message }
@@ -2727,6 +3223,12 @@ function PlanStage( {
 					) && (
 						<Button
 							variant="secondary"
+							disabled={
+								! capability?.available ||
+								( ( latestRun.prompt_attachments?.length ||
+									0 ) > 0 &&
+									! capability?.images )
+							}
 							onClick={ () =>
 								onCreate(
 									latestRun.prompt_attachments?.map(
@@ -2848,6 +3350,7 @@ function PlanEditor( {
 					<small>
 						{ __( 'Saved with this plan job', 'wp-autoplugin' ) }
 					</small>
+					<JobModelMeta job={ job } />
 				</div>
 				<div>
 					{ editing ? (
@@ -2878,6 +3381,12 @@ function PlanEditor( {
 						<>
 							<Button
 								variant="secondary"
+								disabled={
+									! capability?.available ||
+									( ( job.prompt_attachments?.length || 0 ) >
+										0 &&
+										! capability?.images )
+								}
 								onClick={ () =>
 									onRetry(
 										job.prompt_attachments?.map(
@@ -3975,6 +4484,7 @@ function CodeConversation( {
 	const [ images, setImages ] = useState< File[] >( [] );
 	const [ submitting, setSubmitting ] = useState( false );
 	const historical = selectedRevisionId !== latestRevisionId;
+	const imagesUnsupported = images.length > 0 && ! capability?.images;
 	const disabled =
 		historical ||
 		editing ||
@@ -4027,6 +4537,8 @@ function CodeConversation( {
 	) => {
 		if (
 			disabled ||
+			( ( promptImages.length > 0 || attachmentIds.length > 0 ) &&
+				! capability?.images ) ||
 			( ! value.trim() &&
 				! promptImages.length &&
 				! attachmentIds.length )
@@ -4065,11 +4577,6 @@ function CodeConversation( {
 						) }
 					</p>
 				</div>
-				{ capability?.available && (
-					<small>
-						{ capability.provider } · { capability.model }
-					</small>
-				) }
 			</header>
 			{ jobs.length > 0 && (
 				<div className="code-conversation__messages">
@@ -4122,6 +4629,7 @@ function CodeConversation( {
 											'wp-autoplugin'
 										) }
 									</strong>
+									<JobModelMeta job={ job } />
 									{ active && (
 										<CodeProgress
 											job={ job }
@@ -4139,7 +4647,12 @@ function CodeConversation( {
 												/>
 												<Button
 													variant="secondary"
-													disabled={ disabled }
+													disabled={
+														disabled ||
+														( job.prompt_attachments
+															.length > 0 &&
+															! capability?.images )
+													}
 													onClick={ () =>
 														send(
 															job.payload
@@ -4223,7 +4736,12 @@ function CodeConversation( {
 											</Notice>
 											<Button
 												variant="secondary"
-												disabled={ disabled }
+												disabled={
+													disabled ||
+													( job.prompt_attachments
+														.length > 0 &&
+														! capability?.images )
+												}
 												onClick={ () =>
 													send(
 														job.payload.message ||
@@ -4272,6 +4790,7 @@ function CodeConversation( {
 							isBusy={ submitting }
 							disabled={
 								disabled ||
+								imagesUnsupported ||
 								( ! message.trim() && ! images.length )
 							}
 							onClick={ () => send() }
@@ -4281,7 +4800,12 @@ function CodeConversation( {
 					}
 					disabled={ disabled }
 					help={
-						disabledCopy ||
+						( imagesUnsupported
+							? __(
+									'The selected Coder does not accept image prompts. Remove the images or choose another model.',
+									'wp-autoplugin'
+							  )
+							: disabledCopy ) ||
 						__(
 							'Ask a question or describe the exact change you want.',
 							'wp-autoplugin'
@@ -4390,16 +4914,6 @@ function CodeGenerationPanel( {
 								'wp-autoplugin'
 						  ) }
 				</p>
-				{ capability && (
-					<p>
-						{ sprintf(
-							/* translators: 1: provider name, 2: coder model name. */
-							__( 'Coder: %1$s · %2$s', 'wp-autoplugin' ),
-							capability.provider,
-							capability.model
-						) }
-					</p>
-				) }
 			</div>
 			{ capability && ! capability.available && (
 				<Notice status="warning" isDismissible={ false }>
@@ -4492,9 +5006,7 @@ function CodeProgress( {
 									progress.total
 							  ) }
 					</span>
-					<span>
-						{ progress.provider } · { progress.model }
-					</span>
+					<span>{ modelIdentity( progress ) }</span>
 					<span>
 						{ sprintf(
 							/* translators: %d: cumulative token count. */
@@ -5115,6 +5627,7 @@ function ReviewStage( {
 	const [ message, setMessage ] = useState( '' );
 	const [ images, setImages ] = useState< File[] >( [] );
 	const [ submitting, setSubmitting ] = useState( false );
+	const imagesUnsupported = images.length > 0 && ! capability?.images;
 	const [ historyFinding, setHistoryFinding ] =
 		useState< ReviewFinding | null >( null );
 	const [ showReportHistory, setShowReportHistory ] = useState( false );
@@ -5220,6 +5733,9 @@ function ReviewStage( {
 				( job.task === 'conversation' &&
 					job.payload.stage === 'review' )
 		);
+	const reportJob = report
+		? jobs.find( ( job ) => job.id === report.job_id )
+		: null;
 	const latestReviewFixJob = [ ...jobs ]
 		.reverse()
 		.find(
@@ -5387,6 +5903,8 @@ function ReviewStage( {
 		if (
 			! report ||
 			! capability?.available ||
+			( ( promptImages.length > 0 || attachmentIds.length > 0 ) &&
+				! capability.images ) ||
 			( ! value.trim() &&
 				! promptImages.length &&
 				! attachmentIds.length ) ||
@@ -5557,6 +6075,18 @@ function ReviewStage( {
 				? __( 'Verify fixes', 'wp-autoplugin' )
 				: __( 'Review latest', 'wp-autoplugin' );
 	}
+	let reviewComposerHelp = currentReport
+		? __( 'To change code, use Fix on an issue.', 'wp-autoplugin' )
+		: __(
+				'Review latest before asking another question.',
+				'wp-autoplugin'
+		  );
+	if ( imagesUnsupported ) {
+		reviewComposerHelp = __(
+			'The selected Reviewer does not accept image prompts. Remove the images or choose another model.',
+			'wp-autoplugin'
+		);
+	}
 
 	return (
 		<div className="review-stage">
@@ -5591,6 +6121,19 @@ function ReviewStage( {
 								</>
 							) : (
 								''
+							) }
+						</small>
+					) }
+					{ report && (
+						<small>
+							{ sprintf(
+								/* translators: %s: Stored provider, model, and effort. */
+								__( 'Used: %s', 'wp-autoplugin' ),
+								modelIdentity(
+									reportJob
+										? jobModelSnapshot( reportJob )
+										: report
+								)
 							) }
 						</small>
 					) }
@@ -5700,7 +6243,15 @@ function ReviewStage( {
 
 					<section className="review-findings">
 						<div className="review-findings__heading">
-							<h4>{ __( 'Issues', 'wp-autoplugin' ) }</h4>
+							<div>
+								<h4>{ __( 'Issues', 'wp-autoplugin' ) }</h4>
+								<small>
+									{ __(
+										'Fix actions use the configured Coder model.',
+										'wp-autoplugin'
+									) }
+								</small>
+							</div>
 							{ currentReport && openFindings.length > 0 && (
 								<div className="review-findings__actions">
 									<Button
@@ -5929,6 +6480,7 @@ function ReviewStage( {
 													'wp-autoplugin'
 												) }
 											</strong>
+											<JobModelMeta job={ job } />
 											{ job.status === 'completed' &&
 												job.result?.outcome ===
 													'report' && (
@@ -5968,7 +6520,12 @@ function ReviewStage( {
 															variant="secondary"
 															disabled={
 																!! activeArtifactJob ||
-																submitting
+																submitting ||
+																( job
+																	.prompt_attachments
+																	.length >
+																	0 &&
+																	! capability?.images )
 															}
 															onClick={ () =>
 																sendMessage(
@@ -6023,7 +6580,8 @@ function ReviewStage( {
 											! currentReport ||
 											!! activeArtifactJob ||
 											! capability?.available ||
-											submitting
+											submitting ||
+											imagesUnsupported
 										}
 										onClick={ () => sendMessage() }
 									>
@@ -6044,19 +6602,10 @@ function ReviewStage( {
 									! currentReport ||
 									!! activeArtifactJob ||
 									! capability?.available ||
-									submitting
+									submitting ||
+									imagesUnsupported
 								}
-								help={
-									currentReport
-										? __(
-												'To change code, use Fix on an issue.',
-												'wp-autoplugin'
-										  )
-										: __(
-												'Review latest before asking another question.',
-												'wp-autoplugin'
-										  )
-								}
+								help={ reviewComposerHelp }
 							/>
 						</div>
 					</section>
@@ -6855,8 +7404,13 @@ function StageConversation( {
 	const [ submitting, setSubmitting ] = useState( false );
 	const isPlan = stage === 'plan';
 	const disabled = submitting || ! capability?.available;
+	const imagesUnsupported = images.length > 0 && ! capability?.images;
 	const submitMessage = async () => {
-		if ( disabled || ( ! message.trim() && ! images.length ) ) {
+		if (
+			disabled ||
+			imagesUnsupported ||
+			( ! message.trim() && ! images.length )
+		) {
 			return;
 		}
 		setSubmitting( true );
@@ -6900,6 +7454,7 @@ function StageConversation( {
 									? __( 'Plan assistant', 'wp-autoplugin' )
 									: __( 'Explain', 'wp-autoplugin' ) }
 							</strong>
+							<JobModelMeta job={ job } />
 							{ job.status === 'completed' && job.result ? (
 								<>
 									{ job.result.outcome === 'artifact' ? (
@@ -6919,6 +7474,12 @@ function StageConversation( {
 									) }
 									<Button
 										variant="secondary"
+										disabled={
+											disabled ||
+											( job.prompt_attachments.length >
+												0 &&
+												! capability?.images )
+										}
 										onClick={ () =>
 											onFollowUp(
 												job.payload.message || '',
@@ -6947,6 +7508,12 @@ function StageConversation( {
 									) && (
 										<Button
 											variant="secondary"
+											disabled={
+												disabled ||
+												( job.prompt_attachments
+													.length > 0 &&
+													! capability?.images )
+											}
 											onClick={ () =>
 												onFollowUp(
 													job.payload.message || '',
@@ -7009,6 +7576,7 @@ function StageConversation( {
 							isBusy={ submitting }
 							disabled={
 								disabled ||
+								imagesUnsupported ||
 								( ! message.trim() && ! images.length )
 							}
 							onClick={ submitMessage }
@@ -7017,6 +7585,14 @@ function StageConversation( {
 								? __( 'Send', 'wp-autoplugin' )
 								: __( 'Ask', 'wp-autoplugin' ) }
 						</Button>
+					}
+					help={
+						imagesUnsupported
+							? __(
+									'The selected model does not accept image prompts. Remove the images or choose another model.',
+									'wp-autoplugin'
+							  )
+							: undefined
 					}
 					onKeyDown={ ( event ) => {
 						if (

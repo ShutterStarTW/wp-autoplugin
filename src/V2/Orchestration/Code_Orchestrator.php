@@ -90,7 +90,13 @@ final class Code_Orchestrator {
 					return is_wp_error( $manifest ) ? $manifest : new \WP_Error( 'code_integration_identity_invalid', __( 'The extension integration target identity could not be preserved.', 'wp-autoplugin' ) );
 				}
 			}
-			$capability = ( new Direct_Transport_Factory() )->capability( 'code' );
+			$capability = (array) ( $job['payload']['prompt_model'] ?? [] );
+			if ( empty( $capability['provider'] ) || empty( $capability['model'] ) ) {
+				$capability = ( new Direct_Transport_Factory() )->capability( 'code' );
+			} else {
+				$capability['available'] = true;
+				$capability['effort']    = (string) ( $capability['effort'] ?? '' );
+			}
 			if ( ! $capability['available'] ) {
 				return new \WP_Error( 'code_transport_unavailable', $capability['message'] );
 			}
