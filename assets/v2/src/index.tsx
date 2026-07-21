@@ -2694,6 +2694,14 @@ function WorkspaceView( {
 							) }
 						</span>
 					) }
+					{ activeModelRole && modelSettings && (
+						<StageModelControl
+							modelRole={ activeModelRole }
+							context={ activeModelContext }
+							settings={ modelSettings }
+							onUpdate={ onUpdateModel }
+						/>
+					) }
 				</div>
 			</header>
 			<div className="workspace-editor__request">
@@ -2747,16 +2755,6 @@ function WorkspaceView( {
 			</div>
 			<Card className="workspace-editor__panel">
 				<CardBody>
-					{ activeModelRole && modelSettings && (
-						<div className="stage-model-bar">
-							<StageModelControl
-								modelRole={ activeModelRole }
-								context={ activeModelContext }
-								settings={ modelSettings }
-								onUpdate={ onUpdateModel }
-							/>
-						</div>
-					) }
 					{ jobsLoading && (
 						<div className="workspace-job-loading">
 							<Spinner />{ ' ' }

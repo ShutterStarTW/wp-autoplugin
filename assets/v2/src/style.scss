@@ -774,11 +774,12 @@ body.wp-autoplugin-v2-distraction-free {
 		}
 	}
 	&__metrics {
+		align-items: center;
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
 		justify-content: flex-end;
-		span {
+		> span {
 			background: #f0f2f4;
 			border-radius: 12px;
 			color: #526069;
@@ -1237,12 +1238,6 @@ body.wp-autoplugin-v2-distraction-free {
 	gap: 12px;
 	justify-content: space-between;
 	margin-top: 16px;
-}
-.stage-model-bar {
-	align-items: center;
-	display: flex;
-	justify-content: flex-end;
-	margin: -6px 0 18px;
 }
 .stage-model-control {
 	align-items: center;
@@ -3098,9 +3093,6 @@ body.wp-autoplugin-v2-distraction-free {
 			justify-content: center;
 			width: 100%;
 		}
-	}
-	.stage-model-bar {
-		justify-content: stretch;
 	}
 	.stage-model-control {
 		align-items: stretch;
