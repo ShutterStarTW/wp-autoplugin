@@ -5622,7 +5622,9 @@ function ReviewStage( {
 		null
 	);
 	const [ revisions, setRevisions ] = useState< RevisionSummary[] >( [] );
-	const [ selected, setSelected ] = useState< Set< number > >( new Set() );
+	const [ selectedFindingId, setSelectedFindingId ] = useState<
+		number | null
+	>( null );
 	const [ message, setMessage ] = useState( '' );
 	const [ images, setImages ] = useState< File[] >( [] );
 	const [ submitting, setSubmitting ] = useState( false );
@@ -5630,6 +5632,8 @@ function ReviewStage( {
 	const [ historyFinding, setHistoryFinding ] =
 		useState< ReviewFinding | null >( null );
 	const [ showReportHistory, setShowReportHistory ] = useState( false );
+	const [ showConversation, setShowConversation ] = useState( false );
+	const [ showRelease, setShowRelease ] = useState( false );
 	const [ loading, setLoading ] = useState( true );
 	const [ actionError, setActionError ] = useState( '' );
 	const [ forkSlug, setForkSlug ] = useState( () =>
@@ -5685,13 +5689,6 @@ function ReviewStage( {
 			] );
 			setRevision( latestRevision );
 			setReport( currentReport );
-			setSelected(
-				new Set(
-					( currentReport?.findings ?? [] )
-						.filter( ( finding ) => finding.status === 'open' )
-						.map( ( finding ) => finding.id )
-				)
-			);
 		} catch ( reason: any ) {
 			setActionError( reason.message );
 		} finally {
@@ -5724,14 +5721,6 @@ function ReviewStage( {
 							job.payload.stage || ''
 						) ) )
 		);
-	const latestReviewJob = [ ...jobs ]
-		.reverse()
-		.find(
-			( job ) =>
-				job.task === 'review' ||
-				( job.task === 'conversation' &&
-					job.payload.stage === 'review' )
-		);
 	const reportJob = report
 		? jobs.find( ( job ) => job.id === report.job_id )
 		: null;
@@ -5756,6 +5745,13 @@ function ReviewStage( {
 		( first, second ) =>
 			priorityOrder[ first.priority ] - priorityOrder[ second.priority ]
 	);
+	const selectedFinding =
+		visibleFindings.find(
+			( finding ) => finding.id === selectedFindingId
+		) ??
+		visibleFindings[ 0 ] ??
+		null;
+	const latestConversationJob = [ ...conversationJobs ].reverse()[ 0 ];
 	const currentReport =
 		!! report && report.revision_id === history?.latest_revision_id;
 	const reviewedRevisionNumber = report
@@ -6086,6 +6082,132 @@ function ReviewStage( {
 			'wp-autoplugin'
 		);
 	}
+	const reviewNumber = report
+		? reviewedRevisionNumber
+		: revision?.revision_number ?? 0;
+	const reviewStatus = history?.current.status || 'not_started';
+	const reviewVerdictLabel =
+		reviewStatus === 'action_required'
+			? sprintf(
+					/* translators: %d: Number of unresolved Review findings. */
+					_n(
+						'%d issue requires action',
+						'%d issues require action',
+						actionableFindings.length,
+						'wp-autoplugin'
+					),
+					actionableFindings.length
+			  )
+			: reviewStatusLabel( reviewStatus );
+	const historyPreview = historyFindings
+		.slice( 0, 2 )
+		.map( ( finding ) => finding.title )
+		.join( '; ' );
+	let historyHeading = sprintf(
+		/* translators: %d: Number of findings no longer current. */
+		_n(
+			'%d previous issue',
+			'%d previous issues',
+			historyFindings.length,
+			'wp-autoplugin'
+		),
+		historyFindings.length
+	);
+	if (
+		historyFindings.length > 0 &&
+		historyFindings.every( ( finding ) => finding.status !== 'dismissed' )
+	) {
+		historyHeading = sprintf(
+			/* translators: %d: Number of resolved or retracted findings. */
+			_n(
+				'✓ %d earlier issue resolved',
+				'✓ %d earlier issues resolved',
+				historyFindings.length,
+				'wp-autoplugin'
+			),
+			historyFindings.length
+		);
+	}
+	let latestFollowUpPreview = __(
+		'No follow-up questions yet. Ask the reviewer for clarification or reconsideration.',
+		'wp-autoplugin'
+	);
+	if ( latestConversationJob ) {
+		if ( latestConversationJob.status === 'completed' ) {
+			latestFollowUpPreview =
+				latestConversationJob.result?.outcome === 'report'
+					? __(
+							'The reviewer updated this report after the latest follow-up.',
+							'wp-autoplugin'
+					  )
+					: latestConversationJob.result?.content ||
+					  __( 'The reviewer replied.', 'wp-autoplugin' );
+		} else {
+			latestFollowUpPreview = sprintf(
+				/* translators: 1: Job number. 2: Job status. */
+				__( 'Follow-up #%1$d is %2$s.', 'wp-autoplugin' ),
+				latestConversationJob.id,
+				latestConversationJob.status
+			);
+		}
+	}
+	let releaseStatusCopy = __(
+		'This revision has not been reviewed. Releasing it requires confirmation.',
+		'wp-autoplugin'
+	);
+	if ( releaseSafe ) {
+		releaseStatusCopy = __(
+			'The current Review is clear. This revision is ready for release.',
+			'wp-autoplugin'
+		);
+	} else if ( reviewStatus === 'action_required' ) {
+		releaseStatusCopy = sprintf(
+			/* translators: %d: Number of unresolved Review findings. */
+			_n(
+				'Release requires confirmation because %d Review issue remains unresolved.',
+				'Release requires confirmation because %d Review issues remain unresolved.',
+				actionableFindings.length,
+				'wp-autoplugin'
+			),
+			actionableFindings.length
+		);
+	} else if ( reviewStatus === 'stale' ) {
+		releaseStatusCopy = __(
+			'The Review belongs to an earlier revision. Releasing requires confirmation.',
+			'wp-autoplugin'
+		);
+	}
+	if ( themeReleaseDisabled ) {
+		releaseStatusCopy = __(
+			'Theme release is not available yet. Review and finding fixes remain available.',
+			'wp-autoplugin'
+		);
+	}
+	let releaseBarClass = 'needs-override';
+	let releaseHeading = __( 'Release needs confirmation', 'wp-autoplugin' );
+	let releaseButtonLabel = __( 'Release anyway', 'wp-autoplugin' );
+	if ( releaseSafe ) {
+		releaseBarClass = 'is-clear';
+		releaseHeading = __( 'Ready to release', 'wp-autoplugin' );
+		releaseButtonLabel = __( 'Release', 'wp-autoplugin' );
+	}
+	if ( themeReleaseDisabled ) {
+		releaseBarClass = 'is-disabled';
+		releaseHeading = __( 'Release unavailable', 'wp-autoplugin' );
+		releaseButtonLabel = __( 'View details', 'wp-autoplugin' );
+	}
+
+	function reconsiderFinding( finding: ReviewFinding ) {
+		setMessage(
+			sprintf(
+				/* translators: 1: Finding label. 2: Finding title. */
+				__( 'Please reconsider %1$s: %2$s', 'wp-autoplugin' ),
+				finding.label,
+				finding.title
+			)
+		);
+		setShowConversation( true );
+	}
 
 	return (
 		<div className="review-stage">
@@ -6094,67 +6216,132 @@ function ReviewStage( {
 					{ actionError }
 				</Notice>
 			) }
-			<header className="review-stage__header">
-				<div>
-					<h3>{ __( 'Review', 'wp-autoplugin' ) }</h3>
-					{ revision && (
-						<small>
-							{ sprintf(
-								/* translators: %d: Current revision number. */
-								__( 'Revision %d', 'wp-autoplugin' ),
-								revision.revision_number
-							) }
-							{ report &&
-							reviewedRevisionNumber !==
-								revision.revision_number ? (
-								<>
-									{ ' · ' }
-									{ sprintf(
+			<header className="review-overview">
+				<div className="review-overview__identity">
+					<span
+						className={ `review-verdict review-verdict--${ reviewStatus }` }
+					>
+						{ reviewVerdictLabel }
+					</span>
+					<div className="review-overview__copy">
+						<h3>
+							{ reviewNumber
+								? sprintf(
 										/* translators: %d: Reviewed revision number. */
-										__(
-											'Reviewed revision %d',
-											'wp-autoplugin'
-										),
-										reviewedRevisionNumber
-									) }
-								</>
-							) : (
-								''
-							) }
-						</small>
-					) }
-					{ report && (
-						<small>
-							{ sprintf(
-								/* translators: %s: Stored provider, model, and effort. */
-								__( 'Used: %s', 'wp-autoplugin' ),
-								modelIdentity(
-									reportJob
-										? jobModelSnapshot( reportJob )
-										: report
-								)
-							) }
-						</small>
-					) }
+										__( 'Review for Revision %d', 'wp-autoplugin' ),
+										reviewNumber
+								  )
+								: __( 'Review', 'wp-autoplugin' ) }
+						</h3>
+						{ report ? (
+							<div className="review-overview__summary">
+								<Markdown content={ report.summary } />
+							</div>
+						) : (
+							<p>
+								{ __(
+									'Review the staged revision for issues before release.',
+									'wp-autoplugin'
+								) }
+							</p>
+						) }
+						{ report && (
+							<small>
+								{ historyFindings.length > 0 && (
+									<>
+										{ sprintf(
+											/* translators: %d: Number of findings no longer current. */
+											_n(
+												'%d earlier issue',
+												'%d earlier issues',
+												historyFindings.length,
+												'wp-autoplugin'
+											),
+											historyFindings.length
+										) }
+										{ ' · ' }
+									</>
+								) }
+								{ sprintf(
+									/* translators: %s: Stored provider, model, and effort. */
+									__( 'Used: %s', 'wp-autoplugin' ),
+									modelIdentity(
+										reportJob
+											? jobModelSnapshot( reportJob )
+											: report
+									)
+								) }
+							</small>
+						) }
+					</div>
 				</div>
-				<div className="review-stage__header-actions">
-					{ ( history?.items.length ?? 0 ) > 1 && (
+				<div className="review-overview__actions">
+					{ revision && (
 						<Button
-							variant="tertiary"
-							onClick={ () => setShowReportHistory( true ) }
+							variant="secondary"
+							disabled={
+								!! activeArtifactJob || ! capability?.available
+							}
+							onClick={ startReview }
 						>
-							{ __( 'Previous reviews', 'wp-autoplugin' ) }
+							{ currentReport
+								? __( 'Run review again', 'wp-autoplugin' )
+								: startReviewLabel }
 						</Button>
 					) }
-					<span
-						className={ `review-verdict review-verdict--${
-							history?.current.status || 'not_started'
-						}` }
-					>
-						{ reviewStatusLabel(
-							history?.current.status || 'not_started'
-						) }
-					</span>
+					{ currentReport && selectedFinding?.status === 'open' && (
+						<>
+							<Button
+								variant="primary"
+								disabled={ !! activeArtifactJob }
+								onClick={ () =>
+									fix( [ selectedFinding.id ], true )
+								}
+							>
+								{ __( 'Fix issue', 'wp-autoplugin' ) }
+							</Button>
+							<DropdownMenu
+								icon="ellipsis"
+								label={ __(
+									'More fix options',
+									'wp-autoplugin'
+								) }
+								controls={ [
+									[
+										{
+											title: __(
+												'Fix this issue without review',
+												'wp-autoplugin'
+											),
+											isDisabled: !! activeArtifactJob,
+											onClick: () =>
+												fix(
+													[ selectedFinding.id ],
+													false
+												),
+										},
+										{
+											title: __(
+												'Fix all issues',
+												'wp-autoplugin'
+											),
+											isDisabled:
+												!! activeArtifactJob ||
+												openFindings.length < 2,
+											onClick: () =>
+												fix(
+													openFindings.map(
+														( finding ) =>
+															finding.id
+													),
+													true
+												),
+										},
+									],
+								] }
+							/>
+						</>
+					) }
 				</div>
 			</header>
 
@@ -6210,185 +6397,190 @@ function ReviewStage( {
 							) }
 					</Notice>
 				) }
-			{ ! activeArtifactJob &&
-				revision &&
-				( ! report || ! currentReport ) && (
-					<Button
-						variant="primary"
-						disabled={ ! capability?.available }
-						onClick={ startReview }
-					>
-						{ startReviewLabel }
-					</Button>
-				) }
-			{ ! activeArtifactJob &&
-				currentReport &&
-				latestReviewJob &&
-				[ 'failed', 'cancelled' ].includes(
-					latestReviewJob.status
-				) && (
-					<Button variant="secondary" onClick={ startReview }>
-						{ __( 'Retry Review', 'wp-autoplugin' ) }
-					</Button>
-				) }
-
 			{ report && (
 				<>
-					<section className="review-summary">
-						<div className="review-summary__verdict">
-							<Markdown content={ report.summary } />
-						</div>
-					</section>
-
-					<section className="review-findings">
-						<div className="review-findings__heading">
-							<div>
-								<h4>{ __( 'Issues', 'wp-autoplugin' ) }</h4>
-								<small>
+					<section className="review-findings-board">
+						<aside className="review-findings-nav">
+							<header>
+								<strong>
 									{ __(
-										'Fix actions use the configured Coder model.',
+										'Current findings',
 										'wp-autoplugin'
 									) }
-								</small>
-							</div>
-							{ currentReport && openFindings.length > 0 && (
-								<div className="review-findings__actions">
-									<Button
-										variant="primary"
-										disabled={
-											! selected.size ||
-											!! activeArtifactJob
+								</strong>
+								<span>
+									{ visibleFindings.length
+										? sprintf(
+												/* translators: 1: Selected finding position. 2: Finding count. */
+												__(
+													'%1$d of %2$d',
+													'wp-autoplugin'
+												),
+												Math.max(
+													1,
+													visibleFindings.findIndex(
+														( finding ) =>
+															finding.id ===
+															selectedFinding?.id
+													) + 1
+												),
+												visibleFindings.length
+										  )
+										: __( '0 issues', 'wp-autoplugin' ) }
+								</span>
+							</header>
+							<div
+								className="review-findings-nav__list"
+								role="group"
+								aria-label={ __(
+									'Current Review findings',
+									'wp-autoplugin'
+								) }
+							>
+								{ visibleFindings.map( ( finding ) => (
+									<button
+										key={ finding.id }
+										type="button"
+										aria-pressed={
+											finding.id === selectedFinding?.id
+										}
+										className={
+											finding.id === selectedFinding?.id
+												? 'is-selected'
+												: ''
 										}
 										onClick={ () =>
-											fix( [ ...selected ], true )
+											setSelectedFindingId( finding.id )
 										}
 									>
+										<i
+											className={ `review-findings-nav__marker review-findings-nav__marker--${ finding.priority.toLowerCase() }` }
+											aria-hidden="true"
+										/>
+										<span>
+											<strong>{ finding.title }</strong>
+											<small>
+												{ finding.category } ·{ ' ' }
+												{ sprintf(
+													/* translators: %d: Revision number. */
+													__(
+														'Revision %d',
+														'wp-autoplugin'
+													),
+													reviewedRevisionNumber
+												) }
+											</small>
+										</span>
+										<b>{ finding.priority }</b>
+									</button>
+								) ) }
+								{ visibleFindings.length === 0 && (
+									<p>
 										{ __(
-											'Fix selected',
+											'No current findings.',
 											'wp-autoplugin'
 										) }
-									</Button>
-									<DropdownMenu
-										icon="ellipsis"
-										label={ __(
-											'More fix options',
+									</p>
+								) }
+							</div>
+						</aside>
+						<div className="review-finding-detail-wrap">
+							{ selectedFinding ? (
+								<ReviewFindingDetail
+									finding={ selectedFinding }
+									current={ currentReport }
+									active={ !! activeArtifactJob }
+									onOpen={ () =>
+										openFinding( selectedFinding )
+									}
+									onFix={ () =>
+										fix( [ selectedFinding.id ], true )
+									}
+									onFixWithoutReview={ () =>
+										fix( [ selectedFinding.id ], false )
+									}
+									onAsk={ () => setShowConversation( true ) }
+									onReconsider={ () =>
+										reconsiderFinding( selectedFinding )
+									}
+									onDismiss={ () =>
+										transition( selectedFinding, 'dismiss' )
+									}
+									onHistory={ () =>
+										setHistoryFinding( selectedFinding )
+									}
+								/>
+							) : (
+								<div className="review-finding-detail__empty">
+									<strong>
+										{ __(
+											'No issues to address',
 											'wp-autoplugin'
 										) }
-										controls={ [
-											[
-												{
-													title: __(
-														'Fix selected without review',
-														'wp-autoplugin'
-													),
-													isDisabled:
-														! selected.size ||
-														!! activeArtifactJob,
-													onClick: () =>
-														fix(
-															[ ...selected ],
-															false
-														),
-												},
-												{
-													title: __(
-														'Fix all issues',
-														'wp-autoplugin'
-													),
-													isDisabled:
-														!! activeArtifactJob,
-													onClick: () =>
-														fix(
-															openFindings.map(
-																( item ) =>
-																	item.id
-															),
-															true
-														),
-												},
-											],
-										] }
-									/>
+									</strong>
+									<p>
+										{ __(
+											'The current Review has no unresolved findings.',
+											'wp-autoplugin'
+										) }
+									</p>
 								</div>
 							) }
 						</div>
-						{ visibleFindings.map( ( finding ) => (
-							<ReviewFindingCard
-								key={ finding.id }
-								finding={ finding }
-								selected={ selected.has( finding.id ) }
-								selectable={
-									currentReport && finding.status === 'open'
-								}
-								onSelect={ ( checked ) =>
-									setSelected( ( current ) => {
-										const next = new Set( current );
-										if ( checked ) {
-											next.add( finding.id );
-										} else {
-											next.delete( finding.id );
-										}
-										return next;
-									} )
-								}
-								onOpen={ () => openFinding( finding ) }
-								onFix={
-									activeArtifactJob
-										? undefined
-										: () => fix( [ finding.id ], true )
-								}
-								onDismiss={
-									activeArtifactJob
-										? undefined
-										: () => transition( finding, 'dismiss' )
-								}
-								onHistory={ () => setHistoryFinding( finding ) }
-							/>
-						) ) }
-						{ visibleFindings.length === 0 && (
-							<p className="review-findings__empty">
-								{ __(
-									'No issues to address.',
-									'wp-autoplugin'
-								) }
-							</p>
-						) }
-						{ historyFindings.length > 0 && (
-							<details className="review-history-findings">
-								<summary>
-									{ sprintf(
-										/* translators: %d: Historical finding count. */
+					</section>
+
+					{ ( historyFindings.length > 0 ||
+						( history?.items.length ?? 0 ) > 1 ) && (
+						<section className="review-summary-row">
+							<div>
+								<strong>
+									{ historyFindings.length
+										? historyHeading
+										: __(
+												'Review history',
+												'wp-autoplugin'
+										  ) }
+								</strong>
+								<p>
+									{ historyPreview ||
 										__(
-											'Previous issues (%d)',
+											'Earlier reviewer reports remain available for reference.',
 											'wp-autoplugin'
-										),
-										historyFindings.length
-									) }
-								</summary>
-								{ historyFindings.map( ( finding ) => (
-									<ReviewFindingCard
-										key={ finding.id }
-										finding={ finding }
-										selected={ false }
-										selectable={ false }
-										onSelect={ () => undefined }
-										onOpen={ () => openFinding( finding ) }
-										onReopen={
-											finding.status === 'dismissed'
-												? () =>
-														transition(
-															finding,
-															'reopen'
-														)
-												: undefined
-										}
-										onHistory={ () =>
-											setHistoryFinding( finding )
-										}
-									/>
-								) ) }
-							</details>
-						) }
+										) }
+								</p>
+							</div>
+							<Button
+								variant="secondary"
+								onClick={ () => setShowReportHistory( true ) }
+							>
+								{ __( 'View history', 'wp-autoplugin' ) }
+							</Button>
+						</section>
+					) }
+
+					<section className="review-summary-row">
+						<div>
+							<strong>
+								{ latestConversationJob
+									? __(
+											'Latest reviewer follow-up',
+											'wp-autoplugin'
+									  )
+									: __(
+											'Reviewer follow-up',
+											'wp-autoplugin'
+									  ) }
+							</strong>
+							<p>{ latestFollowUpPreview }</p>
+						</div>
+						<Button
+							variant="secondary"
+							onClick={ () => setShowConversation( true ) }
+						>
+							{ conversationJobs.length
+								? __( 'View conversation', 'wp-autoplugin' )
+								: __( 'Ask reviewer', 'wp-autoplugin' ) }
+						</Button>
 					</section>
 
 					{ viewer && (
@@ -6418,231 +6610,286 @@ function ReviewStage( {
 						</Modal>
 					) }
 
-					<section className="review-conversation">
-						<header>
-							<h4>
-								{ __( 'Follow-up questions', 'wp-autoplugin' ) }
-							</h4>
-							<p>
-								{ __(
-									'Ask the reviewer to explain a finding or reconsider the current Review.',
-									'wp-autoplugin'
-								) }
-							</p>
-						</header>
-						{ conversationJobs.length > 0 && (
-							<div className="review-conversation__messages">
-								{ conversationJobs.map( ( job ) => (
-									<article
-										className="review-conversation__message"
-										key={ job.id }
-									>
-										<div className="review-conversation__question">
-											<div className="review-conversation__question-meta">
-												<strong>
-													{ __(
-														'You',
-														'wp-autoplugin'
-													) }
-												</strong>
-												{ ( job.result?.revision_id ??
-													job.payload.revision_id ??
-													0 ) > 0 && (
-													<small>
-														{ reviewRevisionLabel(
-															job.result
-																?.revision_id ??
-																job.payload
-																	.revision_id ??
-																0
-														) }
-													</small>
-												) }
-											</div>
-											<p>
-												{ job.payload.message ||
-													__(
-														'Image-only question',
-														'wp-autoplugin'
-													) }
-											</p>
-											<StoredPromptImages
-												attachments={
-													job.prompt_attachments
-												}
-											/>
-										</div>
-										<div className="review-conversation__answer">
-											<strong>
-												{ __(
-													'Reviewer',
-													'wp-autoplugin'
-												) }
-											</strong>
-											<JobModelMeta job={ job } />
-											{ job.status === 'completed' &&
-												job.result?.outcome ===
-													'report' && (
-													<Notice
-														status="info"
-														isDismissible={ false }
-													>
-														{ __(
-															'The review was updated.',
-															'wp-autoplugin'
-														) }
-													</Notice>
-												) }
-											{ job.status === 'completed' &&
-												job.result?.outcome !==
-													'report' && (
-													<Markdown
-														content={
-															job.result
-																?.content || ''
-														}
-													/>
-												) }
-											{ job.status !== 'completed' && (
-												<>
-													<JobStatus
-														job={ job }
-														onCancel={ onCancel }
-													/>
-													{ [
-														'failed',
-														'cancelled',
-													].includes(
-														job.status
-													) && (
-														<Button
-															variant="secondary"
-															disabled={
-																!! activeArtifactJob ||
-																submitting ||
-																( job
-																	.prompt_attachments
-																	.length >
-																	0 &&
-																	! capability?.images )
-															}
-															onClick={ () =>
-																sendMessage(
-																	job.payload
-																		.message ||
-																		'',
-																	[],
-																	job.prompt_attachments.map(
-																		(
-																			item
-																		) =>
-																			item.id
-																	)
-																)
-															}
-														>
+					{ showConversation && (
+						<Modal
+							className="review-conversation-modal"
+							title={ __(
+								'Reviewer conversation',
+								'wp-autoplugin'
+							) }
+							onRequestClose={ () =>
+								setShowConversation( false )
+							}
+						>
+							<section className="review-conversation">
+								<header>
+									<h4>
+										{ __(
+											'Follow-up questions',
+											'wp-autoplugin'
+										) }
+									</h4>
+									<p>
+										{ __(
+											'Ask the reviewer to explain a finding or reconsider the current Review.',
+											'wp-autoplugin'
+										) }
+									</p>
+								</header>
+								{ conversationJobs.length > 0 && (
+									<div className="review-conversation__messages">
+										{ conversationJobs.map( ( job ) => (
+											<article
+												className="review-conversation__message"
+												key={ job.id }
+											>
+												<div className="review-conversation__question">
+													<div className="review-conversation__question-meta">
+														<strong>
 															{ __(
-																'Retry',
+																'You',
 																'wp-autoplugin'
 															) }
-														</Button>
+														</strong>
+														{ ( job.result
+															?.revision_id ??
+															job.payload
+																.revision_id ??
+															0 ) > 0 && (
+															<small>
+																{ reviewRevisionLabel(
+																	job.result
+																		?.revision_id ??
+																		job
+																			.payload
+																			.revision_id ??
+																		0
+																) }
+															</small>
+														) }
+													</div>
+													<p>
+														{ job.payload.message ||
+															__(
+																'Image-only question',
+																'wp-autoplugin'
+															) }
+													</p>
+													<StoredPromptImages
+														attachments={
+															job.prompt_attachments
+														}
+													/>
+												</div>
+												<div className="review-conversation__answer">
+													<strong>
+														{ __(
+															'Reviewer',
+															'wp-autoplugin'
+														) }
+													</strong>
+													<JobModelMeta job={ job } />
+													{ job.status ===
+														'completed' &&
+														job.result?.outcome ===
+															'report' && (
+															<Notice
+																status="info"
+																isDismissible={
+																	false
+																}
+															>
+																{ __(
+																	'The review was updated.',
+																	'wp-autoplugin'
+																) }
+															</Notice>
+														) }
+													{ job.status ===
+														'completed' &&
+														job.result?.outcome !==
+															'report' && (
+															<Markdown
+																content={
+																	job.result
+																		?.content ||
+																	''
+																}
+															/>
+														) }
+													{ job.status !==
+														'completed' && (
+														<>
+															<JobStatus
+																job={ job }
+																onCancel={
+																	onCancel
+																}
+															/>
+															{ [
+																'failed',
+																'cancelled',
+															].includes(
+																job.status
+															) && (
+																<Button
+																	variant="secondary"
+																	disabled={
+																		!! activeArtifactJob ||
+																		submitting ||
+																		( job
+																			.prompt_attachments
+																			.length >
+																			0 &&
+																			! capability?.images )
+																	}
+																	onClick={ () =>
+																		sendMessage(
+																			job
+																				.payload
+																				.message ||
+																				'',
+																			[],
+																			job.prompt_attachments.map(
+																				(
+																					item
+																				) =>
+																					item.id
+																			)
+																		)
+																	}
+																>
+																	{ __(
+																		'Retry',
+																		'wp-autoplugin'
+																	) }
+																</Button>
+															) }
+														</>
 													) }
-												</>
-											) }
-										</div>
-									</article>
-								) ) }
-							</div>
-						) }
-						<div className="review-conversation__composer">
-							<PromptComposerField
-								label={ __(
-									'Ask a follow-up',
-									'wp-autoplugin'
+												</div>
+											</article>
+										) ) }
+									</div>
 								) }
-								placeholder={ __(
-									'Ask a question, request reconsideration, or ask for another area to be inspected…',
-									'wp-autoplugin'
-								) }
-								value={ message }
-								files={ images }
-								onChange={ setMessage }
-								onFilesChange={ setImages }
-								imageEnabled={ !! capability?.images }
-								action={
-									<Button
-										variant="primary"
-										isBusy={ submitting }
+								<div className="review-conversation__composer">
+									<PromptComposerField
+										label={ __(
+											'Ask a follow-up',
+											'wp-autoplugin'
+										) }
+										placeholder={ __(
+											'Ask a question, request reconsideration, or ask for another area to be inspected…',
+											'wp-autoplugin'
+										) }
+										value={ message }
+										files={ images }
+										onChange={ setMessage }
+										onFilesChange={ setImages }
+										imageEnabled={ !! capability?.images }
+										action={
+											<Button
+												variant="primary"
+												isBusy={ submitting }
+												disabled={
+													( ! message.trim() &&
+														! images.length ) ||
+													! currentReport ||
+													!! activeArtifactJob ||
+													! capability?.available ||
+													submitting ||
+													imagesUnsupported
+												}
+												onClick={ () => sendMessage() }
+											>
+												{ __(
+													'Send',
+													'wp-autoplugin'
+												) }
+											</Button>
+										}
+										onKeyDown={ ( event ) => {
+											if (
+												'Enter' === event.key &&
+												! event.shiftKey &&
+												! event.nativeEvent.isComposing
+											) {
+												event.preventDefault();
+												sendMessage();
+											}
+										} }
 										disabled={
-											( ! message.trim() &&
-												! images.length ) ||
 											! currentReport ||
 											!! activeArtifactJob ||
 											! capability?.available ||
 											submitting ||
 											imagesUnsupported
 										}
-										onClick={ () => sendMessage() }
-									>
-										{ __( 'Send', 'wp-autoplugin' ) }
-									</Button>
-								}
-								onKeyDown={ ( event ) => {
-									if (
-										'Enter' === event.key &&
-										! event.shiftKey &&
-										! event.nativeEvent.isComposing
-									) {
-										event.preventDefault();
-										sendMessage();
-									}
-								} }
-								disabled={
-									! currentReport ||
-									!! activeArtifactJob ||
-									! capability?.available ||
-									submitting ||
-									imagesUnsupported
-								}
-								help={ reviewComposerHelp }
-							/>
-						</div>
-					</section>
+										help={ reviewComposerHelp }
+									/>
+								</div>
+							</section>
+						</Modal>
+					) }
 				</>
 			) }
 
 			{ revision && (
-				<ReleasePanel
-					revision={ revision }
-					capability={ releaseCapability }
-					active={ !! activeArtifactJob }
-					themeDisabled={ themeReleaseDisabled }
-					pluginProject={ pluginProject }
-					pluginChanges={ pluginChanges }
-					forkSlug={ forkSlug }
-					onForkSlug={ setForkSlug }
-					onPackage={ queuePackage }
-					onPromotion={ queuePromotion }
-					releaseJobs={ releaseJobs }
-					onQueueEndpoint={ onQueueEndpoint }
-					onDownload={ downloadPackage }
-					manualTests={ report?.tests ?? [] }
-					manualTestStatus={
-						history?.current.status || 'not_started'
-					}
-					checkedTests={ checkedTests }
-					onToggleTest={ ( index, checked ) =>
-						setCheckedTests( ( current ) => {
-							const next = new Set( current );
-							if ( checked ) {
-								next.add( index );
-							} else {
-								next.delete( index );
-							}
-							return next;
-						} )
-					}
-				/>
+				<section
+					className={ `review-release-bar ${ releaseBarClass }` }
+				>
+					<p>
+						<strong>{ releaseHeading }</strong>{ ' ' }
+						{ releaseStatusCopy }
+					</p>
+					<Button
+						variant={
+							releaseSafe && ! themeReleaseDisabled
+								? 'primary'
+								: 'tertiary'
+						}
+						onClick={ () => setShowRelease( true ) }
+					>
+						{ releaseButtonLabel }
+					</Button>
+				</section>
+			) }
+			{ showRelease && revision && (
+				<Modal
+					className="review-release-modal"
+					title={ __( 'Release revision', 'wp-autoplugin' ) }
+					onRequestClose={ () => setShowRelease( false ) }
+				>
+					<ReleasePanel
+						revision={ revision }
+						capability={ releaseCapability }
+						active={ !! activeArtifactJob }
+						themeDisabled={ themeReleaseDisabled }
+						pluginProject={ pluginProject }
+						pluginChanges={ pluginChanges }
+						forkSlug={ forkSlug }
+						onForkSlug={ setForkSlug }
+						onPackage={ queuePackage }
+						onPromotion={ queuePromotion }
+						releaseJobs={ releaseJobs }
+						onQueueEndpoint={ onQueueEndpoint }
+						onDownload={ downloadPackage }
+						manualTests={ report?.tests ?? [] }
+						manualTestStatus={ reviewStatus }
+						checkedTests={ checkedTests }
+						onToggleTest={ ( index, checked ) =>
+							setCheckedTests( ( current ) => {
+								const next = new Set( current );
+								if ( checked ) {
+									next.add( index );
+								} else {
+									next.delete( index );
+								}
+								return next;
+							} )
+						}
+					/>
+				</Modal>
 			) }
 			{ historyFinding && (
 				<Modal
@@ -6670,42 +6917,209 @@ function ReviewStage( {
 			{ showReportHistory && history && (
 				<Modal
 					className="review-history-modal"
-					title={ __( 'Previous reviews', 'wp-autoplugin' ) }
+					title={ __( 'Review history', 'wp-autoplugin' ) }
 					onRequestClose={ () => setShowReportHistory( false ) }
 				>
-					<ul className="review-report-list">
-						{ history?.items.map( ( item ) => (
-							<li key={ item.id }>
-								<div>
-									<strong>
-										{ sprintf(
-											/* translators: %d: Revision number. */
-											__(
-												'Revision %d',
-												'wp-autoplugin'
-											),
-											revisions.find(
-												( revisionItem ) =>
-													revisionItem.id ===
+					{ historyFindings.length > 0 && (
+						<section className="review-history-modal__section">
+							<h3>
+								{ __( 'Previous issues', 'wp-autoplugin' ) }
+							</h3>
+							{ historyFindings.map( ( finding ) => (
+								<ReviewFindingCard
+									key={ finding.id }
+									finding={ finding }
+									selected={ false }
+									selectable={ false }
+									onSelect={ () => undefined }
+									onOpen={ () => {
+										setShowReportHistory( false );
+										openFinding( finding );
+									} }
+									onReopen={
+										finding.status === 'dismissed'
+											? () =>
+													transition(
+														finding,
+														'reopen'
+													)
+											: undefined
+									}
+									onHistory={ () => {
+										setShowReportHistory( false );
+										setHistoryFinding( finding );
+									} }
+								/>
+							) ) }
+						</section>
+					) }
+					<section className="review-history-modal__section">
+						<h3>{ __( 'Review reports', 'wp-autoplugin' ) }</h3>
+						<ul className="review-report-list">
+							{ history.items.map( ( item ) => (
+								<li key={ item.id }>
+									<div>
+										<strong>
+											{ sprintf(
+												/* translators: %d: Revision number. */
+												__(
+													'Revision %d',
+													'wp-autoplugin'
+												),
+												revisions.find(
+													( revisionItem ) =>
+														revisionItem.id ===
+														item.revision_id
+												)?.revision_number ??
 													item.revision_id
-											)?.revision_number ??
-												item.revision_id
+											) }
+										</strong>
+										<small>{ item.created_at } UTC</small>
+									</div>
+									<span>
+										{ reviewStatusLabel(
+											item.effective_status
 										) }
-									</strong>
-									<small>{ item.created_at } UTC</small>
-								</div>
-								<span>
-									{ reviewStatusLabel(
-										item.effective_status
-									) }
-								</span>
-								<p>{ item.summary }</p>
-							</li>
-						) ) }
-					</ul>
+									</span>
+									<p>{ item.summary }</p>
+								</li>
+							) ) }
+						</ul>
+					</section>
 				</Modal>
 			) }
 		</div>
+	);
+}
+
+function ReviewFindingDetail( {
+	finding,
+	current,
+	active,
+	onOpen,
+	onFix,
+	onFixWithoutReview,
+	onAsk,
+	onReconsider,
+	onDismiss,
+	onHistory,
+}: {
+	finding: ReviewFinding;
+	current: boolean;
+	active: boolean;
+	onOpen: () => void;
+	onFix: () => void;
+	onFixWithoutReview: () => void;
+	onAsk: () => void;
+	onReconsider: () => void;
+	onDismiss: () => void;
+	onHistory: () => void;
+} ) {
+	const canFix = current && ! active && finding.status === 'open';
+	const canChangeStatus =
+		current &&
+		! active &&
+		[ 'open', 'addressed' ].includes( finding.status );
+
+	return (
+		<article
+			className={ `review-finding-detail review-finding-detail--${ finding.priority.toLowerCase() }` }
+		>
+			<header>
+				<div>
+					<span className="review-finding__priority">
+						{ finding.priority }
+					</span>
+					<strong>{ finding.title }</strong>
+				</div>
+				<span className="review-finding-detail__category">
+					{ finding.category }
+					{ finding.status !== 'open'
+						? ` · ${ finding.status.replace( /_/g, ' ' ) }`
+						: '' }
+				</span>
+			</header>
+			<Markdown content={ finding.body } />
+			<div className="review-finding-detail__source">
+				{ finding.path ? (
+					<Button variant="link" onClick={ onOpen }>
+						<code>
+							{ finding.path }
+							{ finding.start_line
+								? `:${ finding.start_line }`
+								: '' }
+						</code>
+					</Button>
+				) : (
+					<small>
+						{ __( 'Project-level finding', 'wp-autoplugin' ) }
+					</small>
+				) }
+			</div>
+			{ finding.suggested_fix && (
+				<details className="review-finding__fix">
+					<summary>
+						{ __( 'Suggested fix', 'wp-autoplugin' ) }
+					</summary>
+					<Markdown content={ finding.suggested_fix } />
+				</details>
+			) }
+			<footer>
+				<div className="review-finding-detail__links">
+					<Button
+						variant="tertiary"
+						disabled={ ! current || active }
+						onClick={ onAsk }
+					>
+						{ __( 'Ask reviewer', 'wp-autoplugin' ) }
+					</Button>
+					<Button
+						variant="tertiary"
+						disabled={ ! current || active }
+						onClick={ onReconsider }
+					>
+						{ __( 'Reconsider', 'wp-autoplugin' ) }
+					</Button>
+					{ finding.timeline?.length > 1 && (
+						<Button variant="tertiary" onClick={ onHistory }>
+							{ __( 'History', 'wp-autoplugin' ) }
+						</Button>
+					) }
+					{ canChangeStatus && (
+						<Button variant="tertiary" onClick={ onDismiss }>
+							{ __( 'Dismiss', 'wp-autoplugin' ) }
+						</Button>
+					) }
+				</div>
+				{ finding.status === 'open' && (
+					<div className="review-finding-detail__fix-actions">
+						<Button
+							variant="primary"
+							disabled={ ! canFix }
+							onClick={ onFix }
+						>
+							{ __( 'Fix this issue', 'wp-autoplugin' ) }
+						</Button>
+						<DropdownMenu
+							icon="ellipsis"
+							label={ __( 'More fix options', 'wp-autoplugin' ) }
+							controls={ [
+								[
+									{
+										title: __(
+											'Fix without review',
+											'wp-autoplugin'
+										),
+										isDisabled: ! canFix,
+										onClick: onFixWithoutReview,
+									},
+								],
+							] }
+						/>
+					</div>
+				) }
+			</footer>
+		</article>
 	);
 }
 
