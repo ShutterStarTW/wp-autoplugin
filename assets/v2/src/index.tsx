@@ -1620,9 +1620,6 @@ function StageModelControl( {
 
 	return (
 		<div className="stage-model-control">
-			<span className="stage-model-control__role">
-				{ modelRoleLabel( role ) }
-			</span>
 			<Dropdown
 				className="stage-model-control__dropdown"
 				contentClassName="stage-model-popover"
@@ -5643,6 +5640,10 @@ function ReviewStage( {
 	const [ showConversation, setShowConversation ] = useState( false );
 	const [ loading, setLoading ] = useState( true );
 	const [ actionError, setActionError ] = useState( '' );
+	const [ pendingDownloadJobIds, setPendingDownloadJobIds ] = useState<
+		Set< number >
+	>( new Set() );
+	const handledDownloadJobIds = useRef< Set< number > >( new Set() );
 	const [ forkSlug, setForkSlug ] = useState( () =>
 		slugify(
 			`${
@@ -5710,6 +5711,80 @@ function ReviewStage( {
 	useEffect( () => {
 		setCheckedTests( new Set() );
 	}, [ report?.id ] );
+
+	const downloadPackage = useCallback( async ( packageId: number ) => {
+		try {
+			const response = ( await apiFetch( {
+				path: `${ rest }/release-packages/${ packageId }/download`,
+				parse: false,
+			} as any ) ) as Response;
+			const blob = await response.blob();
+			const url = window.URL.createObjectURL( blob );
+			const disposition =
+				response.headers.get( 'Content-Disposition' ) || '';
+			const filenameMatch = disposition.match( /filename="?([^";]+)"?/i );
+			const anchor = document.createElement( 'a' );
+			anchor.href = url;
+			anchor.download =
+				filenameMatch?.[ 1 ] || 'wp-autoplugin-release.zip';
+			document.body.appendChild( anchor );
+			anchor.click();
+			anchor.remove();
+			window.setTimeout( () => window.URL.revokeObjectURL( url ), 1000 );
+		} catch ( reason: any ) {
+			let downloadErrorMessage =
+				reason?.message ||
+				__( 'The ZIP could not be downloaded.', 'wp-autoplugin' );
+			if ( reason instanceof Response ) {
+				try {
+					const error = await reason.json();
+					downloadErrorMessage =
+						error?.message || downloadErrorMessage;
+				} catch {
+					// Keep the generic download error for a non-JSON response.
+				}
+			}
+			setActionError( downloadErrorMessage );
+		}
+	}, [] );
+
+	useEffect( () => {
+		const handledIds: number[] = [];
+		pendingDownloadJobIds.forEach( ( jobId ) => {
+			const packageJob = jobs.find( ( job ) => job.id === jobId );
+			if (
+				! packageJob ||
+				handledDownloadJobIds.current.has( jobId ) ||
+				! [ 'completed', 'failed', 'cancelled' ].includes(
+					packageJob.status
+				)
+			) {
+				return;
+			}
+			handledDownloadJobIds.current.add( jobId );
+			handledIds.push( jobId );
+			if (
+				packageJob.status === 'completed' &&
+				packageJob.result?.package_id
+			) {
+				void downloadPackage( packageJob.result.package_id );
+			} else if ( packageJob.status === 'completed' ) {
+				setActionError(
+					__(
+						'The ZIP was built, but its download could not be started.',
+						'wp-autoplugin'
+					)
+				);
+			}
+		} );
+		if ( handledIds.length ) {
+			setPendingDownloadJobIds( ( current ) => {
+				const next = new Set( current );
+				handledIds.forEach( ( jobId ) => next.delete( jobId ) );
+				return next;
+			} );
+		}
+	}, [ downloadPackage, jobs, pendingDownloadJobIds ] );
 
 	const activeArtifactJob = [ ...jobs ]
 		.reverse()
@@ -5973,7 +6048,7 @@ function ReviewStage( {
 		if ( override === null ) {
 			return;
 		}
-		await onQueueEndpoint(
+		const created = await onQueueEndpoint(
 			`${ rest }/revisions/${ revision.id }/release-packages`,
 			{
 				expected_latest_revision_id: revision.id,
@@ -5988,6 +6063,11 @@ function ReviewStage( {
 				review_override: override,
 			}
 		);
+		if ( created ) {
+			setPendingDownloadJobIds( ( current ) =>
+				new Set( current ).add( created.id )
+			);
+		}
 	}
 
 	async function queuePromotion(
@@ -6043,24 +6123,6 @@ function ReviewStage( {
 				target_confirmation: targetConfirmation,
 			}
 		);
-	}
-
-	async function downloadPackage( packageId: number ) {
-		try {
-			const response = ( await apiFetch( {
-				path: `${ rest }/release-packages/${ packageId }/download`,
-				parse: false,
-			} as any ) ) as Response;
-			const blob = await response.blob();
-			const url = window.URL.createObjectURL( blob );
-			const anchor = document.createElement( 'a' );
-			anchor.href = url;
-			anchor.download = 'wp-autoplugin-release.zip';
-			anchor.click();
-			window.URL.revokeObjectURL( url );
-		} catch ( reason: any ) {
-			setActionError( reason.message );
-		}
 	}
 
 	if ( loading && ! history ) {
