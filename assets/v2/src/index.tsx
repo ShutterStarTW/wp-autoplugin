@@ -5815,6 +5815,13 @@ function ReviewStage( {
 	const reportJob = report
 		? jobs.find( ( job ) => job.id === report.job_id )
 		: null;
+	const latestReviewJob = [ ...jobs ]
+		.reverse()
+		.find(
+			( job ) =>
+				job.task === 'review' &&
+				job.payload.revision_id === history?.latest_revision_id
+		);
 	const latestReviewFixJob = [ ...jobs ]
 		.reverse()
 		.find(
@@ -6399,6 +6406,17 @@ function ReviewStage( {
 						'This Review is stale because a newer revision exists. Review latest before relying on its verdict.',
 						'wp-autoplugin'
 					) }
+				</Notice>
+			) }
+			{ latestReviewJob?.status === 'failed' && (
+				<Notice status="error" isDismissible={ false }>
+					<span className="job-error-message">
+						{ latestReviewJob.error_message ||
+							__(
+								'The Review did not complete. Try again or check the selected Reviewer configuration.',
+								'wp-autoplugin'
+							) }
+					</span>
 				</Notice>
 			) }
 			{ activeArtifactJob && (
