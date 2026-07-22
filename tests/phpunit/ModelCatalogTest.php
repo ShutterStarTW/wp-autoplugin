@@ -22,6 +22,12 @@ final class ModelCatalogTest extends WP_UnitTestCase {
 		'wp_autoplugin_google_api_key',
 		'wp_autoplugin_xai_api_key',
 		'wp_autoplugin_custom_models',
+		'wp_autoplugin_v2_planner_model',
+		'wp_autoplugin_v2_planner_model_effort',
+		'wp_autoplugin_v2_coder_model',
+		'wp_autoplugin_v2_coder_model_effort',
+		'wp_autoplugin_v2_reviewer_model',
+		'wp_autoplugin_v2_reviewer_model_effort',
 	];
 
 	/** @var array<string, mixed> */
@@ -31,6 +37,9 @@ final class ModelCatalogTest extends WP_UnitTestCase {
 		parent::set_up();
 		foreach ( $this->options as $option ) {
 			$this->previous[ $option ] = get_option( $option, null );
+		}
+		foreach ( [ 'wp_autoplugin_v2_planner_model', 'wp_autoplugin_v2_planner_model_effort', 'wp_autoplugin_v2_coder_model', 'wp_autoplugin_v2_coder_model_effort', 'wp_autoplugin_v2_reviewer_model', 'wp_autoplugin_v2_reviewer_model_effort' ] as $option ) {
+			delete_option( $option );
 		}
 	}
 

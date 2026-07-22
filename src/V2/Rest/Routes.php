@@ -1217,7 +1217,7 @@ final class Routes {
 		$definition = ( new Model_Catalog() )->definition( $model );
 
 		return [
-			'available' => $definition && $provider === (string) $definition['provider'] && ! empty( $definition['configured'] ),
+			'available' => $definition && $provider === (string) $definition['provider'] && ! empty( $definition['configured'] ) && ! empty( $definition['available'] ),
 			'provider'  => $provider,
 			'model'     => $model,
 			'effort'    => sanitize_key( (string) ( $snapshot['effort'] ?? '' ) ),

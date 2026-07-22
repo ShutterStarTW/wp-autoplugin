@@ -24,6 +24,33 @@ if ( ! defined( 'ABSPATH' ) ) {
 <div class="wrap">
 	<h1><?php esc_html_e( 'WP-Autoplugin Settings', 'wp-autoplugin' ); ?></h1>
 	<?php settings_errors(); ?>
+	<section id="wp-autoplugin-chatgpt-provider" class="wp-autoplugin-provider-card" aria-labelledby="wp-autoplugin-chatgpt-title">
+		<div class="wp-autoplugin-provider-card__heading">
+			<div>
+				<h2 id="wp-autoplugin-chatgpt-title"><?php esc_html_e( 'ChatGPT Subscription', 'wp-autoplugin' ); ?> <span class="wp-autoplugin-experimental-badge"><?php esc_html_e( 'Experimental', 'wp-autoplugin' ); ?></span></h2>
+				<p><?php esc_html_e( 'Connect a site-wide ChatGPT account for v2 Plan, Code, Review, Explain, and conversation tasks. This does not change v1 or OpenAI API-key settings.', 'wp-autoplugin' ); ?></p>
+			</div>
+			<strong class="wp-autoplugin-chatgpt-status" data-state="loading" aria-live="polite"><?php esc_html_e( 'Checking…', 'wp-autoplugin' ); ?></strong>
+		</div>
+		<div class="notice inline wp-autoplugin-chatgpt-notice" hidden><p></p></div>
+		<div class="wp-autoplugin-chatgpt-account" hidden></div>
+		<div class="wp-autoplugin-chatgpt-device" hidden>
+			<p><?php esc_html_e( 'Open the verification page and enter this one-time code:', 'wp-autoplugin' ); ?></p>
+			<div class="wp-autoplugin-chatgpt-code-row">
+				<code class="wp-autoplugin-chatgpt-code"></code>
+				<button type="button" class="button wp-autoplugin-chatgpt-copy"><?php esc_html_e( 'Copy code', 'wp-autoplugin' ); ?></button>
+				<a class="button button-primary wp-autoplugin-chatgpt-open" href="#" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Open verification page', 'wp-autoplugin' ); ?></a>
+			</div>
+		</div>
+		<div class="wp-autoplugin-chatgpt-actions">
+			<button type="button" class="button button-primary wp-autoplugin-chatgpt-connect"><?php esc_html_e( 'Connect ChatGPT', 'wp-autoplugin' ); ?></button>
+			<button type="button" class="button wp-autoplugin-chatgpt-cancel" hidden><?php esc_html_e( 'Cancel connection', 'wp-autoplugin' ); ?></button>
+			<button type="button" class="button wp-autoplugin-chatgpt-refresh" hidden><?php esc_html_e( 'Refresh models', 'wp-autoplugin' ); ?></button>
+			<button type="button" class="button-link-delete wp-autoplugin-chatgpt-disconnect" hidden><?php esc_html_e( 'Disconnect', 'wp-autoplugin' ); ?></button>
+		</div>
+		<p class="description wp-autoplugin-chatgpt-model-status"></p>
+		<p class="description"><?php esc_html_e( 'Authentication uses auth.openai.com. Model discovery and generation use chatgpt.com/backend-api/codex. OAuth tokens are encrypted with WordPress salts and never sent to the browser. ChatGPT subscription usage and limits are governed by the connected OpenAI account.', 'wp-autoplugin' ); ?></p>
+	</section>
 	<form method="post" action="options.php">
 		<?php
 		settings_fields( 'wp_autoplugin_settings' );
@@ -246,6 +273,7 @@ function render_model_dropdown( $name, $selected_value ) {
 			high: '<?php echo esc_js( __( 'High', 'wp-autoplugin' ) ); ?>',
 			xhigh: '<?php echo esc_js( __( 'Extra high', 'wp-autoplugin' ) ); ?>',
 			max: '<?php echo esc_js( __( 'Maximum', 'wp-autoplugin' ) ); ?>',
+			ultra: '<?php echo esc_js( __( 'Ultra', 'wp-autoplugin' ) ); ?>',
 			modelDefault: '<?php echo esc_js( __( 'model default', 'wp-autoplugin' ) ); ?>',
 		};
 		const selectedEfforts = {

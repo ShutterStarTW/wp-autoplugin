@@ -11,6 +11,7 @@ final class Capability_Matrix {
 		'anthropic' => '/^claude-/',
 		'google'    => '/^gemini-/',
 		'xai'       => '/^grok-/',
+		'chatgpt'   => '/^chatgpt:gpt-/',
 	];
 
 	/**
@@ -25,10 +26,10 @@ final class Capability_Matrix {
 			'provider'            => $provider,
 			'model'               => sanitize_text_field( $model ),
 			'direct_mode'         => true,
-			'native_read_tools'   => in_array( sanitize_key( $provider ), [ 'openai', 'anthropic' ], true ),
+			'native_read_tools'   => in_array( sanitize_key( $provider ), [ 'openai', 'anthropic', 'chatgpt' ], true ),
 			'unified_patch'       => false,
 			'images'              => '' !== $image_pattern && 1 === preg_match( $image_pattern, $model ),
-			'max_tool_iterations' => in_array( sanitize_key( $provider ), [ 'openai', 'anthropic' ], true ) ? 8 : 0,
+			'max_tool_iterations' => in_array( sanitize_key( $provider ), [ 'openai', 'anthropic', 'chatgpt' ], true ) ? 8 : 0,
 		];
 
 		/**

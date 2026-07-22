@@ -22,6 +22,9 @@ final class Model_Settings {
 				]
 			);
 		}
+		foreach ( Model_Effort::v2_option_names() as $option ) {
+			register_setting( 'wp_autoplugin_settings', $option, [ 'type' => 'string', 'sanitize_callback' => [ Model_Effort::class, 'sanitize' ], 'default' => '' ] );
+		}
 	}
 
 	public static function render_effort_dropdown( string $role ): void {

@@ -12,7 +12,7 @@ final class Direct_Transport_Factory {
 		$role      = 'code' === $stage ? 'coder' : ( in_array( $stage, [ 'explain', 'review' ], true ) ? 'reviewer' : 'planner' );
 		$selection = ( new Model_Catalog() )->selection( $role );
 		if ( $selection ) {
-			$available = ! empty( $selection['configured'] ) && ! empty( $selection['direct'] );
+			$available = ! empty( $selection['configured'] ) && ! empty( $selection['available'] ) && ! empty( $selection['direct'] );
 			return [
 				'available' => $available,
 				'provider'  => (string) $selection['provider'],
@@ -20,7 +20,7 @@ final class Direct_Transport_Factory {
 				'effort'    => (string) $selection['effort'],
 				'message'   => $available
 					? __( 'Direct v2 generation is available.', 'wp-autoplugin' )
-					: __( 'Configure the selected model provider before starting this task.', 'wp-autoplugin' ),
+					: ( (string) ( $selection['availability_message'] ?? '' ) ?: __( 'Configure the selected model provider before starting this task.', 'wp-autoplugin' ) ),
 				'images'    => (bool) $selection['images'],
 			];
 		}
@@ -49,7 +49,7 @@ final class Direct_Transport_Factory {
 
 	/** @return Direct_Transport|\WP_Error */
 	public function create_for( string $provider, string $model, string $effort ) {
-		if ( 'openai' === $provider || 'anthropic' === $provider ) {
+		if ( in_array( $provider, [ 'openai', 'anthropic', 'chatgpt' ], true ) ) {
 			return ( new Agent_Transport_Factory() )->create_for( $provider, $model, $effort );
 		}
 		if ( 'google' === $provider ) {

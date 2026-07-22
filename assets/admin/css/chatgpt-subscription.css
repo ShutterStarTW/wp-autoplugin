@@ -1,0 +1,61 @@
+.wp-autoplugin-provider-card {
+	max-width: 900px;
+	margin: 20px 0;
+	padding: 20px;
+	border: 1px solid #c3c4c7;
+	border-radius: 6px;
+	background: #fff;
+}
+
+.wp-autoplugin-provider-card__heading,
+.wp-autoplugin-chatgpt-code-row,
+.wp-autoplugin-chatgpt-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.wp-autoplugin-provider-card__heading {
+	justify-content: space-between;
+}
+
+.wp-autoplugin-provider-card h2 {
+	margin-top: 0;
+}
+
+.wp-autoplugin-experimental-badge {
+	display: inline-block;
+	padding: 2px 7px;
+	border-radius: 10px;
+	background: #f0f0f1;
+	font-size: 11px;
+	font-weight: 600;
+	vertical-align: middle;
+}
+
+.wp-autoplugin-chatgpt-status[data-state="connected"] {
+	color: #008a20;
+}
+
+.wp-autoplugin-chatgpt-status[data-state="disconnected"] {
+	color: #646970;
+}
+
+.wp-autoplugin-chatgpt-code {
+	padding: 8px 12px;
+	font-size: 18px;
+	letter-spacing: 0.08em;
+}
+
+.wp-autoplugin-chatgpt-actions {
+	margin: 16px 0 10px;
+}
+
+@media screen and (max-width: 782px) {
+	.wp-autoplugin-provider-card__heading,
+	.wp-autoplugin-chatgpt-code-row,
+	.wp-autoplugin-chatgpt-actions {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+}

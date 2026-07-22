@@ -22,6 +22,7 @@ WP-Autoplugin is a free and open-source WordPress plugin that leverages AI to as
 - Specialized model settings to delegate different tasks (planning, coding, reviewing) to specific AI models.
 - Detailed token usage tracking for better cost management.
 - Support for multiple AI models, including OpenAI, Anthropic, Google Gemini, with custom API support to use any OpenAI-compatible model.
+- Experimental v2-only ChatGPT Subscription connection using OpenAI's Codex device authorization, with live model availability and reasoning effort controls.
 - Full control over generated code.
 - Privacy-focused: no data collection or external communication, except for the AI API you choose.
 - Completely free, with no ads or account requirements.
@@ -53,10 +54,10 @@ For more details and screenshots, visit [https://wp-autoplugin.com](https://wp-a
 == Frequently Asked Questions ==
 
 = Do I need an API key to use WP-Autoplugin? =
-Yes, you need an API key from a supported AI provider (e.g., OpenAI, Anthropic, Google AI Studio, or xAI). Your API key is stored on your server and is never shared externally.
+Normally, yes: configure a supported provider such as OpenAI, Anthropic, Google AI Studio, or xAI. For v2 only, administrators may instead connect the experimental ChatGPT Subscription provider. API keys and encrypted ChatGPT OAuth tokens stay on the WordPress server and are never returned to the browser.
 
 = Is WP-Autoplugin free? =
-Yes, the plugin is completely free with no ads or account requirements. However, API usage may incur costs depending on the provider you choose.
+Yes, the plugin is completely free with no ads. API usage may incur costs depending on the provider. ChatGPT Subscription usage is governed by the connected account's plan limits, billing, and workspace controls.
 
 = Is the generated code production-ready? =
 While WP-Autoplugin aims to generate high-quality code adhering to WordPress standards, we recommend testing the code thoroughly before using it on a production site.
@@ -78,6 +79,9 @@ WP-Autoplugin relies on third-party AI APIs. No data is transmitted until you co
 - [Privacy Policy](https://policies.google.com/privacy)
 
 **OpenAI**  
+- The optional ChatGPT connection sends device authorization and token requests to `https://auth.openai.com`, and sends model discovery and v2 AI requests to `https://chatgpt.com/backend-api/codex`.
+- OAuth tokens are exchanged and refreshed server-side, encrypted at rest with WordPress salts, and never exposed through REST responses. The integration is experimental because this account-backed backend is not documented as a supported third-party API and may change.
+- [Codex authentication guidance](https://learn.chatgpt.com/docs/auth)
 - [Terms of Use](https://openai.com/policies/terms-of-use/)  
 - [Privacy Policy](https://openai.com/policies/privacy-policy/)
 
@@ -92,6 +96,7 @@ WP-Autoplugin relies on third-party AI APIs. No data is transmitted until you co
 == Changelog ==
 
 = 2.0.0-dev =
+* Added an experimental v2-only ChatGPT Subscription provider with site-wide Codex device authorization, encrypted token storage, live model entitlements, and reasoning effort controls.
 * Added the v2 universal React/TypeScript workspace foundation.
 * Added versioned projects, workspaces, revisions, jobs, events, usage, diagnostics, and prompt-template tables.
 * Added durable background planning and explanation jobs with polling and cancellation.

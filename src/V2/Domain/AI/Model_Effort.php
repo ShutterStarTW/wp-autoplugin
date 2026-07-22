@@ -2,6 +2,9 @@
 
 namespace WP_Autoplugin\V2\Domain\AI;
 
+use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Config;
+use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Model_Service;
+
 /**
  * Defines provider effort controls without changing the existing model catalog.
  */
@@ -11,6 +14,11 @@ final class Model_Effort {
 		'planner'  => 'wp_autoplugin_planner_model_effort',
 		'coder'    => 'wp_autoplugin_coder_model_effort',
 		'reviewer' => 'wp_autoplugin_reviewer_model_effort',
+	];
+	private const V2_ROLE_OPTIONS = [
+		'planner'  => 'wp_autoplugin_v2_planner_model_effort',
+		'coder'    => 'wp_autoplugin_v2_coder_model_effort',
+		'reviewer' => 'wp_autoplugin_v2_reviewer_model_effort',
 	];
 
 	/**
@@ -23,7 +31,7 @@ final class Model_Effort {
 		$openai_gpt_5    = [ 'minimal', 'low', 'medium', 'high' ];
 		$anthropic       = [ 'low', 'medium', 'high', 'max' ];
 
-		return [
+		$capabilities = [
 			'gpt-5.5'                     => [ 'provider' => 'openai', 'levels' => $openai_standard, 'default' => 'medium' ],
 			'gpt-5.5-pro'                 => [ 'provider' => 'openai', 'levels' => [ 'medium', 'high', 'xhigh' ], 'default' => 'high' ],
 			'gpt-5.4'                     => [ 'provider' => 'openai', 'levels' => $openai_standard, 'default' => 'none' ],
@@ -40,6 +48,18 @@ final class Model_Effort {
 			'claude-sonnet-4-6'           => [ 'provider' => 'anthropic', 'levels' => $anthropic, 'default' => 'high' ],
 			'claude-opus-4-5-20251101'    => [ 'provider' => 'anthropic', 'levels' => [ 'low', 'medium', 'high' ], 'default' => 'high' ],
 		];
+
+		foreach ( ( new ChatGPT_Model_Service() )->verified_models() as $slug => $metadata ) {
+			if ( ! isset( ChatGPT_Config::models()[ $slug ] ) ) {
+				continue;
+			}
+			$fallback = ChatGPT_Config::models()[ $slug ];
+			$levels = array_values( (array) ( $metadata['levels'] ?? [] ) ) ?: $fallback['levels'];
+			$default = in_array( (string) ( $metadata['default'] ?? '' ), $levels, true ) ? (string) $metadata['default'] : $fallback['default'];
+			$capabilities[ ChatGPT_Config::catalog_id( $slug ) ] = [ 'provider' => 'chatgpt', 'levels' => $levels, 'default' => $default ];
+		}
+
+		return $capabilities;
 	}
 
 	public static function option_name( string $role ): string {
@@ -51,10 +71,24 @@ final class Model_Effort {
 		return self::ROLE_OPTIONS;
 	}
 
+	public static function v2_option_name( string $role ): string {
+		return self::V2_ROLE_OPTIONS[ $role ] ?? '';
+	}
+
+	/** @return array<string, string> */
+	public static function v2_option_names(): array {
+		return self::V2_ROLE_OPTIONS;
+	}
+
 	public static function selected_model( string $role ): string {
 		$default = (string) get_option( 'wp_autoplugin_model' );
 		if ( 'default' === $role ) {
 			return $default;
+		}
+
+		$v2_model = (string) get_option( 'wp_autoplugin_v2_' . $role . '_model', '' );
+		if ( str_starts_with( $v2_model, 'chatgpt:' ) ) {
+			return $v2_model;
 		}
 
 		$option = match ( $role ) {
@@ -73,6 +107,9 @@ final class Model_Effort {
 	 */
 	public static function for_role( string $role ): string {
 		$model = self::selected_model( $role );
+		if ( 'default' !== $role && str_starts_with( $model, 'chatgpt:' ) ) {
+			return self::normalize( $model, (string) get_option( self::v2_option_name( $role ), '' ) );
+		}
 		if ( 'default' !== $role ) {
 			$model_option = (string) get_option( 'wp_autoplugin_' . $role . '_model' );
 			if ( '' === $model_option ) {
@@ -98,6 +135,6 @@ final class Model_Effort {
 
 	public static function sanitize( $effort ): string {
 		$effort = sanitize_key( (string) $effort );
-		return in_array( $effort, [ 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max' ], true ) ? $effort : '';
+		return in_array( $effort, [ 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra' ], true ) ? $effort : '';
 	}
 }

@@ -360,6 +360,7 @@ type ModelCatalogItem = {
 	images: boolean;
 	effort_levels: string[];
 	default_effort: string;
+	availability_message: string;
 };
 
 type ModelRoleSelection = {
@@ -377,6 +378,7 @@ type ModelRoleSelection = {
 	effort: string;
 	effort_levels: string[];
 	default_effort: string;
+	availability_message: string;
 };
 
 type ModelSettings = {
@@ -1574,6 +1576,7 @@ function modelSupportsContext(
 ): boolean {
 	return Boolean(
 		model?.configured &&
+			model.available &&
 			model.direct &&
 			( context === 'direct' || model.native_read_tools )
 	);
@@ -1728,6 +1731,11 @@ function StageModelControl( {
 												{ model.label === model.id
 													? model.id
 													: `${ model.label } (${ model.id })` }
+												{ ! model.available &&
+													` — ${ __(
+														'unavailable',
+														'wp-autoplugin'
+													) }` }
 											</option>
 										) ) }
 									</optgroup>
@@ -1793,15 +1801,16 @@ function StageModelControl( {
 									status="warning"
 									isDismissible={ false }
 								>
-									{ context === 'native'
-										? __(
-												'This Plan requires a configured OpenAI or Anthropic model with native source tools.',
-												'wp-autoplugin'
-										  )
-										: __(
-												'Configure this model provider before using it.',
-												'wp-autoplugin'
-										  ) }
+									{ selectedModel?.availability_message ||
+										( context === 'native'
+											? __(
+													'This Plan requires a configured OpenAI, Anthropic, or ChatGPT Subscription model with native source tools.',
+													'wp-autoplugin'
+											  )
+											: __(
+													'Configure this model provider before using it.',
+													'wp-autoplugin'
+											  ) ) }
 								</Notice>
 							) }
 							{ error && (

@@ -3,6 +3,9 @@
 namespace WP_Autoplugin\V2\Domain\AI;
 
 use WP_Autoplugin\Admin\Admin;
+use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Config;
+use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Model_Service;
+use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Token_Manager;
 
 /**
  * Provides one sanitized model catalog and role-selection contract for v2.
@@ -12,6 +15,11 @@ final class Model_Catalog {
 		'planner'  => 'wp_autoplugin_planner_model',
 		'coder'    => 'wp_autoplugin_coder_model',
 		'reviewer' => 'wp_autoplugin_reviewer_model',
+	];
+	private const V2_ROLE_OPTIONS = [
+		'planner'  => 'wp_autoplugin_v2_planner_model',
+		'coder'    => 'wp_autoplugin_v2_coder_model',
+		'reviewer' => 'wp_autoplugin_v2_reviewer_model',
 	];
 
 	private const PROVIDERS = [
@@ -34,6 +42,7 @@ final class Model_Catalog {
 		return array_values(
 			array_map(
 				static function ( array $definition ): array {
+					$definition['availability_message'] ??= '';
 					unset( $definition['transport_model'] );
 					return $definition;
 				},
@@ -76,6 +85,7 @@ final class Model_Catalog {
 			'effort'            => Model_Effort::for_role( 'default' ),
 			'effort_levels'     => (array) ( $definition['effort_levels'] ?? [] ),
 			'default_effort'    => (string) ( $definition['default_effort'] ?? '' ),
+			'availability_message' => (string) ( $definition['availability_message'] ?? '' ),
 		];
 	}
 
@@ -89,7 +99,8 @@ final class Model_Catalog {
 			return [];
 		}
 
-		$configured_model = (string) get_option( self::ROLE_OPTIONS[ $role ], '' );
+		$v2_model = (string) get_option( self::V2_ROLE_OPTIONS[ $role ], '' );
+		$configured_model = str_starts_with( $v2_model, 'chatgpt:' ) ? $v2_model : (string) get_option( self::ROLE_OPTIONS[ $role ], '' );
 		$inherited        = '' === $configured_model;
 		$model            = $inherited ? (string) get_option( 'wp_autoplugin_model', '' ) : $configured_model;
 		$definition       = $this->definition( $model );
@@ -110,6 +121,7 @@ final class Model_Catalog {
 			'effort'            => $effort,
 			'effort_levels'     => (array) ( $definition['effort_levels'] ?? [] ),
 			'default_effort'    => (string) ( $definition['default_effort'] ?? '' ),
+			'availability_message' => (string) ( $definition['availability_message'] ?? '' ),
 		];
 	}
 
@@ -124,7 +136,19 @@ final class Model_Catalog {
 		}
 
 		$model = sanitize_text_field( $model );
+		if ( str_starts_with( $model, 'chatgpt:' ) ) {
+			$definition = $this->definition( $model );
+			if ( ! $definition || empty( $definition['available'] ) ) {
+				return new \WP_Error( 'wp_autoplugin_chatgpt_model_unavailable', (string) ( $definition['availability_message'] ?? __( 'This ChatGPT subscription model is not available to the connected account.', 'wp-autoplugin' ) ), [ 'status' => 400 ] );
+			}
+			update_option( self::V2_ROLE_OPTIONS[ $role ], $model, false );
+			update_option( Model_Effort::v2_option_name( $role ), Model_Effort::normalize( $model, $effort ), false );
+			return $this->selection( $role );
+		}
+
 		if ( '' === $model ) {
+			delete_option( self::V2_ROLE_OPTIONS[ $role ] );
+			delete_option( Model_Effort::v2_option_name( $role ) );
 			update_option( self::ROLE_OPTIONS[ $role ], '' );
 			update_option( Model_Effort::option_name( $role ), '' );
 			return $this->selection( $role );
@@ -134,6 +158,8 @@ final class Model_Catalog {
 			return new \WP_Error( 'wp_autoplugin_model_invalid', __( 'The selected model is not available in the configured catalog.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
 
+		delete_option( self::V2_ROLE_OPTIONS[ $role ] );
+		delete_option( Model_Effort::v2_option_name( $role ) );
 		$normalized_effort = Model_Effort::normalize( $model, $effort );
 		update_option( self::ROLE_OPTIONS[ $role ], $model );
 		update_option( Model_Effort::option_name( $role ), $normalized_effort );
@@ -212,6 +238,39 @@ final class Model_Catalog {
 				'effort_levels'     => [],
 				'default_effort'    => '',
 				'transport_model'   => trim( (string) ( $custom['modelParameter'] ?? '' ) ) ?: $id,
+			];
+		}
+
+		$token_state = ( new ChatGPT_Token_Manager() )->stored();
+		$connected = is_array( $token_state );
+		$model_service = new ChatGPT_Model_Service();
+		$verified = $model_service->verified_models();
+		$sync = $model_service->state();
+		foreach ( ChatGPT_Config::models() as $slug => $fallback ) {
+			$id = ChatGPT_Config::catalog_id( $slug );
+			$metadata = is_array( $verified[ $slug ] ?? null ) ? $verified[ $slug ] : [];
+			$available = $connected && empty( $sync['reconnect_required'] ) && [] !== $metadata;
+			$capability = $matrix->for_model( 'chatgpt', $id );
+			$message = '';
+			if ( ! $connected ) {
+				$message = is_wp_error( $token_state ) ? $token_state->get_error_message() : __( 'Connect a ChatGPT subscription in Settings.', 'wp-autoplugin' );
+			} elseif ( ! $available ) {
+				$message = '' !== (string) ( $sync['error'] ?? '' ) ? (string) $sync['error'] : __( 'This model was not reported for the connected ChatGPT account.', 'wp-autoplugin' );
+			}
+			$definitions[ $id ] = [
+				'id'                   => $id,
+				'label'                => sanitize_text_field( (string) ( $metadata['label'] ?? $fallback['label'] ) ),
+				'provider'             => 'chatgpt',
+				'provider_label'       => __( 'ChatGPT Subscription (Experimental)', 'wp-autoplugin' ),
+				'configured'           => $connected,
+				'available'            => $available,
+				'availability_message' => sanitize_text_field( $message ),
+				'direct'               => (bool) $capability['direct_mode'],
+				'native_read_tools'    => (bool) $capability['native_read_tools'],
+				'images'               => (bool) $capability['images'],
+				'effort_levels'        => $available ? array_values( (array) ( $metadata['levels'] ?? [] ) ) : [],
+				'default_effort'       => $available ? (string) ( $metadata['default'] ?? '' ) : '',
+				'transport_model'      => $slug,
 			];
 		}
 

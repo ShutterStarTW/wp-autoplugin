@@ -639,6 +639,17 @@ final class Installer {
 				'wp_autoplugin_planner_model_effort'  => false,
 				'wp_autoplugin_coder_model_effort'    => false,
 				'wp_autoplugin_reviewer_model_effort' => false,
+				'_wp_autoplugin_chatgpt_oauth_tokens' => false,
+				'_wp_autoplugin_chatgpt_oauth_lock' => false,
+				'_wp_autoplugin_chatgpt_oauth_poll_lock' => false,
+				'_wp_autoplugin_chatgpt_models_lock' => false,
+				'wp_autoplugin_chatgpt_model_cache' => false,
+				'wp_autoplugin_v2_planner_model' => false,
+				'wp_autoplugin_v2_coder_model' => false,
+				'wp_autoplugin_v2_reviewer_model' => false,
+				'wp_autoplugin_v2_planner_model_effort' => false,
+				'wp_autoplugin_v2_coder_model_effort' => false,
+				'wp_autoplugin_v2_reviewer_model_effort' => false,
 			]
 		);
 	}

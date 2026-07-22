@@ -16,6 +16,7 @@ use WP_Autoplugin\V2\Orchestration\Review_Orchestrator;
 use WP_Autoplugin\V2\Orchestration\Package_Orchestrator;
 use WP_Autoplugin\V2\Orchestration\Promotion_Orchestrator;
 use WP_Autoplugin\V2\Rest\Routes;
+use WP_Autoplugin\V2\Rest\ChatGPT_Provider_Routes;
 
 /**
  * Wires the v2 modules into WordPress.
@@ -30,6 +31,7 @@ final class Application {
 		( new Assets() )->register();
 		( new Model_Settings() )->register();
 		( new Routes() )->register();
+		( new ChatGPT_Provider_Routes() )->register();
 		( new Source_Agent() )->register();
 		( new Code_Orchestrator() )->register();
 		( new Code_Follow_Up_Orchestrator() )->register();

@@ -16,6 +16,12 @@ Generated changes are represented as staged revisions. The current development b
 
 Frontend sources live in `assets/v2/src`; distributable assets live in `assets/v2/build`. Run `npm run build` after installing the declared development packages when changing the TypeScript or SCSS sources.
 
+### Experimental ChatGPT Subscription provider
+
+Administrators can optionally connect one site-wide ChatGPT account from Settings using OpenAI's Codex device-authorization flow. This provider is v2-only and remains separate from the OpenAI API-key provider: its models can be assigned to the v2 Planner, Coder, and Reviewer controls without changing v1 selections. The curated catalog uses collision-safe IDs: `chatgpt:gpt-5.6-sol`, `chatgpt:gpt-5.6-terra`, `chatgpt:gpt-5.6-luna`, `chatgpt:gpt-5.5`, `chatgpt:gpt-5.4`, and `chatgpt:gpt-5.4-mini`.
+
+OAuth tokens are exchanged and refreshed only on the WordPress server, encrypted with AES-256-GCM using WordPress salts, and stored in a non-autoloaded option. Authentication uses `auth.openai.com`; model discovery and generation use `chatgpt.com/backend-api/codex`. The connected subscription's billing, workspace policy, availability, and usage limits apply. This integration follows [Codex authentication guidance](https://learn.chatgpt.com/docs/auth), but remains experimental because the account-backed backend is not documented as a supported third-party API and may change without notice.
+
 - Generate plugins using AI
 - Fix and extend existing plugins
 - Full control over the generation process
@@ -35,7 +41,7 @@ WP-Autoplugin offers practical solutions for various WordPress development scena
 
 - **Completely Free**: No premium version, no ads, no account required.
 - **Privacy-Focused**: No data collection or external communication (except for the AI API you choose).
-- **BYOK (Bring Your Own Key)**: Use your own API key from the AI provider of your choice.
+- **Flexible provider access**: Use your own API key, or connect ChatGPT experimentally for v2.
 - **Flexible AI Models**: Choose from a variety of AI models to suit your needs, or set up custom models.
 - **Use in Your Language**: The plugin is fully translatable and has built-in support for 10+ languages.
 
@@ -150,7 +156,7 @@ WP-Autoplugin supports 30+ AI models, including:
 - xAI Grok Latest
 - xAI Grok Build 0.1
 
-While WP-Autoplugin is free to use, you may need to pay for API usage based on your chosen model.
+While WP-Autoplugin is free to use, API usage may be billed by your provider. ChatGPT Subscription requests use the connected account's subscription limits and workspace controls rather than an OpenAI API key.
 
 ## Custom Models
 
@@ -158,7 +164,7 @@ WP-Autoplugin supports custom models: you can plug in any OpenAI-compatible API 
 
 ## BYOK (Bring Your Own Key)
 
-To use WP-Autoplugin, you'll need an API key from an AI provider. Insert your key in the plugin settings to get started. Your API key remains on your server and is not shared with anyone.
+To use WP-Autoplugin, configure an API key from an AI provider or connect the experimental ChatGPT Subscription provider for v2. Provider credentials remain on your server and are not exposed to browsers.
 
 Some AI platforms currently offer free plans and include SOTA models, like **Gemini 2.5 Pro** through [Google AI Studio](https://aistudio.google.com/). Refer to the respective websites for pricing information.
 
