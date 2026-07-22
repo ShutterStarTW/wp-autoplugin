@@ -7433,6 +7433,33 @@ function ReleasePanel( {
 						</Notice>
 					) ) }
 
+					{ installed?.result?.promotion_id && (
+						<Notice status="success" isDismissible={ false }>
+							<p>
+								{ __(
+									'Installed. Click Activate to enable the plugin on this site.',
+									'wp-autoplugin'
+								) }
+							</p>
+							<Button
+								variant="primary"
+								disabled={
+									active || ! capability?.can_activate
+								}
+								onClick={ () =>
+									onQueueEndpoint(
+										`${ rest }/promotions/${ installed.result?.promotion_id }/activate`,
+										{}
+									)
+								}
+							>
+								{ installed.result.mode === 'install_fork'
+									? __( 'Switch to fork', 'wp-autoplugin' )
+									: __( 'Activate', 'wp-autoplugin' ) }
+							</Button>
+						</Notice>
+					) }
+
 					{ themeDisabled && (
 						<>
 							<Notice status="info" isDismissible={ false }>
@@ -7677,33 +7704,6 @@ function ReleasePanel( {
 								</div>
 							</details>
 						</>
-					) }
-
-					{ installed?.result?.promotion_id && (
-						<Notice status="success" isDismissible={ false }>
-							<p>
-								{ __(
-									'Installed. Click Activate to enable the plugin on this site.',
-									'wp-autoplugin'
-								) }
-							</p>
-							<Button
-								variant="primary"
-								disabled={
-									active || ! capability?.can_activate
-								}
-								onClick={ () =>
-									onQueueEndpoint(
-										`${ rest }/promotions/${ installed.result?.promotion_id }/activate`,
-										{}
-									)
-								}
-							>
-								{ installed.result.mode === 'install_fork'
-									? __( 'Switch to fork', 'wp-autoplugin' )
-									: __( 'Activate', 'wp-autoplugin' ) }
-							</Button>
-						</Notice>
 					) }
 
 					{ direct?.result?.promotion_id && (
