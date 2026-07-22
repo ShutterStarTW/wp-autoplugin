@@ -47,7 +47,15 @@ type Job = {
 		message?: string;
 		stage?: string;
 		artifact_job_id?: number;
-		mode?: 'generate' | 'regenerate';
+		mode?:
+			| 'generate'
+			| 'regenerate'
+			| 'project'
+			| 'fork'
+			| 'replacement'
+			| 'install_project'
+			| 'install_fork'
+			| 'modify_original';
 		plan_artifact_job_id?: number;
 		parent_revision_id?: number;
 		revision_id?: number;
@@ -5633,7 +5641,6 @@ function ReviewStage( {
 		useState< ReviewFinding | null >( null );
 	const [ showReportHistory, setShowReportHistory ] = useState( false );
 	const [ showConversation, setShowConversation ] = useState( false );
-	const [ showRelease, setShowRelease ] = useState( false );
 	const [ loading, setLoading ] = useState( true );
 	const [ actionError, setActionError ] = useState( '' );
 	const [ forkSlug, setForkSlug ] = useState( () =>
@@ -5945,7 +5952,7 @@ function ReviewStage( {
 			sprintf(
 				/* translators: 1: Review status. 2: Open finding priority counts. */
 				__(
-					'Proceed without current all-clear Review? Status: %1$s. Open findings: %2$s. This override will be recorded.',
+					'Proceed without current all-clear Review? Status: %1$s. Open findings: %2$s.',
 					'wp-autoplugin'
 				),
 				history?.current.status || 'not_started',
@@ -6151,52 +6158,6 @@ function ReviewStage( {
 			);
 		}
 	}
-	let releaseStatusCopy = __(
-		'This revision has not been reviewed. Releasing it requires confirmation.',
-		'wp-autoplugin'
-	);
-	if ( releaseSafe ) {
-		releaseStatusCopy = __(
-			'The current Review is clear. This revision is ready for release.',
-			'wp-autoplugin'
-		);
-	} else if ( reviewStatus === 'action_required' ) {
-		releaseStatusCopy = sprintf(
-			/* translators: %d: Number of unresolved Review findings. */
-			_n(
-				'Release requires confirmation because %d Review issue remains unresolved.',
-				'Release requires confirmation because %d Review issues remain unresolved.',
-				actionableFindings.length,
-				'wp-autoplugin'
-			),
-			actionableFindings.length
-		);
-	} else if ( reviewStatus === 'stale' ) {
-		releaseStatusCopy = __(
-			'The Review belongs to an earlier revision. Releasing requires confirmation.',
-			'wp-autoplugin'
-		);
-	}
-	if ( themeReleaseDisabled ) {
-		releaseStatusCopy = __(
-			'Theme release is not available yet. Review and finding fixes remain available.',
-			'wp-autoplugin'
-		);
-	}
-	let releaseBarClass = 'needs-override';
-	let releaseHeading = __( 'Release needs confirmation', 'wp-autoplugin' );
-	let releaseButtonLabel = __( 'Release anyway', 'wp-autoplugin' );
-	if ( releaseSafe ) {
-		releaseBarClass = 'is-clear';
-		releaseHeading = __( 'Ready to release', 'wp-autoplugin' );
-		releaseButtonLabel = __( 'Release', 'wp-autoplugin' );
-	}
-	if ( themeReleaseDisabled ) {
-		releaseBarClass = 'is-disabled';
-		releaseHeading = __( 'Release unavailable', 'wp-autoplugin' );
-		releaseButtonLabel = __( 'View details', 'wp-autoplugin' );
-	}
-
 	function reconsiderFinding( finding: ReviewFinding ) {
 		setMessage(
 			sprintf(
@@ -6228,7 +6189,10 @@ function ReviewStage( {
 							{ reviewNumber
 								? sprintf(
 										/* translators: %d: Reviewed revision number. */
-										__( 'Review for Revision %d', 'wp-autoplugin' ),
+										__(
+											'Review for Revision %d',
+											'wp-autoplugin'
+										),
 										reviewNumber
 								  )
 								: __( 'Review', 'wp-autoplugin' ) }
@@ -6835,61 +6799,36 @@ function ReviewStage( {
 			) }
 
 			{ revision && (
-				<section
-					className={ `review-release-bar ${ releaseBarClass }` }
-				>
-					<p>
-						<strong>{ releaseHeading }</strong>{ ' ' }
-						{ releaseStatusCopy }
-					</p>
-					<Button
-						variant={
-							releaseSafe && ! themeReleaseDisabled
-								? 'primary'
-								: 'tertiary'
-						}
-						onClick={ () => setShowRelease( true ) }
-					>
-						{ releaseButtonLabel }
-					</Button>
-				</section>
-			) }
-			{ showRelease && revision && (
-				<Modal
-					className="review-release-modal"
-					title={ __( 'Release revision', 'wp-autoplugin' ) }
-					onRequestClose={ () => setShowRelease( false ) }
-				>
-					<ReleasePanel
-						revision={ revision }
-						capability={ releaseCapability }
-						active={ !! activeArtifactJob }
-						themeDisabled={ themeReleaseDisabled }
-						pluginProject={ pluginProject }
-						pluginChanges={ pluginChanges }
-						forkSlug={ forkSlug }
-						onForkSlug={ setForkSlug }
-						onPackage={ queuePackage }
-						onPromotion={ queuePromotion }
-						releaseJobs={ releaseJobs }
-						onQueueEndpoint={ onQueueEndpoint }
-						onDownload={ downloadPackage }
-						manualTests={ report?.tests ?? [] }
-						manualTestStatus={ reviewStatus }
-						checkedTests={ checkedTests }
-						onToggleTest={ ( index, checked ) =>
-							setCheckedTests( ( current ) => {
-								const next = new Set( current );
-								if ( checked ) {
-									next.add( index );
-								} else {
-									next.delete( index );
-								}
-								return next;
-							} )
-						}
-					/>
-				</Modal>
+				<ReleasePanel
+					revision={ revision }
+					capability={ releaseCapability }
+					active={ !! activeArtifactJob }
+					themeDisabled={ themeReleaseDisabled }
+					pluginProject={ pluginProject }
+					pluginChanges={ pluginChanges }
+					forkSlug={ forkSlug }
+					onForkSlug={ setForkSlug }
+					onPackage={ queuePackage }
+					onPromotion={ queuePromotion }
+					releaseJobs={ releaseJobs }
+					onQueueEndpoint={ onQueueEndpoint }
+					onDownload={ downloadPackage }
+					manualTests={ report?.tests ?? [] }
+					manualTestStatus={ reviewStatus }
+					unresolvedFindings={ actionableFindings.length }
+					checkedTests={ checkedTests }
+					onToggleTest={ ( index, checked ) =>
+						setCheckedTests( ( current ) => {
+							const next = new Set( current );
+							if ( checked ) {
+								next.add( index );
+							} else {
+								next.delete( index );
+							}
+							return next;
+						} )
+					}
+				/>
 			) }
 			{ historyFinding && (
 				<Modal
@@ -7249,6 +7188,7 @@ function ReleasePanel( {
 	onDownload,
 	manualTests,
 	manualTestStatus,
+	unresolvedFindings,
 	checkedTests,
 	onToggleTest,
 }: {
@@ -7269,9 +7209,11 @@ function ReleasePanel( {
 	onDownload: ( packageId: number ) => void;
 	manualTests: ReviewTest[];
 	manualTestStatus: ReviewHistory[ 'current' ][ 'status' ];
+	unresolvedFindings: number;
 	checkedTests: Set< number >;
 	onToggleTest: ( index: number, checked: boolean ) => void;
 } ) {
+	const [ showAllActivity, setShowAllActivity ] = useState( false );
 	const installed = [ ...releaseJobs ]
 		.filter(
 			( candidate ) =>
@@ -7315,282 +7257,443 @@ function ReleasePanel( {
 				job.result.status === 'completed'
 		);
 	const disabled = active || ! revision.id;
+	const completedTests = manualTests.reduce(
+		( count, _test, index ) =>
+			checkedTests.has( index ) ? count + 1 : count,
+		0
+	);
+	const activityJobs = [ ...releaseJobs ].reverse();
+	const visibleActivityJobs = showAllActivity
+		? activityJobs
+		: activityJobs.slice( 0, 3 );
+	let releaseTitle = __( 'Review release options', 'wp-autoplugin' );
+	if ( pluginProject ) {
+		releaseTitle = __( 'Package and deploy this plugin', 'wp-autoplugin' );
+	} else if ( pluginChanges ) {
+		releaseTitle = __(
+			'Package and deploy these changes',
+			'wp-autoplugin'
+		);
+	}
+	let reviewTone = 'is-neutral';
+	let reviewHeading = __( 'Review not run', 'wp-autoplugin' );
+	let reviewMessage = __(
+		'You can release this revision, but it has not been reviewed yet.',
+		'wp-autoplugin'
+	);
+	if ( manualTestStatus === 'action_required' ) {
+		reviewTone = 'is-warning';
+		reviewHeading = sprintf(
+			/* translators: %d: Number of unresolved Review findings. */
+			_n(
+				'%d unresolved review issue',
+				'%d unresolved review issues',
+				unresolvedFindings,
+				'wp-autoplugin'
+			),
+			unresolvedFindings
+		);
+		reviewMessage = __(
+			'You can release this revision, but it has not passed Review.',
+			'wp-autoplugin'
+		);
+	} else if (
+		[ 'all_clear', 'cleared_with_dismissals' ].includes( manualTestStatus )
+	) {
+		reviewTone = 'is-clear';
+		reviewHeading =
+			manualTestStatus === 'cleared_with_dismissals'
+				? __( 'Review cleared with dismissals', 'wp-autoplugin' )
+				: __( 'Review passed', 'wp-autoplugin' );
+		reviewMessage = __(
+			'This revision has no unresolved Review issues.',
+			'wp-autoplugin'
+		);
+	} else if ( manualTestStatus === 'stale' ) {
+		reviewTone = 'is-warning';
+		reviewHeading = __( 'Review is out of date', 'wp-autoplugin' );
+		reviewMessage = __(
+			'The available Review belongs to an earlier revision. Releasing requires confirmation.',
+			'wp-autoplugin'
+		);
+	} else if ( manualTestStatus === 'in_progress' ) {
+		reviewTone = 'is-neutral';
+		reviewHeading = __( 'Review in progress', 'wp-autoplugin' );
+		reviewMessage = __(
+			'Release tools remain available while the current Review runs.',
+			'wp-autoplugin'
+		);
+	} else if ( manualTestStatus === 'failed' ) {
+		reviewTone = 'is-error';
+		reviewHeading = __( 'Review failed', 'wp-autoplugin' );
+		reviewMessage = __(
+			'The latest Review did not complete. Releasing requires confirmation.',
+			'wp-autoplugin'
+		);
+	}
 
 	return (
 		<section className="release-panel">
-			<header>
-				<div>
-					<p>{ __( 'Deployment', 'wp-autoplugin' ) }</p>
-					<h3>{ __( 'Release', 'wp-autoplugin' ) }</h3>
-				</div>
-				<small>
-					{ sprintf(
-						/* translators: %d: Revision number. */
-						__( 'Revision %d', 'wp-autoplugin' ),
-						revision.revision_number
-					) }
-				</small>
-			</header>
-			{ capability?.disabled_reasons.map( ( reason ) => (
-				<Notice status="warning" isDismissible={ false } key={ reason }>
-					{ reason }
-				</Notice>
-			) ) }
-
-			{ themeDisabled && (
-				<div className="release-panel__actions release-panel__actions--disabled">
-					<Notice status="info" isDismissible={ false }>
+			<header className="release-panel__header">
+				<div className="release-panel__intro">
+					<p>
+						{ sprintf(
+							/* translators: %d: Revision number. */
+							__( 'Release · Revision %d', 'wp-autoplugin' ),
+							revision.revision_number
+						) }
+					</p>
+					<h3>{ releaseTitle }</h3>
+					<span>
 						{ __(
-							'Theme release is not available yet. Review and finding fixes remain fully available.',
+							'Release tools remain available regardless of Review status.',
 							'wp-autoplugin'
 						) }
-					</Notice>
-					<Button disabled>
-						{ __( 'Download theme ZIP', 'wp-autoplugin' ) }
-					</Button>
-					<Button disabled>
-						{ __( 'Install as copy', 'wp-autoplugin' ) }
-					</Button>
-					<Button disabled>
-						{ __( 'Modify theme directly', 'wp-autoplugin' ) }
-					</Button>
+					</span>
 				</div>
-			) }
-
-			{ pluginProject && (
-				<div className="release-panel__actions">
-					<Button
-						variant="secondary"
-						disabled={ disabled || ! capability?.zip }
-						onClick={ () => onPackage( 'project' ) }
-					>
-						{ __( 'Download ZIP', 'wp-autoplugin' ) }
-					</Button>
-					<Button
-						variant="primary"
-						disabled={ disabled || ! capability?.can_install }
-						onClick={ () => onPromotion( 'install_project' ) }
-					>
-						{ __( 'Install on this site', 'wp-autoplugin' ) }
-					</Button>
+				<div
+					className={ `release-panel__review-status ${ reviewTone }` }
+				>
+					<strong>{ reviewHeading }</strong>
+					<p>{ reviewMessage }</p>
 				</div>
-			) }
+			</header>
+			<div className="release-panel__workspace">
+				<section className="release-panel__action-column">
+					<h4>{ __( 'Release actions', 'wp-autoplugin' ) }</h4>
+					{ capability?.disabled_reasons.map( ( reason ) => (
+						<Notice
+							status="warning"
+							isDismissible={ false }
+							key={ reason }
+						>
+							{ reason }
+						</Notice>
+					) ) }
 
-			{ pluginChanges && (
-				<>
-					<div className="release-panel__fork">
-						<h4>
-							{ __(
-								'Recommended: release as a fork',
-								'wp-autoplugin'
-							) }
-						</h4>
-						<p>
-							{ __(
-								'The fork and original share plugin data and must not be active together. A fork does not automatically receive upstream releases.',
-								'wp-autoplugin'
-							) }
-						</p>
-						<TextControl
-							label={ __( 'Fork plugin slug', 'wp-autoplugin' ) }
-							value={ forkSlug }
-							onChange={ ( value ) =>
-								onForkSlug( slugify( value ) )
-							}
-						/>
-						<div className="release-panel__actions">
-							<Button
-								variant="secondary"
-								disabled={
-									disabled || ! capability?.zip || ! forkSlug
-								}
-								onClick={ () => onPackage( 'fork' ) }
-							>
-								{ __( 'Download fork ZIP', 'wp-autoplugin' ) }
-							</Button>
+					{ themeDisabled && (
+						<>
+							<Notice status="info" isDismissible={ false }>
+								{ __(
+									'Theme release is not available yet. Review and finding fixes remain fully available.',
+									'wp-autoplugin'
+								) }
+							</Notice>
+							<div className="release-panel__action-card">
+								<Button variant="secondary" disabled>
+									{ __(
+										'Download theme ZIP',
+										'wp-autoplugin'
+									) }
+								</Button>
+								<p>
+									{ __(
+										'Theme packaging is not available yet.',
+										'wp-autoplugin'
+									) }
+								</p>
+							</div>
+							<div className="release-panel__action-card">
+								<Button variant="secondary" disabled>
+									{ __( 'Install as copy', 'wp-autoplugin' ) }
+								</Button>
+								<p>
+									{ __(
+										'Theme installation is not available yet.',
+										'wp-autoplugin'
+									) }
+								</p>
+							</div>
+						</>
+					) }
+
+					{ pluginProject && (
+						<>
+							<div className="release-panel__action-card">
+								<Button
+									variant="secondary"
+									disabled={ disabled || ! capability?.zip }
+									onClick={ () => onPackage( 'project' ) }
+								>
+									{ __( 'Download ZIP', 'wp-autoplugin' ) }
+								</Button>
+								<p>
+									{ __(
+										'Create a portable ZIP package without changing this site.',
+										'wp-autoplugin'
+									) }
+								</p>
+							</div>
+							<div className="release-panel__action-card">
+								<Button
+									variant="primary"
+									disabled={
+										disabled || ! capability?.can_install
+									}
+									onClick={ () =>
+										onPromotion( 'install_project' )
+									}
+								>
+									{ __(
+										'Install on this site',
+										'wp-autoplugin'
+									) }
+								</Button>
+								<p>
+									{ __(
+										'Install this revision on the current WordPress site. Activation remains a separate step.',
+										'wp-autoplugin'
+									) }
+								</p>
+							</div>
+						</>
+					) }
+
+					{ pluginChanges && (
+						<>
+							<div className="release-panel__fork-intro">
+								<strong>
+									{ __(
+										'Recommended: release as a fork',
+										'wp-autoplugin'
+									) }
+								</strong>
+								<p>
+									{ __(
+										'The fork and original share plugin data and must not be active together.',
+										'wp-autoplugin'
+									) }
+								</p>
+								<TextControl
+									label={ __(
+										'Fork plugin slug',
+										'wp-autoplugin'
+									) }
+									value={ forkSlug }
+									onChange={ ( value ) =>
+										onForkSlug( slugify( value ) )
+									}
+								/>
+							</div>
+							<div className="release-panel__action-card">
+								<Button
+									variant="secondary"
+									disabled={
+										disabled ||
+										! capability?.zip ||
+										! forkSlug
+									}
+									onClick={ () => onPackage( 'fork' ) }
+								>
+									{ __(
+										'Download fork ZIP',
+										'wp-autoplugin'
+									) }
+								</Button>
+								<p>
+									{ __(
+										'Create a separately named plugin package while leaving the original untouched.',
+										'wp-autoplugin'
+									) }
+								</p>
+							</div>
+							<div className="release-panel__action-card">
+								<Button
+									variant="primary"
+									disabled={
+										disabled ||
+										! capability?.can_install ||
+										! forkSlug
+									}
+									onClick={ () =>
+										onPromotion( 'install_fork' )
+									}
+								>
+									{ __( 'Install as fork', 'wp-autoplugin' ) }
+								</Button>
+								<p>
+									{ __(
+										'Install the fork on this site. Switching activation remains a separate step.',
+										'wp-autoplugin'
+									) }
+								</p>
+							</div>
+							<details className="release-panel__fork-details">
+								<summary>
+									{ __( 'Fork details', 'wp-autoplugin' ) }
+								</summary>
+								<dl className="release-panel__transform-preview">
+									<div>
+										<dt>
+											{ __(
+												'Plugin Name',
+												'wp-autoplugin'
+											) }
+										</dt>
+										<dd>
+											{
+												revision.project_manifest
+													?.plugin_name
+											}{ ' ' }
+											—{ ' ' }
+											{ __(
+												'WP-Autoplugin Fork',
+												'wp-autoplugin'
+											) }
+										</dd>
+									</div>
+									<div>
+										<dt>
+											{ __(
+												'Update URI',
+												'wp-autoplugin'
+											) }
+										</dt>
+										<dd>
+											<code>
+												https://wp-autoplugin.local/fork/
+												{ forkSlug }
+											</code>
+										</dd>
+									</div>
+									<div>
+										<dt>
+											{ __( 'Version', 'wp-autoplugin' ) }
+										</dt>
+										<dd>
+											{ __(
+												'Patch version bump',
+												'wp-autoplugin'
+											) }
+										</dd>
+									</div>
+								</dl>
+							</details>
+							<details className="release-panel__advanced">
+								<summary>
+									{ __(
+										'Advanced: replace or modify the original',
+										'wp-autoplugin'
+									) }
+								</summary>
+								<p>
+									{ __(
+										'The replacement ZIP is for manual deployment. Upstream updates may overwrite direct changes, and file rollback cannot undo database or runtime side effects.',
+										'wp-autoplugin'
+									) }
+								</p>
+								<div className="release-panel__advanced-actions">
+									<Button
+										variant="secondary"
+										disabled={
+											disabled || ! capability?.zip
+										}
+										onClick={ () =>
+											onPackage( 'replacement' )
+										}
+									>
+										{ __(
+											'Download replacement ZIP',
+											'wp-autoplugin'
+										) }
+									</Button>
+									<Button
+										variant="secondary"
+										isDestructive
+										disabled={
+											disabled || ! capability?.can_modify
+										}
+										onClick={ () =>
+											onPromotion( 'modify_original' )
+										}
+									>
+										{ __(
+											'Modify original',
+											'wp-autoplugin'
+										) }
+									</Button>
+								</div>
+							</details>
+						</>
+					) }
+
+					{ installed?.result?.promotion_id && (
+						<Notice status="success" isDismissible={ false }>
+							<p>
+								{ __(
+									'Installed. Click Activate to enable the plugin on this site.',
+									'wp-autoplugin'
+								) }
+							</p>
 							<Button
 								variant="primary"
 								disabled={
-									disabled ||
-									! capability?.can_install ||
-									! forkSlug
+									active || ! capability?.can_activate
 								}
-								onClick={ () => onPromotion( 'install_fork' ) }
+								onClick={ () =>
+									onQueueEndpoint(
+										`${ rest }/promotions/${ installed.result?.promotion_id }/activate`,
+										{}
+									)
+								}
 							>
-								{ __( 'Install as fork', 'wp-autoplugin' ) }
+								{ installed.result.mode === 'install_fork'
+									? __( 'Switch to fork', 'wp-autoplugin' )
+									: __( 'Activate', 'wp-autoplugin' ) }
 							</Button>
-						</div>
-						<details className="release-panel__fork-details">
-							<summary>
-								{ __( 'Fork details', 'wp-autoplugin' ) }
-							</summary>
-							<dl className="release-panel__transform-preview">
-								<div>
-									<dt>
-										{ __( 'Plugin Name', 'wp-autoplugin' ) }
-									</dt>
-									<dd>
-										{
-											revision.project_manifest
-												?.plugin_name
-										}{ ' ' }
-										—{ ' ' }
-										{ __(
-											'WP-Autoplugin Fork',
-											'wp-autoplugin'
-										) }
-									</dd>
-								</div>
-								<div>
-									<dt>
-										{ __( 'Update URI', 'wp-autoplugin' ) }
-									</dt>
-									<dd>
-										<code>
-											https://wp-autoplugin.local/fork/
-											{ forkSlug }
-										</code>
-									</dd>
-								</div>
-								<div>
-									<dt>
-										{ __( 'Version', 'wp-autoplugin' ) }
-									</dt>
-									<dd>
-										{ __(
-											'Patch version bump',
-											'wp-autoplugin'
-										) }
-									</dd>
-								</div>
-							</dl>
-						</details>
-					</div>
-					<details className="release-panel__advanced">
-						<summary>
-							{ __(
-								'Advanced: replace or modify the original',
-								'wp-autoplugin'
-							) }
-						</summary>
-						<p>
-							{ __(
-								'The replacement ZIP is for manual deployment. Upstream updates remain enabled and may overwrite direct changes. File rollback cannot undo database or runtime side effects and is blocked after affected-file drift.',
-								'wp-autoplugin'
-							) }
-						</p>
-						<div className="release-panel__actions">
-							<Button
-								variant="secondary"
-								disabled={ disabled || ! capability?.zip }
-								onClick={ () => onPackage( 'replacement' ) }
-							>
+						</Notice>
+					) }
+
+					{ direct?.result?.promotion_id && (
+						<Notice status="warning" isDismissible={ false }>
+							<p>
 								{ __(
-									'Download replacement ZIP',
+									'The original plugin files were modified. Rollback remains available only while every affected file matches the promoted state.',
 									'wp-autoplugin'
 								) }
-							</Button>
+							</p>
 							<Button
 								variant="secondary"
 								isDestructive
-								disabled={
-									disabled || ! capability?.can_modify
-								}
+								disabled={ active || ! capability?.can_modify }
 								onClick={ () =>
-									onPromotion( 'modify_original' )
+									onQueueEndpoint(
+										`${ rest }/promotions/${ direct.result?.promotion_id }/rollback`,
+										{}
+									)
 								}
 							>
-								{ __( 'Modify original', 'wp-autoplugin' ) }
+								{ __( 'Rollback files', 'wp-autoplugin' ) }
 							</Button>
-						</div>
-					</details>
-				</>
-			) }
+						</Notice>
+					) }
+				</section>
 
-			{ installed?.result?.promotion_id && (
-				<Notice status="success" isDismissible={ false }>
-					<p>
-						{ __(
-							'Installed. Click Activate to enable the plugin on this site.',
-							'wp-autoplugin'
-						) }
-					</p>
-					<Button
-						variant="primary"
-						disabled={ active || ! capability?.can_activate }
-						onClick={ () =>
-							onQueueEndpoint(
-								`${ rest }/promotions/${ installed.result?.promotion_id }/activate`,
-								{}
-							)
-						}
-					>
-						{ installed.result.mode === 'install_fork'
-							? __( 'Switch to fork', 'wp-autoplugin' )
-							: __( 'Activate', 'wp-autoplugin' ) }
-					</Button>
-				</Notice>
-			) }
-
-			{ direct?.result?.promotion_id && (
-				<Notice status="warning" isDismissible={ false }>
-					<p>
-						{ __(
-							'The original plugin files were modified. Rollback remains available only while every affected file matches the promoted state.',
-							'wp-autoplugin'
-						) }
-					</p>
-					<Button
-						variant="secondary"
-						isDestructive
-						disabled={ active || ! capability?.can_modify }
-						onClick={ () =>
-							onQueueEndpoint(
-								`${ rest }/promotions/${ direct.result?.promotion_id }/rollback`,
-								{}
-							)
-						}
-					>
-						{ __( 'Rollback files', 'wp-autoplugin' ) }
-					</Button>
-				</Notice>
-			) }
-
-			<details className="release-panel__testing">
-				<summary>
-					<span>
-						<strong>
-							{ __( 'Manual testing', 'wp-autoplugin' ) }
-						</strong>
-						<small>
-							{ manualTests.length
-								? sprintf(
-										/* translators: %d: Number of suggested manual tests. */
-										__(
-											'%d suggested checks',
-											'wp-autoplugin'
-										),
-										manualTests.length
-								  )
-								: __(
-										'Review-generated checks',
+				<section className="release-panel__testing">
+					<header>
+						<div>
+							<h4>{ __( 'Manual testing', 'wp-autoplugin' ) }</h4>
+							<p>
+								{ sprintf(
+									/* translators: 1: Completed checks. 2: Total checks. */
+									__(
+										'%1$d of %2$d complete',
 										'wp-autoplugin'
-								  ) }
-						</small>
-					</span>
-				</summary>
-				<div className="release-panel__testing-content">
-					<p>
-						{ themeDisabled
-							? __(
-									'Deploy the changes to a test site with the theme active before working through these checks.',
-									'wp-autoplugin'
-							  )
-							: __(
-									'Install this release and activate the plugin on a test site before working through these checks.',
-									'wp-autoplugin'
-							  ) }
-					</p>
+									),
+									completedTests,
+									manualTests.length
+								) }
+							</p>
+						</div>
+						<progress
+							value={ completedTests }
+							max={ Math.max( 1, manualTests.length ) }
+							aria-label={ __(
+								'Manual testing progress',
+								'wp-autoplugin'
+							) }
+						/>
+					</header>
 					{ manualTestStatus === 'stale' &&
 						manualTests.length > 0 && (
 							<Notice status="warning" isDismissible={ false }>
@@ -7622,20 +7725,22 @@ function ReleasePanel( {
 										/>
 										<strong>{ test.title }</strong>
 									</label>
-									<ul>
-										{ test.steps.map( ( step ) => (
-											<li key={ step }>{ step }</li>
-										) ) }
-									</ul>
-									<p>
-										<strong>
-											{ __(
-												'Expected:',
-												'wp-autoplugin'
-											) }
-										</strong>{ ' ' }
-										{ test.expected }
-									</p>
+									<div className="release-panel__test-details">
+										<ul>
+											{ test.steps.map( ( step ) => (
+												<li key={ step }>{ step }</li>
+											) ) }
+										</ul>
+										<p>
+											<strong>
+												{ __(
+													'Expected:',
+													'wp-autoplugin'
+												) }
+											</strong>{ ' ' }
+											{ test.expected }
+										</p>
+									</div>
 								</li>
 							) ) }
 						</ol>
@@ -7652,27 +7757,62 @@ function ReleasePanel( {
 							) }
 						</small>
 					) }
-				</div>
-			</details>
+				</section>
+			</div>
 
-			{ releaseJobs.length > 0 && (
-				<details className="release-panel__jobs">
-					<summary>
-						{ __( 'Release activity', 'wp-autoplugin' ) }
-					</summary>
+			<footer className="release-panel__activity">
+				<header>
+					<div>
+						<h4>{ __( 'Release activity', 'wp-autoplugin' ) }</h4>
+						<p>
+							{ __(
+								'Recent packages, installations, forks, and errors.',
+								'wp-autoplugin'
+							) }
+						</p>
+					</div>
+					{ releaseJobs.length > 3 && (
+						<Button
+							variant="secondary"
+							onClick={ () =>
+								setShowAllActivity( ! showAllActivity )
+							}
+						>
+							{ showAllActivity
+								? __( 'Show recent', 'wp-autoplugin' )
+								: __( 'View all', 'wp-autoplugin' ) }
+						</Button>
+					) }
+				</header>
+				{ visibleActivityJobs.length > 0 ? (
 					<ul>
-						{ releaseJobs
-							.slice( -6 )
-							.reverse()
-							.map( ( job ) => (
+						{ visibleActivityJobs.map( ( job ) => {
+							const tone = releaseActivityTone( job );
+							let icon = '•';
+							if ( tone === 'is-success' ) {
+								icon = '✓';
+							} else if ( tone === 'is-error' ) {
+								icon = '!';
+							}
+							return (
 								<li key={ job.id }>
-									<strong>
-										#{ job.id } · { job.task }
-									</strong>
-									<span>{ job.status }</span>
-									{ job.error_message && (
-										<small>{ job.error_message }</small>
-									) }
+									<time>{ job.created_at } UTC</time>
+									<span
+										className={ `release-panel__activity-icon ${ tone }` }
+										aria-hidden="true"
+									>
+										{ icon }
+									</span>
+									<div>
+										<strong>
+											{ releaseActivityTitle( job ) }
+										</strong>
+										<p>
+											{ releaseActivityDescription(
+												job
+											) }
+										</p>
+									</div>
 									{ job.status === 'completed' &&
 										job.result?.package_id && (
 											<Button
@@ -7685,17 +7825,98 @@ function ReleasePanel( {
 												}
 											>
 												{ __(
-													'Download ready ZIP',
+													'Download ZIP',
 													'wp-autoplugin'
 												) }
 											</Button>
 										) }
 								</li>
-							) ) }
+							);
+						} ) }
 					</ul>
-				</details>
-			) }
+				) : (
+					<p className="release-panel__activity-empty">
+						{ __(
+							'No release activity yet. Packages and deployments will appear here.',
+							'wp-autoplugin'
+						) }
+					</p>
+				) }
+			</footer>
 		</section>
+	);
+}
+
+function releaseActivityTone( job: Job ): string {
+	if ( [ 'failed', 'cancelled' ].includes( job.status ) ) {
+		return 'is-error';
+	}
+	return job.status === 'completed' ? 'is-success' : 'is-progress';
+}
+
+function releaseActivityTitle( job: Job ): string {
+	const mode = job.result?.mode || job.payload.mode;
+	if ( job.status === 'failed' ) {
+		return __( 'Release action failed', 'wp-autoplugin' );
+	}
+	if ( job.status === 'cancelled' ) {
+		return __( 'Release action cancelled', 'wp-autoplugin' );
+	}
+	if ( job.task === 'package' ) {
+		return job.status === 'completed'
+			? __( 'ZIP package created', 'wp-autoplugin' )
+			: __( 'Creating ZIP package', 'wp-autoplugin' );
+	}
+	if ( job.result?.outcome === 'promotion_action' ) {
+		if ( job.result.status === 'activated' ) {
+			return __( 'Plugin activated', 'wp-autoplugin' );
+		}
+		if ( job.result.status === 'switched' ) {
+			return __( 'Switched to fork', 'wp-autoplugin' );
+		}
+		if ( job.result.status === 'rolled_back' ) {
+			return __( 'Plugin files rolled back', 'wp-autoplugin' );
+		}
+	}
+	if ( mode === 'install_fork' ) {
+		return job.status === 'completed'
+			? __( 'Fork installed', 'wp-autoplugin' )
+			: __( 'Installing fork', 'wp-autoplugin' );
+	}
+	if ( mode === 'modify_original' ) {
+		return job.status === 'completed'
+			? __( 'Original plugin modified', 'wp-autoplugin' )
+			: __( 'Modifying original plugin', 'wp-autoplugin' );
+	}
+	return job.status === 'completed'
+		? __( 'Plugin installed', 'wp-autoplugin' )
+		: __( 'Installing plugin', 'wp-autoplugin' );
+}
+
+function releaseActivityDescription( job: Job ): string {
+	if ( job.error_message ) {
+		return job.error_message;
+	}
+	if ( job.task === 'package' && job.status === 'completed' ) {
+		return __( 'The private ZIP is ready to download.', 'wp-autoplugin' );
+	}
+	if (
+		job.result?.outcome === 'promotion' &&
+		job.result.status === 'installed'
+	) {
+		return __(
+			'Installed successfully. Activation remains a separate action.',
+			'wp-autoplugin'
+		);
+	}
+	if ( job.latest_event?.message ) {
+		return job.latest_event.message;
+	}
+	return sprintf(
+		/* translators: 1: Job number. 2: Job status. */
+		__( 'Release job #%1$d is %2$s.', 'wp-autoplugin' ),
+		job.id,
+		job.status
 	);
 }
 
