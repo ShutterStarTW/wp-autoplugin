@@ -18,7 +18,7 @@ Frontend sources live in `assets/v2/src`; distributable assets live in `assets/v
 
 ### Experimental ChatGPT Subscription provider
 
-Administrators can optionally connect one site-wide ChatGPT account from Settings using OpenAI's Codex device-authorization flow. This provider is v2-only and remains separate from the OpenAI API-key provider: its models can be assigned to the v2 Planner, Coder, and Reviewer controls without changing v1 selections. The curated catalog uses collision-safe IDs: `chatgpt:gpt-5.6-sol`, `chatgpt:gpt-5.6-terra`, `chatgpt:gpt-5.6-luna`, `chatgpt:gpt-5.5`, `chatgpt:gpt-5.4`, and `chatgpt:gpt-5.4-mini`.
+Administrators can optionally connect one site-wide ChatGPT account from Settings using OpenAI's Codex device-authorization flow. This provider remains separate from the OpenAI API-key provider. Its verified models appear in the Settings Default, Planner, Coder, and Reviewer selectors as well as the matching v2 controls. The curated catalog uses collision-safe IDs: `chatgpt:gpt-5.6-sol`, `chatgpt:gpt-5.6-terra`, `chatgpt:gpt-5.6-luna`, `chatgpt:gpt-5.5`, `chatgpt:gpt-5.4`, and `chatgpt:gpt-5.4-mini`.
 
 OAuth tokens are exchanged and refreshed only on the WordPress server, encrypted with AES-256-GCM using WordPress salts, and stored in a non-autoloaded option. Authentication uses `auth.openai.com`; model discovery and generation use `chatgpt.com/backend-api/codex`. The connected subscription's billing, workspace policy, availability, and usage limits apply. This integration follows [Codex authentication guidance](https://learn.chatgpt.com/docs/auth), but remains experimental because the account-backed backend is not documented as a supported third-party API and may change without notice.
 

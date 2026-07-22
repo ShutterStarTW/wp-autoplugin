@@ -11,6 +11,7 @@ final class Model_Settings {
 	}
 
 	public function register_settings(): void {
+		$this->migrate_chatgpt_overrides();
 		foreach ( Model_Effort::option_names() as $option ) {
 			register_setting(
 				'wp_autoplugin_settings',
@@ -22,8 +23,20 @@ final class Model_Settings {
 				]
 			);
 		}
-		foreach ( Model_Effort::v2_option_names() as $option ) {
-			register_setting( 'wp_autoplugin_settings', $option, [ 'type' => 'string', 'sanitize_callback' => [ Model_Effort::class, 'sanitize' ], 'default' => '' ] );
+	}
+
+	/** Move the earlier hidden v2-only ChatGPT choices into the visible shared settings. */
+	private function migrate_chatgpt_overrides(): void {
+		foreach ( [ 'planner', 'coder', 'reviewer' ] as $role ) {
+			$model_option = 'wp_autoplugin_v2_' . $role . '_model';
+			$effort_option = 'wp_autoplugin_v2_' . $role . '_model_effort';
+			$model = (string) get_option( $model_option, '' );
+			if ( str_starts_with( $model, 'chatgpt:' ) ) {
+				update_option( 'wp_autoplugin_' . $role . '_model', $model, false );
+				update_option( 'wp_autoplugin_' . $role . '_model_effort', Model_Effort::sanitize( get_option( $effort_option, '' ) ), false );
+			}
+			delete_option( $model_option );
+			delete_option( $effort_option );
 		}
 	}
 

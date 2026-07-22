@@ -22,7 +22,7 @@ WP-Autoplugin is a free and open-source WordPress plugin that leverages AI to as
 - Specialized model settings to delegate different tasks (planning, coding, reviewing) to specific AI models.
 - Detailed token usage tracking for better cost management.
 - Support for multiple AI models, including OpenAI, Anthropic, Google Gemini, with custom API support to use any OpenAI-compatible model.
-- Experimental v2-only ChatGPT Subscription connection using OpenAI's Codex device authorization, with live model availability and reasoning effort controls.
+- Experimental ChatGPT Subscription connection using OpenAI's Codex device authorization, with live model availability and reasoning effort controls in Settings and v2.
 - Full control over generated code.
 - Privacy-focused: no data collection or external communication, except for the AI API you choose.
 - Completely free, with no ads or account requirements.
@@ -54,7 +54,7 @@ For more details and screenshots, visit [https://wp-autoplugin.com](https://wp-a
 == Frequently Asked Questions ==
 
 = Do I need an API key to use WP-Autoplugin? =
-Normally, yes: configure a supported provider such as OpenAI, Anthropic, Google AI Studio, or xAI. For v2 only, administrators may instead connect the experimental ChatGPT Subscription provider. API keys and encrypted ChatGPT OAuth tokens stay on the WordPress server and are never returned to the browser.
+Normally, yes: configure a supported provider such as OpenAI, Anthropic, Google AI Studio, or xAI. Administrators may instead connect the experimental ChatGPT Subscription provider and select its verified models in Settings. API keys and encrypted ChatGPT OAuth tokens stay on the WordPress server and are never returned to the browser.
 
 = Is WP-Autoplugin free? =
 Yes, the plugin is completely free with no ads. API usage may incur costs depending on the provider. ChatGPT Subscription usage is governed by the connected account's plan limits, billing, and workspace controls.
@@ -96,7 +96,7 @@ WP-Autoplugin relies on third-party AI APIs. No data is transmitted until you co
 == Changelog ==
 
 = 2.0.0-dev =
-* Added an experimental v2-only ChatGPT Subscription provider with site-wide Codex device authorization, encrypted token storage, live model entitlements, and reasoning effort controls.
+* Added an experimental ChatGPT Subscription provider with site-wide Codex device authorization, encrypted token storage, live model entitlements, and shared Settings/v2 reasoning controls.
 * Added the v2 universal React/TypeScript workspace foundation.
 * Added versioned projects, workspaces, revisions, jobs, events, usage, diagnostics, and prompt-template tables.
 * Added durable background planning and explanation jobs with polling and cancellation.

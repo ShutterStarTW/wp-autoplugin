@@ -421,18 +421,17 @@ class Scripts {
 				[
 					'path'    => '/wp-autoplugin/v2/providers/chatgpt',
 					'strings' => [
-						'connecting'          => esc_html__( 'Starting secure device authorization…', 'wp-autoplugin' ),
-						'waiting'             => esc_html__( 'Waiting for approval in the OpenAI verification page…', 'wp-autoplugin' ),
+						'connecting'          => esc_html__( 'Connecting…', 'wp-autoplugin' ),
+						'waiting'             => esc_html__( 'Waiting for approval', 'wp-autoplugin' ),
 						'connected'           => esc_html__( 'Connected', 'wp-autoplugin' ),
 						'disconnected'        => esc_html__( 'Not connected', 'wp-autoplugin' ),
+						'reconnectRequired'   => esc_html__( 'Reconnect required', 'wp-autoplugin' ),
+						'connect'             => esc_html__( 'Connect', 'wp-autoplugin' ),
+						'reconnect'           => esc_html__( 'Reconnect', 'wp-autoplugin' ),
 						'copied'              => esc_html__( 'Verification code copied.', 'wp-autoplugin' ),
 						'copyFailed'          => esc_html__( 'Copy the verification code manually.', 'wp-autoplugin' ),
 						'confirmDisconnect'   => esc_html__( 'Disconnect this site-wide ChatGPT account?', 'wp-autoplugin' ),
-						'modelsRefreshed'     => esc_html__( 'Subscription model access refreshed.', 'wp-autoplugin' ),
 						'genericError'        => esc_html__( 'The ChatGPT connection request failed.', 'wp-autoplugin' ),
-						'account'             => esc_html__( 'Account:', 'wp-autoplugin' ),
-						'modelsAvailable'     => esc_html__( 'subscription models available.', 'wp-autoplugin' ),
-						'modelsNotSynced'     => esc_html__( 'Subscription models have not been synchronized yet.', 'wp-autoplugin' ),
 					],
 				]
 			);

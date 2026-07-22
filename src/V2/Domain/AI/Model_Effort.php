@@ -15,11 +15,6 @@ final class Model_Effort {
 		'coder'    => 'wp_autoplugin_coder_model_effort',
 		'reviewer' => 'wp_autoplugin_reviewer_model_effort',
 	];
-	private const V2_ROLE_OPTIONS = [
-		'planner'  => 'wp_autoplugin_v2_planner_model_effort',
-		'coder'    => 'wp_autoplugin_v2_coder_model_effort',
-		'reviewer' => 'wp_autoplugin_v2_reviewer_model_effort',
-	];
 
 	/**
 	 * Return effort capabilities keyed by exact provider model ID.
@@ -71,24 +66,10 @@ final class Model_Effort {
 		return self::ROLE_OPTIONS;
 	}
 
-	public static function v2_option_name( string $role ): string {
-		return self::V2_ROLE_OPTIONS[ $role ] ?? '';
-	}
-
-	/** @return array<string, string> */
-	public static function v2_option_names(): array {
-		return self::V2_ROLE_OPTIONS;
-	}
-
 	public static function selected_model( string $role ): string {
 		$default = (string) get_option( 'wp_autoplugin_model' );
 		if ( 'default' === $role ) {
 			return $default;
-		}
-
-		$v2_model = (string) get_option( 'wp_autoplugin_v2_' . $role . '_model', '' );
-		if ( str_starts_with( $v2_model, 'chatgpt:' ) ) {
-			return $v2_model;
 		}
 
 		$option = match ( $role ) {
@@ -107,9 +88,6 @@ final class Model_Effort {
 	 */
 	public static function for_role( string $role ): string {
 		$model = self::selected_model( $role );
-		if ( 'default' !== $role && str_starts_with( $model, 'chatgpt:' ) ) {
-			return self::normalize( $model, (string) get_option( self::v2_option_name( $role ), '' ) );
-		}
 		if ( 'default' !== $role ) {
 			$model_option = (string) get_option( 'wp_autoplugin_' . $role . '_model' );
 			if ( '' === $model_option ) {

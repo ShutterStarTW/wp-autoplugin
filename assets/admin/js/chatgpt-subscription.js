@@ -11,7 +11,6 @@
 	const elements = {
 		status: root.querySelector( '.wp-autoplugin-chatgpt-status' ),
 		notice: root.querySelector( '.wp-autoplugin-chatgpt-notice' ),
-		noticeText: root.querySelector( '.wp-autoplugin-chatgpt-notice p' ),
 		account: root.querySelector( '.wp-autoplugin-chatgpt-account' ),
 		device: root.querySelector( '.wp-autoplugin-chatgpt-device' ),
 		code: root.querySelector( '.wp-autoplugin-chatgpt-code' ),
@@ -21,10 +20,8 @@
 		cancel: root.querySelector( '.wp-autoplugin-chatgpt-cancel' ),
 		refresh: root.querySelector( '.wp-autoplugin-chatgpt-refresh' ),
 		disconnect: root.querySelector( '.wp-autoplugin-chatgpt-disconnect' ),
-		modelStatus: root.querySelector(
-			'.wp-autoplugin-chatgpt-model-status'
-		),
 	};
+	const renderedModelSync = Number( root.dataset.modelSyncedAt || 0 );
 	let session = null;
 	let pollTimer = null;
 
@@ -37,8 +34,8 @@
 
 	function setNotice( message = '', type = 'error' ) {
 		elements.notice.hidden = ! message;
-		elements.notice.className = `notice inline wp-autoplugin-chatgpt-notice notice-${ type }`;
-		elements.noticeText.textContent = message;
+		elements.notice.className = `description wp-autoplugin-chatgpt-notice is-${ type }`;
+		elements.notice.textContent = message;
 	}
 
 	function setBusy( busy ) {
@@ -51,31 +48,46 @@
 		const pending =
 			state.session &&
 			[ 'pending', 'exchanging' ].includes( state.session.status );
+		const reconnectRequired = Boolean( state.reconnect_required );
+		let statusState = 'disconnected';
+		let statusText = strings.disconnected;
+
+		if ( pending ) {
+			statusState = 'pending';
+			statusText = strings.waiting;
+		} else if ( reconnectRequired ) {
+			statusState = 'error';
+			statusText = strings.reconnectRequired;
+		} else if ( state.connected ) {
+			statusState = 'connected';
+			statusText = strings.connected;
+		}
+
 		session = pending ? state.session : null;
-		elements.status.dataset.state = state.connected
-			? 'connected'
-			: 'disconnected';
-		elements.status.textContent = state.connected
-			? strings.connected
-			: strings.disconnected;
-		elements.account.hidden = ! state.connected;
+		elements.status.dataset.state = statusState;
+		elements.status.textContent = statusText;
+		elements.account.hidden = ! state.connected || ! state.account_label;
 		elements.account.textContent = state.connected
-			? `${ strings.account } ${ state.account_label }`
+			? state.account_label
 			: '';
 		elements.device.hidden = ! pending;
 		elements.code.textContent = pending ? state.session.user_code : '';
 		elements.open.href = pending ? state.session.verification_url : '#';
-		elements.connect.hidden = state.connected || pending;
+		elements.connect.hidden =
+			( state.connected && ! reconnectRequired ) || pending;
+		elements.connect.textContent = reconnectRequired
+			? strings.reconnect
+			: strings.connect;
 		elements.cancel.hidden = ! pending;
-		elements.refresh.hidden = ! state.connected;
+		elements.refresh.hidden = ! state.connected || reconnectRequired;
 		elements.disconnect.hidden = ! state.connected;
-		const models = state.models || {};
-		const count = Object.keys( models.models || {} ).length;
-		elements.modelStatus.textContent =
-			models.error ||
-			( models.last_synced_at
-				? `${ count } ${ strings.modelsAvailable }`
-				: strings.modelsNotSynced );
+		if (
+			! pending &&
+			Number( state.models?.last_synced_at || 0 ) > renderedModelSync
+		) {
+			window.location.reload();
+			return;
+		}
 		if ( state.error ) {
 			setNotice( state.error );
 		}
@@ -104,11 +116,12 @@
 
 	async function connect() {
 		setBusy( true );
-		setNotice( strings.connecting, 'info' );
+		setNotice( '' );
+		elements.status.dataset.state = 'pending';
+		elements.status.textContent = strings.connecting;
 		try {
 			const started = await request( '/oauth/start', { method: 'POST' } );
 			session = started;
-			setNotice( strings.waiting, 'info' );
 			render( { connected: false, session: started, models: {} } );
 		} catch ( error ) {
 			setNotice( error.message || strings.genericError );
@@ -130,11 +143,7 @@
 				schedulePoll( result.retry_after || session.interval || 5 );
 				return;
 			}
-			setNotice(
-				result.notice || '',
-				result.notice ? 'warning' : 'success'
-			);
-			await load();
+			window.location.reload();
 		} catch ( error ) {
 			if (
 				error.code === 'chatgpt_oauth_poll_early' ||
@@ -180,8 +189,7 @@
 		setBusy( true );
 		try {
 			await request( '/connection', { method: 'DELETE' } );
-			setNotice( '' );
-			await load();
+			window.location.reload();
 		} catch ( error ) {
 			setNotice( error.message || strings.genericError );
 		} finally {
@@ -193,8 +201,7 @@
 		setBusy( true );
 		try {
 			await request( '/models/refresh', { method: 'POST' } );
-			setNotice( strings.modelsRefreshed, 'success' );
-			await load();
+			window.location.reload();
 		} catch ( error ) {
 			setNotice( error.message || strings.genericError );
 		} finally {

@@ -1,5 +1,6 @@
 <?php
 
+use WP_Autoplugin\V2\Admin\Model_Settings;
 use WP_Autoplugin\V2\Domain\AI\Model_Catalog;
 use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Config;
@@ -10,7 +11,7 @@ use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Token_Store;
 use WP_Autoplugin\V2\Rest\ChatGPT_Provider_Routes;
 use WP_Autoplugin\V2\Rest\Routes as V2_Routes;
 
-/** Security, persistence, and v2 isolation coverage for ChatGPT Subscription. */
+/** Security, persistence, and shared Settings coverage for ChatGPT Subscription. */
 final class ChatGPTProviderTest extends WP_UnitTestCase {
 	private int $oauth_polls = 0;
 	private const OPTIONS = [
@@ -21,8 +22,12 @@ final class ChatGPTProviderTest extends WP_UnitTestCase {
 		'wp_autoplugin_chatgpt_model_cache',
 		'wp_autoplugin_v2_planner_model',
 		'wp_autoplugin_v2_planner_model_effort',
+		'wp_autoplugin_v2_coder_model',
+		'wp_autoplugin_v2_coder_model_effort',
 		'wp_autoplugin_planner_model',
 		'wp_autoplugin_planner_model_effort',
+		'wp_autoplugin_coder_model',
+		'wp_autoplugin_coder_model_effort',
 		'wp_autoplugin_model',
 	];
 
@@ -140,7 +145,7 @@ final class ChatGPTProviderTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'new-signature', $rotated['access_token'] );
 	}
 
-	public function test_namespaced_role_override_preserves_shared_v1_selection(): void {
+	public function test_namespaced_role_selection_is_shared_with_settings(): void {
 		( new ChatGPT_Token_Store() )->save( $this->tokens() );
 		$account = hash_hmac( 'sha256', 'acct-test', wp_salt( 'auth' ) );
 		update_option( 'wp_autoplugin_chatgpt_model_cache', [
@@ -158,21 +163,34 @@ final class ChatGPTProviderTest extends WP_UnitTestCase {
 		$this->assertFalse( is_wp_error( $selection ) );
 		$this->assertSame( 'chatgpt', $selection['provider'] );
 		$this->assertSame( 'ultra', $selection['effort'] );
-		$this->assertSame( 'gpt-5.4', get_option( 'wp_autoplugin_planner_model' ) );
-		$this->assertSame( 'high', get_option( 'wp_autoplugin_planner_model_effort' ) );
+		$this->assertSame( 'chatgpt:gpt-5.6-sol', get_option( 'wp_autoplugin_planner_model' ) );
+		$this->assertSame( 'ultra', get_option( 'wp_autoplugin_planner_model_effort' ) );
 		$snapshot_method = new ReflectionMethod( V2_Routes::class, 'snapshot_job_models' );
 		$snapshot = $snapshot_method->invoke( new V2_Routes(), 'plan', [], [ 'target_kind' => 'new_plugin', 'target_metadata' => [ 'kind' => 'new_plugin' ] ] );
 		$this->assertSame( [ 'provider' => 'chatgpt', 'model' => 'chatgpt:gpt-5.6-sol', 'effort' => 'ultra' ], $snapshot['prompt_model'] );
 
 		$restored = ( new Model_Catalog() )->update( 'planner', '', '' );
 		$this->assertTrue( $restored['inherits_default'] );
-		$this->assertSame( '', get_option( 'wp_autoplugin_v2_planner_model', '' ) );
+		$this->assertSame( '', get_option( 'wp_autoplugin_planner_model', '' ) );
+		$this->assertSame( '', get_option( 'wp_autoplugin_planner_model_effort', '' ) );
 		$this->assertSame( 'ultra', Model_Effort::sanitize( 'ultra' ) );
 
 		$new_tokens = $this->tokens();
 		$new_tokens['account_id'] = 'acct-other';
 		( new ChatGPT_Token_Store() )->save( $new_tokens );
 		$this->assertFalse( ( new Model_Catalog() )->definition( 'chatgpt:gpt-5.6-sol' )['available'] );
+	}
+
+	public function test_hidden_chatgpt_overrides_migrate_to_shared_settings(): void {
+		update_option( 'wp_autoplugin_v2_coder_model', 'chatgpt:gpt-5.6-terra', false );
+		update_option( 'wp_autoplugin_v2_coder_model_effort', 'max', false );
+
+		( new Model_Settings() )->register_settings();
+
+		$this->assertSame( 'chatgpt:gpt-5.6-terra', get_option( 'wp_autoplugin_coder_model' ) );
+		$this->assertSame( 'max', get_option( 'wp_autoplugin_coder_model_effort' ) );
+		$this->assertFalse( get_option( 'wp_autoplugin_v2_coder_model', false ) );
+		$this->assertFalse( get_option( 'wp_autoplugin_v2_coder_model_effort', false ) );
 	}
 
 	public function test_catalog_always_uses_all_six_collision_safe_ids(): void {
