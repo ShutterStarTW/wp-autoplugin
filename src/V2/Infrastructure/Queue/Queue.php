@@ -2,9 +2,11 @@
 
 namespace WP_Autoplugin\V2\Infrastructure\Queue;
 
+use WP_Autoplugin\V2\Domain\AI\Agent_Task;
 use WP_Autoplugin\V2\Infrastructure\Database\Agent_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Code_Run_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 
 /**
  * Enqueues short job-runner callbacks outside the originating request.
@@ -44,6 +46,34 @@ final class Queue {
 			$this->dispatch( $args[0], $args[1], true );
 			$jobs->event( $args[0], 'code_recovered', __( 'Recovered a stalled Code generation continuation.', 'wp-autoplugin' ), [ 'generation' => $args[1] ], 'warning' );
 		}
+		$workspaces = new Workspace_Repository();
+		$before     = gmdate( 'Y-m-d H:i:s', time() - self::STALE_AFTER );
+		foreach ( $jobs->active_before( $before ) as $job ) {
+			$this->reconcile_abandoned_job( $job, $workspaces->find( (int) $job['workspace_id'] ) );
+		}
+	}
+
+	/** Fail one non-resumable job whose Action Scheduler callback is no longer active. */
+	public function reconcile_abandoned_job( array $job, ?array $workspace = null ): array {
+		if ( ! in_array( $job['status'] ?? '', [ 'queued', 'running', 'retrying' ], true ) ) {
+			return $job;
+		}
+		$updated = strtotime( (string) ( $job['updated_at'] ?? '' ) . ' UTC' );
+		if ( false === $updated || $updated > time() - self::STALE_AFTER ) {
+			return $job;
+		}
+		$workspace ??= ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
+		if ( Job_Repository::is_code_work( $job ) || ( $workspace && Agent_Task::uses_source_tools( $job, $workspace ) ) ) {
+			return $job;
+		}
+		if ( as_has_scheduled_action( self::HOOK, [ (int) $job['id'], 0 ], self::GROUP ) ) {
+			return $job;
+		}
+		$message = __( 'Background processing stopped unexpectedly. The operation did not complete and can be retried.', 'wp-autoplugin' );
+		$jobs    = new Job_Repository();
+		$jobs->update( (int) $job['id'], [ 'status' => 'failed', 'error_message' => $message, 'finished_at' => current_time( 'mysql', true ) ] );
+		$jobs->event( (int) $job['id'], 'failed', $message, [], 'error' );
+		return $jobs->find( (int) $job['id'] ) ?? $job;
 	}
 
 	/**

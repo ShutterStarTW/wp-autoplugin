@@ -633,10 +633,14 @@ final class Routes {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function job( \WP_REST_Request $request ) {
-		$job = ( new Job_Repository() )->find( (int) $request['id'] );
-		return $job && $this->workspace_for_current_user( (int) $job['workspace_id'] )
-			? rest_ensure_response( $this->with_latest_event( $job, new Job_Repository() ) )
-			: new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		$jobs      = new Job_Repository();
+		$job       = $jobs->find( (int) $request['id'] );
+		$workspace = $job ? $this->workspace_for_current_user( (int) $job['workspace_id'] ) : null;
+		if ( ! $job || ! $workspace ) {
+			return new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+		$job = ( new Queue() )->reconcile_abandoned_job( $job, $workspace );
+		return rest_ensure_response( $this->with_latest_event( $job, $jobs ) );
 	}
 
 	/**

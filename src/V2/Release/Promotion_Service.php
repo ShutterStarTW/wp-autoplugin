@@ -84,24 +84,67 @@ final class Promotion_Service {
 		$destination = (string) $promotion['destination_plugin_file'];
 		$source      = (string) $promotion['source_plugin_file'];
 		$original_active = '' !== $source && is_plugin_active( $source );
+		$valid = validate_plugin( $destination );
+		if ( is_wp_error( $valid ) ) {
+			return $this->activation_failed( $promotion, $valid->get_error_message(), $original_active );
+		}
+		$requirements = validate_plugin_requirements( $destination );
+		if ( is_wp_error( $requirements ) ) {
+			return $this->activation_failed( $promotion, $requirements->get_error_message(), $original_active );
+		}
+		$activator = new Isolated_Plugin_Activator();
 		if ( 'install_fork' === $promotion['mode'] && $original_active ) {
+			$probe = $activator->probe( (int) $promotion['created_by'] );
+			if ( is_wp_error( $probe ) ) {
+				return $this->activation_failed( $promotion, $probe->get_error_message(), true );
+			}
 			deactivate_plugins( $source, false, false );
 		}
-		$error = activate_plugin( $destination, '', false, true );
+		$error = $activator->activate( $destination, (int) $promotion['created_by'] );
 		if ( is_wp_error( $error ) ) {
 			$message = $error->get_error_message();
 			if ( 'install_fork' === $promotion['mode'] && $original_active ) {
-				$reactivated = activate_plugin( $source, '', false, true );
+				$reactivated = $activator->activate( $source, (int) $promotion['created_by'] );
 				if ( is_wp_error( $reactivated ) ) {
-					$message .= ' ' . sprintf( __( 'The original plugin also could not be reactivated: %s', 'wp-autoplugin' ), $reactivated->get_error_message() );
+					if ( $this->restore_active_plugin( $source, $destination ) ) {
+						$message .= ' ' . __( 'The original plugin was marked active again, but WordPress could not rerun its activation hook.', 'wp-autoplugin' );
+					} else {
+						$message .= ' ' . sprintf( __( 'The original plugin also could not be reactivated: %s', 'wp-autoplugin' ), $reactivated->get_error_message() );
+					}
 				}
 			}
-			( new Release_Repository() )->update_promotion( (int) $promotion['id'], [ 'status' => 'activation_failed', 'error_message' => $message, 'active_before' => $original_active ? 1 : 0, 'active_after' => 0 ] );
-			return new \WP_Error( 'promotion_activation_failed', $message );
+			return $this->activation_failed( $promotion, $message, $original_active );
 		}
 		$status = 'install_fork' === $promotion['mode'] ? 'switched' : 'activated';
 		( new Release_Repository() )->update_promotion( (int) $promotion['id'], [ 'status' => $status, 'error_message' => null, 'active_before' => $original_active ? 1 : 0, 'active_after' => 1, 'finished_at' => current_time( 'mysql', true ) ] );
 		return [ 'status' => $status, 'plugin_file' => $destination, 'active' => true, 'original_plugin_file' => $source ?: null, 'original_active' => false, 'side_effect_warning' => __( 'Activation and deactivation may have database or runtime side effects that file rollback cannot undo.', 'wp-autoplugin' ) ];
+	}
+
+	/** @return \WP_Error */
+	private function activation_failed( array $promotion, string $message, bool $original_active ) {
+		( new Release_Repository() )->update_promotion(
+			(int) $promotion['id'],
+			[
+				'status'        => 'activation_failed',
+				'error_message' => $message,
+				'active_before' => $original_active ? 1 : 0,
+				'active_after'  => 0,
+				'finished_at'   => current_time( 'mysql', true ),
+			]
+		);
+		return new \WP_Error( 'promotion_activation_failed', $message );
+	}
+
+	private function restore_active_plugin( string $source, string $destination ): bool {
+		$active = array_values( array_diff( (array) get_option( 'active_plugins', [] ), [ $destination ] ) );
+		if ( ! in_array( $source, $active, true ) ) {
+			$active[] = $source;
+		}
+		sort( $active );
+		update_option( 'active_plugins', $active );
+		wp_cache_delete( 'active_plugins', 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
+		return in_array( $source, (array) get_option( 'active_plugins', [] ), true );
 	}
 
 	/** @return array<string,mixed>|\WP_Error */

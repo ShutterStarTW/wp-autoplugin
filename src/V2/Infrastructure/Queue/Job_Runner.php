@@ -42,6 +42,26 @@ final class Job_Runner {
 		} else {
 			$jobs->update( $job_id, [ 'status' => 'running' ] );
 		}
+		$fatal_guard = true;
+		register_shutdown_function(
+			static function () use ( $job_id, &$fatal_guard ): void {
+				if ( ! $fatal_guard ) {
+					return;
+				}
+				$error = error_get_last();
+				if ( ! $error || ! in_array( $error['type'], [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR, E_RECOVERABLE_ERROR ], true ) ) {
+					return;
+				}
+				$repository = new Job_Repository();
+				$latest     = $repository->find( $job_id );
+				if ( ! $latest || ! in_array( $latest['status'], [ 'queued', 'running', 'retrying' ], true ) ) {
+					return;
+				}
+				$message = __( 'Background processing stopped because PHP encountered a fatal error. Check the PHP error log for details.', 'wp-autoplugin' );
+				$repository->update( $job_id, [ 'status' => 'failed', 'error_message' => $message, 'finished_at' => current_time( 'mysql', true ) ] );
+				$repository->event( $job_id, 'failed', $message, [], 'error' );
+			}
+		);
 
 		try {
 			/**
@@ -61,6 +81,7 @@ final class Job_Runner {
 				throw new \RuntimeException( __( 'No v2 orchestration adapter is registered for this task.', 'wp-autoplugin' ) );
 			}
 			if ( ! empty( $result['_continuation'] ) ) {
+				$fatal_guard = false;
 				return;
 			}
 
@@ -70,6 +91,7 @@ final class Job_Runner {
 				( new Code_Run_Repository() )->terminate_by_job( $job_id, 'cancelled' );
 				$jobs->update( $job_id, [ 'status' => 'cancelled', 'finished_at' => current_time( 'mysql', true ) ] );
 				$jobs->event( $job_id, 'cancelled', __( 'Job cancelled.', 'wp-autoplugin' ) );
+				$fatal_guard = false;
 				return;
 			}
 
@@ -96,6 +118,7 @@ final class Job_Runner {
 			}
 			$jobs->event( $job_id, 'completed', __( 'Job completed.', 'wp-autoplugin' ) );
 			do_action( 'wp_autoplugin_v2_job_completed', $jobs->find( $job_id ), $result );
+			$fatal_guard = false;
 		} catch ( \Throwable $error ) {
 			( new Agent_Run_Repository() )->terminate_by_job( $job_id, 'failed' );
 			( new Code_Run_Repository() )->terminate_by_job( $job_id, 'failed', $error->getMessage() );
@@ -108,6 +131,7 @@ final class Job_Runner {
 				]
 			);
 			$jobs->event( $job_id, 'failed', $error->getMessage(), [], 'error' );
+			$fatal_guard = false;
 		}
 	}
 }

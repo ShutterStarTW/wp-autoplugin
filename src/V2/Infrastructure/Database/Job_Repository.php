@@ -151,6 +151,21 @@ final class Job_Repository extends Repository {
 		return false;
 	}
 
+	/** @return array<int,array<string,mixed>> */
+	public function active_before( string $before ): array {
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE status IN (%s,%s,%s) AND updated_at <= %s ORDER BY id ASC',
+				'queued',
+				'running',
+				'retrying',
+				$before
+			),
+			ARRAY_A
+		);
+		return array_map( [ $this, 'hydrate' ], (array) $rows );
+	}
+
 	/** Whether a job participates in the mutually exclusive Code-work lock. */
 	public static function is_code_work( array $job ): bool {
 		return in_array( (string) ( $job['task'] ?? '' ), [ 'code', 'review_fix' ], true )
