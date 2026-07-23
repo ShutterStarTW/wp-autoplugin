@@ -1,6 +1,6 @@
 <?php
 
-use WP_Autoplugin\V2\Admin\Model_Settings;
+use WP_Autoplugin\V2\Admin\Settings;
 use WP_Autoplugin\V2\Domain\AI\Model_Catalog;
 use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Config;
@@ -185,7 +185,7 @@ final class ChatGPTProviderTest extends WP_UnitTestCase {
 		update_option( 'wp_autoplugin_v2_coder_model', 'chatgpt:gpt-5.6-terra', false );
 		update_option( 'wp_autoplugin_v2_coder_model_effort', 'max', false );
 
-		( new Model_Settings() )->register_settings();
+		( new Settings() )->register_settings();
 
 		$this->assertSame( 'chatgpt:gpt-5.6-terra', get_option( 'wp_autoplugin_coder_model' ) );
 		$this->assertSame( 'max', get_option( 'wp_autoplugin_coder_model_effort' ) );

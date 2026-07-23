@@ -1,339 +1,95 @@
 # WP-Autoplugin
 
-<p align="center">
-  <img src="https://wp-autoplugin.com/logo192.png" alt="WP-Autoplugin Logo" width="128">
-</p>
+WP-Autoplugin is a local-first WordPress development workspace that uses AI to plan, create, inspect, revise, review, package, and promote plugin changes.
 
-WP-Autoplugin is a free WordPress plugin that uses AI to assist in generating, fixing, and extending plugins on-demand. It enables users to quickly create functional plugins from simple descriptions, addressing specific needs without unnecessary bloat.
+Version 2 is a rewrite targeting WordPress 6.6+ and PHP 8.2+. The plugin now boots only the v2 application; the v1 workers, AJAX workflows, flow-specific admin pages, and simple/complex generation modes have been removed.
 
-## v2 development architecture
+## How v2 works
 
-The v2 codebase targets WordPress 6.6+ and PHP 8.2+. Its primary admin screen is a local-first React/TypeScript workspace backed by capability-checked REST resources and versioned custom tables. Planning and explanation requests run as durable jobs, and results and normalized usage are persisted.
+Every task lives in a durable workspace:
 
-Open workspaces are restored as IDE-style tabs when an administrator returns to the page. Closing a tab hides the workspace from the active tab set without deleting its project, revisions, jobs, or usage history.
+1. Choose a new plugin, installed plugin, or installed theme.
+2. Describe the task and generate a Plan.
+3. Generate Code into an immutable staged revision.
+4. Inspect source, diffs, history, and AI Review findings.
+5. Explicitly package, install, activate, fork, modify, or roll back supported plugin changes.
 
-Generated changes are represented as staged revisions. The current development build intentionally does not expose a promotion endpoint: target files remain unchanged until revision validation, diff approval, copy/in-place safeguards, and rollback are complete.
+AI output never writes directly to a target. Code is validated and staged first, and filesystem promotion remains an explicit administrator action with capability checks, conflict detection, and rollback records.
 
-Frontend sources live in `assets/v2/src`; distributable assets live in `assets/v2/build`. Run `npm run build` after installing the declared development packages when changing the TypeScript or SCSS sources.
+Closing a workspace tab is non-destructive. Projects, jobs, revisions, files, reviews, events, and usage remain available when the workspace is reopened.
 
-### Experimental ChatGPT Subscription provider
+## Admin settings
 
-Administrators can optionally connect one site-wide ChatGPT account from Settings using OpenAI's Codex device-authorization flow. This provider remains separate from the OpenAI API-key provider. Its verified models appear in the Settings Default, Planner, Coder, and Reviewer selectors as well as the matching v2 controls. The curated catalog uses collision-safe IDs: `chatgpt:gpt-5.6-sol`, `chatgpt:gpt-5.6-terra`, `chatgpt:gpt-5.6-luna`, `chatgpt:gpt-5.5`, `chatgpt:gpt-5.4`, and `chatgpt:gpt-5.4-mini`.
+The native v2 settings screen keeps the existing upgrade-compatible option names for:
 
-OAuth tokens are exchanged and refreshed only on the WordPress server, encrypted with AES-256-GCM using WordPress salts, and stored in a non-autoloaded option. Authentication uses `auth.openai.com`; model discovery and generation use `chatgpt.com/backend-api/codex`. The connected subscription's billing, workspace policy, availability, and usage limits apply. This integration follows [Codex authentication guidance](https://learn.chatgpt.com/docs/auth), but remains experimental because the account-backed backend is not documented as a supported third-party API and may change without notice.
+- OpenAI, Anthropic, Google Gemini, and xAI API keys
+- Default, Planner, Coder, and Reviewer model selection
+- per-role reasoning effort
+- custom OpenAI-compatible endpoints
+- the experimental ChatGPT Subscription connection
 
-- Generate plugins using AI
-- Fix and extend existing plugins
-- Full control over the generation process
-- Support for multiple AI models, and any OpenAI-compatible custom API
-- View the list of generated plugins for easy management
+The v1 simple/complex mode switch and AI Response Language option are intentionally not registered or shown in v2. Existing database rows for those retired options are left untouched and inert.
 
----
+## Providers and models
 
-WP-Autoplugin offers practical solutions for various WordPress development scenarios:
+Built-in model definitions are owned by the v2 model registry and remain filterable with `wp_autoplugin_models`. Supported direct transports include OpenAI, Anthropic, Google Gemini, xAI, and custom OpenAI-compatible endpoints. OpenAI and Anthropic models with the required capabilities can also use the native read-only source-agent tools.
 
-- **Lightweight Alternatives**: Create simple, focused plugins to replace large, feature-heavy plugins that may slow down your site or include unnecessary features and advertisements.
-- **Custom Solutions**: Develop site-specific plugins tailored to your unique requirements, eliminating the need for complex workarounds or multiple plugins.
-- **Developer Foundations**: Generate solid base plugins that developers can extend and build upon, streamlining the process of creating complex, custom plugins.
-- **Professional Multi-File Plugins**: Create sophisticated plugins with proper file structure, organization, and scalability using complex plugin mode.
+Administrators may optionally connect one site-wide ChatGPT account through the experimental Codex device-authorization flow. OAuth tokens are exchanged and refreshed on the WordPress server, encrypted at rest with WordPress salts, and never exposed through v2 REST resources. Subscription availability, billing, workspace policy, and usage limits apply.
 
-## Plugin Highlights
+API usage may be billed by the selected provider.
 
-- **Completely Free**: No premium version, no ads, no account required.
-- **Privacy-Focused**: No data collection or external communication (except for the AI API you choose).
-- **Flexible provider access**: Use your own API key, or connect ChatGPT experimentally for v2.
-- **Flexible AI Models**: Choose from a variety of AI models to suit your needs, or set up custom models.
-- **Use in Your Language**: The plugin is fully translatable and has built-in support for 10+ languages.
+## Safety model
 
-## How It Works
+- All v2 REST resources require `manage_options`.
+- Source inspection is bounded, read-only, and constrained to the selected target root.
+- API secrets never belong in jobs, events, revisions, usage, diagnostics, or browser bootstrap data.
+- Generated files are deterministic staged revisions, not direct AI writes.
+- Plugin package, install, activation, modification, and rollback actions require explicit approval and the relevant WordPress capabilities.
+- `DISALLOW_FILE_MODS` and multisite mutation restrictions are respected.
+- Markdown rendered in the workspace is sanitized before insertion into the DOM.
 
-1. **Describe Your Plugin**: Provide a description of the plugin you want to create.
-2. **AI Generation**: WP-Autoplugin uses AI to generate a development plan and write the code.
-3. **Review and Install**: Review the generated plan and code, make any necessary changes, and install the plugin with a single click.
+AI-generated code should still be reviewed and tested on a staging site before production use.
 
-You can also use WP-Autoplugin to **fix bugs**, **add new features**, or **explain plugins** you've created with the tool. The **Explain Plugin** feature allows you to ask questions or obtain general overviews of generated plugins, helping you better understand their functionality and structure.
+## Architecture
 
-## Complex Plugin Generation
+- `src/V2/` — PHP domain, infrastructure, orchestration, REST, release, and admin modules
+- `assets/v2/src/` — TypeScript/React and SCSS source
+- `assets/v2/build/` — committed production bundles, metadata, and RTL styles
+- `assets/v2/vendor/` — vendored browser-only Markdown rendering dependencies
+- `wp-autoplugin/v2` — REST namespace
+- `WP_Autoplugin\V2\Application` — runtime composition root
 
-WP-Autoplugin's complex plugin mode enables the creation of sophisticated, multi-file plugins with:
+Durable v2 records use additive, versioned custom tables. The bundled Action Scheduler runs queued jobs in the `wp-autoplugin` group.
 
-- **Proper File Structure**: Organized directories and file hierarchies
-- **Object-Oriented Design**: Well-structured classes and namespaces
-- **Scalable Architecture**: Plugins designed for growth and maintenance
-- **Professional Standards**: Code that follows WordPress development best practices
+The detailed architecture, lifecycle, schema, security invariants, implementation status, and verification checklist live in [`docs/V2.md`](docs/V2.md).
 
-<details>
-<summary>Click to view complex plugin generation screenshot</summary>
+## Development
 
-![Complex plugin generation interface](https://wp-autoplugin.com/screenshot-6.png)
+Install the declared PHP and Node dependencies, then use:
 
-</details>
+```sh
+npm run lint:js -- --no-fix
+npm run build
+find src/V2 -name '*.php' -print0 | xargs -0 -n1 php -l
+composer validate --strict --no-check-publish
+git diff --check
+```
 
-## Specialized Models Configuration
+Frontend changes must be made in `assets/v2/src/`. Commit the regenerated files in `assets/v2/build/`, including asset metadata and RTL CSS.
 
-Optimize your plugin generation workflow by assigning different AI models to specific tasks:
-
-- **Planner Model**: Handles plugin analysis and extension planning
-- **Coder Model**: Focuses on code generation and implementation
-- **Reviewer Model**: Provides code explanations and reviews
-
-This approach allows you to:
-- Use reasoning models for planning complex architectures
-- Employ fast, cost-effective models for simple coding tasks
-- Leverage specialized models for code review and explanations
-- Optimize both performance and API costs
-
-## Token Usage Tracking
-
-Monitor your API consumption with detailed usage information:
-- Real-time token count display during generation
-- Per-step token usage breakdown
-- Duration of each API request
-
-This helps you:
-- Control API costs effectively
-- Choose the most cost-efficient models for your needs
-- Understand the token impact of different generation modes
-
-<details>
-<summary>Click to view token usage information screenshot</summary>
-
-![Token usage information](https://wp-autoplugin.com/screenshot-7.png)
-
-</details>
-
-## Extend Third-Party Plugins and Themes with Hooks
-
-WP-Autoplugin allows you to easily extend **any plugin** or **theme** directly from the WordPress admin dashboard:
-
-- Click on the "**Extend Plugin**" action link for the plugin you'd like to enhance, or look for the "**Extend**" button on the Appearance > Themes page.
-- WP-Autoplugin will analyze the selected plugin or theme, extracting available action and filter hooks along with relevant contextual details.
-- Provide a description of the desired extension; WP-Autoplugin assesses the technical feasibility using available hooks.
-- A new extension plugin will be generated based on your description, allowing seamless integration with the existing functionality.
-
-Demo video: [Extend a third-party plugin with WP-Autoplugin](https://www.youtube.com/watch?v=_9RnFcEGncY)
-
-## Auto-detect Fatal Errors
-
-When you activate an AI-generated plugin, WP-Autoplugin will automatically detect fatal errors and deactivate the plugin to prevent site crashes. A message with the error details will be displayed, along with a link to fix the issue automatically with AI.
-
-## Supported Models
-
-WP-Autoplugin supports 30+ AI models, including:
-
-- Claude Opus 4.8
-- Claude Opus 4.7
-- Claude Opus 4.6
-- Claude Opus 4.5
-- Claude Sonnet 4.6
-- Claude Sonnet 4.5
-- Claude Haiku 4.5
-- o3
-- o3-pro
-- GPT-5.5
-- GPT-5.5 Pro
-- GPT-5.4
-- GPT-5.4 Pro
-- GPT-5.4 mini
-- GPT-5.4 nano
-- GPT-5 Pro
-- GPT-5
-- GPT-5 mini
-- GPT-5 nano
-- GPT-4.1
-- GPT-4.1 mini
-- GPT-4o
-- GPT-4o mini
-- Google Gemini 3.1 Pro Preview
-- Google Gemini 3.5 Flash
-- Google Gemini 3 Flash Preview
-- Google Gemini 3.1 Flash Lite
-- Google Gemini 2.5 Pro
-- Google Gemini 2.5 Flash
-- Google Gemini 2.5 Flash Lite
-- xAI Grok 4.3
-- xAI Grok 4.3 Latest
-- xAI Grok Latest
-- xAI Grok Build 0.1
-
-While WP-Autoplugin is free to use, API usage may be billed by your provider. ChatGPT Subscription requests use the connected account's subscription limits and workspace controls rather than an OpenAI API key.
-
-## Custom Models
-
-WP-Autoplugin supports custom models: you can plug in any OpenAI-compatible API by providing the endpoint URL, model name, and API key. This feature allows you to use any model you have access to, including locally hosted models, or custom models you've trained yourself.
-
-## BYOK (Bring Your Own Key)
-
-To use WP-Autoplugin, configure an API key from an AI provider or connect the experimental ChatGPT Subscription provider for v2. Provider credentials remain on your server and are not exposed to browsers.
-
-Some AI platforms currently offer free plans and include SOTA models, like **Gemini 2.5 Pro** through [Google AI Studio](https://aistudio.google.com/). Refer to the respective websites for pricing information.
-
-## AI-Generated Plugins
-
-Plugins created by WP-Autoplugin are standard WordPress plugins:
-
-- They function independently and will continue to work even if WP-Autoplugin is deactivated or deleted.
-- You can install them on other WordPress sites without WP-Autoplugin.
-- While WP-Autoplugin provides a convenient listing screen for generated plugins, they can also be managed from the standard WordPress Plugins screen.
-
-## Code Quality and Security
-
-WP-Autoplugin aims to generate code that adheres to WordPress coding standards. However, it's important to treat AI-generated code with the same caution you would apply to any third-party code. We strongly recommend:
-
-- Reviewing and testing all generated code before use in a production environment.
-- Conducting thorough testing on a staging site before deployment.
-- Considering a professional security audit for critical applications.
+Do not hand-edit generated bundles.
 
 ## Installation
 
-1. Download the latest release from the [Releases](https://github.com/WP-Autoplugin/wp-autoplugin/releases) page.
-2. Upload the plugin zip file through the 'Plugins' screen in WordPress, or unzip the file and upload the `wp-autoplugin` folder to the `/wp-content/plugins/` directory.
-3. Activate the plugin through the 'Plugins' screen in WordPress.
-4. Go to the WP-Autoplugin settings page and enter your API key(s).
-5. Choose your preferred AI model in the settings.
-6. Start generating plugins!
+1. Install and activate WP-Autoplugin.
+2. Open **WP-Autoplugin → Settings**.
+3. Configure at least one provider and select a default model.
+4. Open **WP-Autoplugin → Workspace** and create a project.
 
-## Screenshots
+## Privacy
 
-<details>
-<summary>Click to view screenshots</summary>
+WP-Autoplugin does not require a WP-Autoplugin account. Source and credentials remain on the WordPress site except for the task content sent to the configured AI provider. See `readme.txt` for the external-service disclosures.
 
-1. Generate plugin form
-![Generate plugin form](https://wp-autoplugin.com/screenshot-1.png)
+## License
 
-2. Review generated plan
-![Review generated plan](https://wp-autoplugin.com/screenshot-2.png)
-
-3. Review generated code
-![Review generated code](https://wp-autoplugin.com/screenshot-3.png)
-
-4. Autoplugins listing screen
-![Autoplugins listing screen](https://wp-autoplugin.com/screenshot-4.png)
-
-5. Fix plugin form
-![Fix plugin form](https://wp-autoplugin.com/screenshot-5.png)
-
-</details>
-
-Or watch the [WP-Autoplugin demo video on Youtube](https://www.youtube.com/watch?v=b36elwTLfa4) that shows how it generates a plugin and fixes a bug.
-
-## Translations
-
-WP-Autoplugin is fully translatable. If you would like to contribute a translation, please create a pull request with the translation files. Currently, the plugin includes translations for the following languages:
-- English - `en_US`
-- Français (French) - `fr_FR`
-- Español (Spanish) - `es_ES`
-- Deutsch (German) - `de_DE`
-- Português (Portuguese) - `pt_PT`
-- Italiano (Italian) - `it_IT`
-- Magyar (Hungarian) - `hu_HU`
-- Nederlands (Dutch) - `nl_NL`
-- Polski (Polish) - `pl_PL`
-- Türkçe (Turkish) - `tr_TR`
-- Русский (Russian) - `ru_RU`
-
-## Licensing
-
-WP-Autoplugin is licensed under the GPLv3 or later.
-
-## Changelog
-
-### 1.8.0
-- Updated translations (thanks ShutterStarTW)
-- New setting: AI output language (thanks ShutterStarTW)
-- Added support for new Google, Anthropic, OpenAI and xAI models
-
-### 1.7.1
-- Added support for new models across all providers
-
-### 1.7
-- Added image input support for OpenAI, Anthropic and Google models
-- Added support for Claude Sonnet 4.5-20250929 model
-- Added support for GPT-5-Codex model and the OpenAI Responses API
-
-### 1.6
-- Added complex plugin mode for multi-file plugin generation
-- Added specialized model settings to delegate tasks to specific AI models
-- Added detailed token usage tracking and display
-- Improved plugin generation architecture
-- Enhanced UI with better progress indicators
-
-### 1.5
-- Added Extend Themes feature to extend existing themes with hooks
-- Added support for new AI models
-
-### 1.4.3
-- Added support for Google Gemini 2.5 Pro model
-- Fixed minor UI issue in the Fix Plugin form
-- Improved code generation step for the Fix Plugin feature to avoid fatal errors
-
-### 1.4.2 
-- Added a "Copy Hooks" button to use the extracted hooks with any LLM
-- Added CMD/CTRL + Enter shortcut to submit the forms
-- Fixed minor UI issues
-
-### 1.4.1
-- Added option to change model at every step
-- Fixed minor issues with the Extend Plugin feature
-
-### 1.4
-- Analyze and extend any third-party plugin
-
-### 1.3
-- Added new Explain Plugin feature
-- Refactored admin-side PHP & JS codes
-- Added new Google models
-
-### 1.2.1
-- Added support for reasoning models (o1, o3-mini, Claude 3.7 Sonnet Thinking)
-- Fixed PHPCS issues throughout the codebase
-
-### 1.2
-- Added support for any OpenAI-compatible API with the custom models option
-- Added translations for 10 more languages
-- Fixed PHP notice on "Add New Plugin" screen.
-
-### 1.1.2
-- Added support for Google Gemini Flash 2.0 Thinking model
-- Added support for xAI Grok-2-1212 model
-
-### 1.1.1
-- Added support for Claude 3.5 Sonnet-20241022, Gemini 2.0 Flash Experimental, and Gemini Experimental 1206 models
-- Some refactoring and code cleanup
-
-### 1.1
-- Added support for Claude 3.5 Haiku
-- Added support for xAI and its only current model, Grok-beta
-- Fixed an issue that prevented the code from being edited in the code editor
-- Fixed wrong model name for "chatgpt-4o-latest"
-- Improved the generator prompt for better code generation on lower-end models
-- Improved inline documentation
-
-### 1.0.6
-- Fixed Github updater class
-- Fixed a few bugs
-- Added i18n support and Hungarian translation
-- Adjusted prompt for better code generation
-- Added docblocks to the code
-
-### 1.0.5
-- Added update from GitHub feature
-- Reorganized files and folders and added Composer support
-- Fixed small bugs
-
-### 1.0.4
-- Added support for Google Gemini models
-
-### 1.0.3
-- Added support for gpt-4o-2024-08-06
-- Cleaned up prompts for better readability
-
-### 1.0.2
-- Added support for GPT-4o mini
-- Added support for the high-limit (8192 tokens) version of Claude 3.5 Sonnet
-
-### 1.0.1
-- Fixed max_tokens value for OpenAI models
-
-### 1.0
-- Initial release
+GPL-2.0-or-later.

@@ -2,7 +2,6 @@
 
 namespace WP_Autoplugin\V2\Domain\AI;
 
-use WP_Autoplugin\Admin\Admin;
 use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Config;
 use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Model_Service;
 use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Token_Manager;
@@ -172,9 +171,9 @@ final class Model_Catalog {
 		$efforts     = Model_Effort::capabilities();
 		$matrix      = new Capability_Matrix();
 
-		foreach ( Admin::get_models() as $provider_label => $models ) {
+		foreach ( Model_Registry::all() as $provider_label => $models ) {
 			$provider = self::PROVIDERS[ $provider_label ] ?? null;
-			if ( ! $provider ) {
+			if ( ! $provider || ! is_array( $models ) ) {
 				continue;
 			}
 			$configured = '' !== (string) get_option( $provider['key_option'], '' );

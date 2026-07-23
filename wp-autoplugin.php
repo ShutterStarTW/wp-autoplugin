@@ -45,7 +45,6 @@ register_activation_hook( __FILE__, [ \WP_Autoplugin\V2\Infrastructure\Database\
  */
 function wp_autoplugin_init() {
 	load_plugin_textdomain( 'wp-autoplugin', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
-	$admin_pages = new \WP_Autoplugin\Admin\Admin();
 	$application = new \WP_Autoplugin\V2\Application();
 	$application->boot();
 }

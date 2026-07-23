@@ -16,9 +16,6 @@
     "autoload": {
         "psr-4": {
             "WP_Autoplugin\\V2\\": "src/V2/"
-        },
-        "classmap": [
-            "includes/"
-        ]
+        }
     }
 }

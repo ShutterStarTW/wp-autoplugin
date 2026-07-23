@@ -3,7 +3,10 @@
 namespace WP_Autoplugin\V2;
 
 use WP_Autoplugin\V2\Admin\Assets;
-use WP_Autoplugin\V2\Admin\Model_Settings;
+use WP_Autoplugin\V2\Admin\Menu;
+use WP_Autoplugin\V2\Admin\Settings;
+use WP_Autoplugin\V2\Admin\Settings_Assets;
+use WP_Autoplugin\V2\Admin\Updater;
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Queue\Job_Runner;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
@@ -27,8 +30,11 @@ final class Application {
 	public function boot(): void {
 		Installer::maybe_upgrade();
 
+		( new Menu() )->register();
 		( new Assets() )->register();
-		( new Model_Settings() )->register();
+		( new Settings() )->register();
+		( new Settings_Assets() )->register();
+		( new Updater() )->register();
 		( new Routes() )->register();
 		( new ChatGPT_Provider_Routes() )->register();
 		( new Source_Agent() )->register();

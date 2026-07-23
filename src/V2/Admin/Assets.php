@@ -17,8 +17,8 @@ final class Assets {
 			return;
 		}
 
-		wp_enqueue_script( 'wp-autoplugin-marked', WP_AUTOPLUGIN_URL . 'assets/admin/js/marked.min.js', [], WP_AUTOPLUGIN_VERSION, true );
-		wp_enqueue_script( 'wp-autoplugin-purify', WP_AUTOPLUGIN_URL . 'assets/admin/js/purify.min.js', [], WP_AUTOPLUGIN_VERSION, true );
+		wp_enqueue_script( 'wp-autoplugin-marked', WP_AUTOPLUGIN_URL . 'assets/v2/vendor/marked.min.js', [], WP_AUTOPLUGIN_VERSION, true );
+		wp_enqueue_script( 'wp-autoplugin-purify', WP_AUTOPLUGIN_URL . 'assets/v2/vendor/purify.min.js', [], WP_AUTOPLUGIN_VERSION, true );
 		$php_editor  = wp_enqueue_code_editor( [ 'type' => 'text/x-php' ] );
 		$js_editor   = wp_enqueue_code_editor( [ 'type' => 'text/javascript' ] );
 		$css_editor  = wp_enqueue_code_editor( [ 'type' => 'text/css' ] );
