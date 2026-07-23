@@ -8,7 +8,34 @@ namespace WP_Autoplugin\V2\Admin;
 final class Menu {
 	public function register(): void {
 		add_action( 'admin_menu', [ $this, 'add_pages' ] );
+		add_action( 'admin_head', [ $this, 'render_icon_style' ] );
 		add_filter( 'plugin_action_links_' . plugin_basename( WP_AUTOPLUGIN_DIR . 'wp-autoplugin.php' ), [ $this, 'add_action_links' ] );
+	}
+
+	/**
+	 * Render the decorative ring around the plugin's admin menu icon.
+	 */
+	public function render_icon_style(): void {
+		?>
+		<style id="wp-autoplugin-admin-menu-icon">
+			li.toplevel_page_wp-autoplugin .wp-menu-image::after {
+				content: "";
+				display: block;
+				width: 20px;
+				height: 20px;
+				border: 2px solid;
+				border-radius: 100px;
+				position: absolute;
+				top: 5px;
+				left: 6px;
+			}
+
+			li.toplevel_page_wp-autoplugin:not(.wp-menu-open) a:not(:hover) .wp-menu-image::after {
+				color: #a7aaad;
+				color: rgba(240, 246, 252, 0.6);
+			}
+		</style>
+		<?php
 	}
 
 	public function add_pages(): void {
