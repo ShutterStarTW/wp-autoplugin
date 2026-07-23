@@ -58,7 +58,6 @@ class ComposerStaticInit62b8c0a821dc44c3b86fc9def1bcbee9
         'WP_Autoplugin\\V2\\Application' => __DIR__ . '/../..' . '/src/V2/Application.php',
         'WP_Autoplugin\\V2\\Domain\\AI\\Capability_Matrix' => __DIR__ . '/../..' . '/src/V2/Domain/AI/Capability_Matrix.php',
         'WP_Autoplugin\\V2\\Domain\\Revision\\Version_Bumper' => __DIR__ . '/../..' . '/src/V2/Domain/Revision/Version_Bumper.php',
-        'WP_Autoplugin\\V2\\Domain\\Target\\Source_Reader' => __DIR__ . '/../..' . '/src/V2/Domain/Target/Source_Reader.php',
         'WP_Autoplugin\\V2\\Domain\\Target\\Target_Scanner' => __DIR__ . '/../..' . '/src/V2/Domain/Target/Target_Scanner.php',
         'WP_Autoplugin\\V2\\Infrastructure\\Database\\Installer' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Database/Installer.php',
         'WP_Autoplugin\\V2\\Infrastructure\\Database\\Job_Repository' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Database/Job_Repository.php',
@@ -68,7 +67,6 @@ class ComposerStaticInit62b8c0a821dc44c3b86fc9def1bcbee9
         'WP_Autoplugin\\V2\\Infrastructure\\Database\\Workspace_Repository' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Database/Workspace_Repository.php',
         'WP_Autoplugin\\V2\\Infrastructure\\Queue\\Job_Runner' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Queue/Job_Runner.php',
         'WP_Autoplugin\\V2\\Infrastructure\\Queue\\Queue' => __DIR__ . '/../..' . '/src/V2/Infrastructure/Queue/Queue.php',
-        'WP_Autoplugin\\V2\\Orchestration\\Legacy_Orchestrator' => __DIR__ . '/../..' . '/src/V2/Orchestration/Legacy_Orchestrator.php',
         'WP_Autoplugin\\V2\\Rest\\Routes' => __DIR__ . '/../..' . '/src/V2/Rest/Routes.php',
         'WP_Autoplugin\\XAI_API' => __DIR__ . '/../..' . '/includes/api/class-xai-api.php',
     );

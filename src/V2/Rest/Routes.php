@@ -680,26 +680,32 @@ final class Routes {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function update_plan( \WP_REST_Request $request ) {
-		$jobs = new Job_Repository();
-		$job  = $jobs->find( (int) $request['id'] );
-		if ( ! $job || ! $this->workspace_for_current_user( (int) $job['workspace_id'] ) ) {
+		$jobs      = new Job_Repository();
+		$job       = $jobs->find( (int) $request['id'] );
+		$workspace = $job ? $this->workspace_for_current_user( (int) $job['workspace_id'] ) : null;
+		if ( ! $job || ! $workspace ) {
 			return new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+		if ( ! $jobs->is_plan_artifact( $job ) ) {
+			return new \WP_Error( 'wp_autoplugin_plan_not_editable', __( 'Only completed plan artifacts can be edited.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+
+		$payload = $this->snapshot_job_models( 'plan_structure', [], $workspace );
+		if ( is_wp_error( $payload ) ) {
+			return $payload;
 		}
 
 		$successor = $jobs->create_plan_successor( $job, (string) $request['content'], get_current_user_id() );
 		if ( ! $successor ) {
 			return new \WP_Error( 'wp_autoplugin_plan_not_editable', __( 'Only completed plan artifacts can be edited.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
+		$payload['artifact_job_id'] = (int) $successor['id'];
 		$regeneration = null;
 		try {
-			$selection    = ( new Model_Catalog() )->selection( 'planner' );
 			$regeneration = $jobs->create(
 				(int) $successor['workspace_id'],
 				'plan_structure',
-				[
-					'artifact_job_id' => (int) $successor['id'],
-					'prompt_model'    => [ 'provider' => (string) ( $selection['provider'] ?? '' ), 'model' => (string) ( $selection['model'] ?? '' ), 'effort' => (string) ( $selection['effort'] ?? '' ) ],
-				],
+				$payload,
 				get_current_user_id()
 			);
 			$runner = ( new Queue() )->dispatch( (int) $regeneration['id'] );

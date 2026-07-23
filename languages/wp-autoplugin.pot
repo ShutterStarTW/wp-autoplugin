@@ -1986,7 +1986,6 @@ msgid "Code generation cancelled. No partial revision was created."
 msgstr ""
 
 #: src/V2/Orchestration/Direct_Planner.php:31
-#: src/V2/Orchestration/Legacy_Orchestrator.php:44
 #: src/V2/Orchestration/Source_Agent.php:42
 #: src/V2/Rest/Routes.php:404
 #: src/V2/Rest/Routes.php:439
@@ -2013,72 +2012,23 @@ msgid "A completed Plan artifact is required for this request."
 msgstr ""
 
 #: src/V2/Orchestration/Direct_Planner.php:193
-#: src/V2/Orchestration/Legacy_Orchestrator.php:444
 msgid "No earlier messages."
 msgstr ""
 
-#: src/V2/Orchestration/Legacy_Orchestrator.php:48
-msgid "This task requires the v2 staged-revision generator, which is not registered."
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:53
-msgid "This workspace stage does not support follow-up messages yet."
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:64
-msgid "Configure an API key and model for this task before starting the job."
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:77
-msgid "Sending a redacted task request to the selected provider."
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:103
-#: src/V2/Orchestration/Legacy_Orchestrator.php:323
-msgid "There is no source to explain for this target."
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:179
+#: src/V2/Orchestration/Source_Agent.php:362
 msgid "A completed Plan artifact is required to regenerate its file structure."
 msgstr ""
 
-#: src/V2/Orchestration/Legacy_Orchestrator.php:183
-#: src/V2/Orchestration/Legacy_Orchestrator.php:328
-msgid "No target source is available for this workspace."
+#: src/V2/Orchestration/Source_Agent.php:367
+msgid "The Plan artifact is empty and its file structure cannot be regenerated."
 msgstr ""
 
-#: src/V2/Orchestration/Legacy_Orchestrator.php:252
-msgid "The provider returned an invalid project structure. The Plan was not changed."
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:291
 #: assets/v2/build/index.tsx.js:18
 msgid "Implementation plan"
 msgstr ""
 
-#: src/V2/Orchestration/Legacy_Orchestrator.php:320
-#: src/V2/Orchestration/Source_Agent.php:303
+#: src/V2/Orchestration/Source_Agent.php:338
 msgid "A completed Plan artifact is required for this follow-up."
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:329
-msgid "current Plan artifact"
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:329
-msgid "current Explain context"
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:374
-msgid "The provider returned an invalid follow-up response. No artifact was changed."
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:379
-msgid "This stage cannot create a replacement artifact yet."
-msgstr ""
-
-#: src/V2/Orchestration/Legacy_Orchestrator.php:410
-msgid "No prior artifact is available."
 msgstr ""
 
 #: src/V2/Orchestration/Package_Orchestrator.php:25

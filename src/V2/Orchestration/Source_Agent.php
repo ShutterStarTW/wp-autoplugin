@@ -124,7 +124,17 @@ final class Source_Agent {
 			if ( $images && isset( $transcript[0] ) && 'user' === ( $transcript[0]['role'] ?? '' ) ) {
 				$transcript[0]['prompt_images'] = $images;
 			}
-			$response = $transport->send( $this->instructions( $run, $stage, 'conversation' === $job['task'], (string) $workspace['operation'] ), $transcript, $tools->definitions() );
+			$response = $transport->send(
+				$this->instructions(
+					$run,
+					$stage,
+					'conversation' === $job['task'],
+					(string) $workspace['operation'],
+					'plan_structure' === $job['task']
+				),
+				$transcript,
+				$tools->definitions()
+			);
 			if ( is_wp_error( $response ) ) {
 				return $this->provider_failure( $response, $job, $run, $token, $runs );
 			}
@@ -146,6 +156,15 @@ final class Source_Agent {
 					);
 					if ( is_wp_error( $task_result ) ) {
 						throw new \RuntimeException( $this->with_debug_response( $task_result->get_error_message(), $response ) );
+					}
+					if ( 'plan_structure' === $job['task'] ) {
+						$artifact = $this->plan_artifact( $workspace, $job );
+						$task_result['content']  = $artifact['content'];
+						$task_result['artifact'] = [
+							'type'          => 'plan',
+							'content'       => $artifact['content'],
+							'parent_job_id' => $artifact['id'],
+						];
 					}
 				} else {
 					$task_result = [ 'content' => (string) $response['content'], 'outcome' => 'answer' ];
@@ -249,7 +268,7 @@ final class Source_Agent {
 	}
 
 	/** @param array<string, mixed> $run */
-	private function instructions( array $run, string $stage, bool $follow_up, string $operation ): string {
+	private function instructions( array $run, string $stage, bool $follow_up, string $operation, bool $structure ): string {
 		$remaining_calls = max( 0, self::MAX_TOOL_CALLS - (int) $run['tool_calls'] );
 		$turn_limit      = min( self::MAX_TOOL_BATCH, $remaining_calls );
 		$remaining_bytes = max( 0, self::MAX_SOURCE_BYTES - (int) $run['source_bytes'] );
@@ -264,6 +283,14 @@ final class Source_Agent {
 		}
 
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+		if ( $structure ) {
+			if ( 'hook_extension' === $operation ) {
+				return 'You are regenerating validated structured metadata for an administrator-edited Plan for a separate WordPress extension plugin. This is read-only planning work. Preserve the supplied Plan Markdown exactly and never propose editing, deleting, replacing, or copying files inside the inspected target plugin or theme. ' . $runtime_constraints . ' Use the source tools only as needed to verify the relevant target hooks, call sites, arguments, timing, and technical feasibility. You may also use established WordPress core hooks and public APIs, but never invent a target hook. If the edited Plan is feasible without target changes, return a minimal non-empty file map containing only add actions relative to the implicit extension-plugin root. If infeasible, return empty hooks, directories, files, and main_file. Never write code, execute code, install, activate, modify files, or claim implementation occurred. When inspection is sufficient, return only one valid JSON object with no Markdown fence in this shape: {"outcome":"artifact","content":"the complete administrator-edited Plan in Markdown, unchanged","structured":{"technically_feasible":true,"plugin_name":"Name of the new extension plugin","main_file":"extension-plugin.php","hooks":["verified_target_hook_or_wordpress_core_hook"],"project_structure":{"directories":["relative/directory/"],"files":[{"path":"extension-plugin.php","type":"php","description":"brief purpose","action":"add"}]}}}. A feasible result requires a non-empty plugin_name, a root-level PHP main_file naming an exact file in the map, at least one hook, and at least one file. File type must be php, js, or css, paths must start directly at the extension-plugin root and be unique, and every action must be add. ' . $budget;
+			}
+
+			return 'You are regenerating the validated file map for an administrator-edited implementation Plan for an existing WordPress plugin or theme. This is read-only planning work. Preserve the supplied Plan Markdown exactly. ' . $runtime_constraints . ' Inspect the target only as needed to identify the minimal files that must be added, updated, or deleted to implement the edited Plan consistently with the current architecture. Prefer searches and targeted line-range reads. Never write code, change files, execute code, install, activate, or claim implementation occurred. When inspection is sufficient, return only one valid JSON object with no Markdown fence in this shape: {"outcome":"artifact","content":"the complete administrator-edited Plan in Markdown, unchanged","structured":{"project_structure":{"directories":["relative/directory/"],"files":[{"path":"relative/file.php","type":"php","description":"brief purpose","action":"update"}]}}}. Keep the structure minimal. File type must be php, js, or css; action must be add, update, or delete; paths must be relative to the target root and unique. ' . $budget;
+		}
+
 		$outcomes            = $follow_up
 			? 'For a question or ambiguity, return {"outcome":"answer","content":"concise Markdown answer"} and omit structured. Only when the administrator clearly requests a Plan change, use outcome "artifact" with the complete replacement Plan and file map.'
 			: 'The initial Plan must use outcome "artifact".';
@@ -294,6 +321,14 @@ final class Source_Agent {
 		if ( 'explain' === $stage ) {
 			return "Question:\n{$message}\n\nRecent Explain conversation:\n{$history}\n\nThe initial target inspection follows. Do not assume unshown file contents.\n\n{$bootstrap}";
 		}
+		if ( 'plan_structure' === $job['task'] ) {
+			$artifact = $this->plan_artifact( $workspace, $job );
+			$request   = trim( (string) $workspace['request'] );
+			$operation = (string) $workspace['operation'];
+			$prior     = (string) wp_json_encode( $artifact['structured'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+
+			return "Original workspace request:\n{$request}\n\nOperation:\n{$operation}\n\nAdministrator-edited Plan in Markdown:\n{$artifact['content']}\n\nPrior validated Plan metadata, for reference only:\n{$prior}\n\nThe initial target inspection follows. Do not assume unshown file contents.\n\n{$bootstrap}";
+		}
 
 		$artifact = '';
 		if ( 'conversation' === $job['task'] ) {
@@ -310,6 +345,33 @@ final class Source_Agent {
 		$current   = $artifact ? "\n\nCurrent Plan artifact:\n{$artifact}" : '';
 		$follow_up = 'conversation' === $job['task'] ? "\n\nAdministrator's new message:\n{$message}" : '';
 		return "Original workspace request:\n{$request}\n\nOperation:\n{$operation}{$current}\n\nRecent Plan conversation:\n{$history}{$follow_up}\n\nThe initial target inspection follows. Do not assume unshown file contents.\n\n{$bootstrap}";
+	}
+
+	/**
+	 * Resolve the immutable manually edited Plan that owns a structure job.
+	 *
+	 * @param array<string, mixed> $workspace Durable workspace.
+	 * @param array<string, mixed> $job       Structure-regeneration job.
+	 * @return array{id:int,content:string,structured:array<string, mixed>}
+	 */
+	private function plan_artifact( array $workspace, array $job ): array {
+		$artifact_id = (int) ( $job['payload']['artifact_job_id'] ?? 0 );
+		$jobs        = new Job_Repository();
+		$artifact    = $artifact_id ? $jobs->find( $artifact_id ) : null;
+		if ( ! $artifact || (int) $workspace['id'] !== (int) $artifact['workspace_id'] || ! $jobs->is_plan_artifact( $artifact ) ) {
+			throw new \RuntimeException( __( 'A completed Plan artifact is required to regenerate its file structure.', 'wp-autoplugin' ) );
+		}
+
+		$content = (string) ( $artifact['result']['artifact']['content'] ?? $artifact['result']['content'] ?? '' );
+		if ( '' === trim( $content ) ) {
+			throw new \RuntimeException( __( 'The Plan artifact is empty and its file structure cannot be regenerated.', 'wp-autoplugin' ) );
+		}
+
+		return [
+			'id'         => $artifact_id,
+			'content'    => $content,
+			'structured' => is_array( $artifact['result']['structured'] ?? null ) ? $artifact['result']['structured'] : [],
+		];
 	}
 
 	private function history( int $workspace_id, int $current_job_id, string $stage ): string {

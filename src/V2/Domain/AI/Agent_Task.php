@@ -9,8 +9,11 @@ final class Agent_Task {
 	/** @param array<string, mixed> $job */
 	public static function stage( array $job ): ?string {
 		$task = (string) ( $job['task'] ?? '' );
-		if ( in_array( $task, [ 'plan', 'explain' ], true ) ) {
-			return $task;
+		if ( in_array( $task, [ 'plan', 'plan_structure' ], true ) ) {
+			return 'plan';
+		}
+		if ( 'explain' === $task ) {
+			return 'explain';
 		}
 		if ( 'conversation' === $task ) {
 			$stage = (string) ( $job['payload']['stage'] ?? '' );

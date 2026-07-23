@@ -7,7 +7,6 @@ use WP_Autoplugin\V2\Admin\Model_Settings;
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Queue\Job_Runner;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
-use WP_Autoplugin\V2\Orchestration\Legacy_Orchestrator;
 use WP_Autoplugin\V2\Orchestration\Direct_Planner;
 use WP_Autoplugin\V2\Orchestration\Code_Orchestrator;
 use WP_Autoplugin\V2\Orchestration\Code_Follow_Up_Orchestrator;
@@ -39,7 +38,6 @@ final class Application {
 		( new Package_Orchestrator() )->register();
 		( new Promotion_Orchestrator() )->register();
 		( new Direct_Planner() )->register();
-		( new Legacy_Orchestrator() )->register();
 		( new Queue() )->register();
 		( new Job_Runner() )->register();
 	}
