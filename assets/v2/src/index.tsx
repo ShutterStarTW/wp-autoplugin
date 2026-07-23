@@ -3616,9 +3616,11 @@ function CodeStage( {
 			.find( ( job ) =>
 				[ 'queued', 'running', 'retrying' ].includes( job.status )
 			) ?? null;
-	const codeWorkJobs = [ ...codeJobs, ...conversationJobs ].sort(
-		( left, right ) => left.id - right.id
-	);
+	const codeWorkJobs = [
+		...codeJobs,
+		...conversationJobs,
+		...jobs.filter( ( job ) => job.task === 'review_fix' ),
+	].sort( ( left, right ) => left.id - right.id );
 	const activeCodeWork =
 		[ ...codeWorkJobs ]
 			.reverse()
