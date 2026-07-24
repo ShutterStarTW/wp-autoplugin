@@ -101,7 +101,9 @@ final class Settings_Page {
 					<input type="password" id="custom-model-api-key" placeholder="<?php esc_attr_e( 'API Key', 'wp-autoplugin' ); ?>" class="large-text" autocomplete="off">
 					<label class="screen-reader-text" for="custom-model-headers"><?php esc_html_e( 'Custom model headers', 'wp-autoplugin' ); ?></label>
 					<textarea id="custom-model-headers" placeholder="<?php esc_attr_e( 'Additional Headers (one per line, name=value)', 'wp-autoplugin' ); ?>" rows="4" class="large-text"></textarea>
-					<button type="button" id="add-custom-model" class="button"><?php esc_html_e( 'Add Custom Model', 'wp-autoplugin' ); ?></button>
+					<div class="wp-autoplugin-add-custom-model-action">
+						<button type="button" id="add-custom-model" class="button"><?php esc_html_e( 'Add Custom Model', 'wp-autoplugin' ); ?></button>
+					</div>
 				</div>
 				<input type="hidden" name="wp_autoplugin_custom_models" id="wp_autoplugin_custom_models" value="<?php echo esc_attr( wp_json_encode( $custom_models ) ); ?>">
 
