@@ -31,7 +31,7 @@ final class Settings_Page {
 				<h2><?php esc_html_e( 'AI Providers', 'wp-autoplugin' ); ?></h2>
 				<p><?php esc_html_e( 'Configure at least one provider used by your selected models.', 'wp-autoplugin' ); ?></p>
 				<table class="form-table" role="presentation">
-					<?php $this->render_secret_row( 'wp_autoplugin_openai_api_key', __( 'OpenAI API Key', 'wp-autoplugin' ) ); ?>
+					<?php $this->render_secret_row( 'wp_autoplugin_openai_api_key', __( 'OpenAI API Key', 'wp-autoplugin' ), 'openai' ); ?>
 					<tr id="wp-autoplugin-chatgpt-provider" data-model-synced-at="<?php echo esc_attr( (string) $model_state['last_synced_at'] ); ?>">
 						<th scope="row"><?php esc_html_e( 'ChatGPT Subscription (experimental)', 'wp-autoplugin' ); ?></th>
 						<td>
@@ -51,9 +51,9 @@ final class Settings_Page {
 							<p class="description wp-autoplugin-chatgpt-notice" role="status" hidden></p>
 						</td>
 					</tr>
-					<?php $this->render_secret_row( 'wp_autoplugin_anthropic_api_key', __( 'Anthropic API Key', 'wp-autoplugin' ) ); ?>
-					<?php $this->render_secret_row( 'wp_autoplugin_google_api_key', __( 'Google Gemini API Key', 'wp-autoplugin' ) ); ?>
-					<?php $this->render_secret_row( 'wp_autoplugin_xai_api_key', __( 'xAI API Key', 'wp-autoplugin' ) ); ?>
+					<?php $this->render_secret_row( 'wp_autoplugin_anthropic_api_key', __( 'Anthropic API Key', 'wp-autoplugin' ), 'anthropic' ); ?>
+					<?php $this->render_secret_row( 'wp_autoplugin_google_api_key', __( 'Google Gemini API Key', 'wp-autoplugin' ), 'google' ); ?>
+					<?php $this->render_secret_row( 'wp_autoplugin_xai_api_key', __( 'xAI API Key', 'wp-autoplugin' ), 'xai' ); ?>
 				</table>
 
 				<h2><?php esc_html_e( 'Models', 'wp-autoplugin' ); ?></h2>
@@ -111,11 +111,16 @@ final class Settings_Page {
 		<?php
 	}
 
-	private function render_secret_row( string $option, string $label ): void {
+	private function render_secret_row( string $option, string $label, string $provider ): void {
 		?>
 		<tr>
 			<th scope="row"><label for="<?php echo esc_attr( $option ); ?>"><?php echo esc_html( $label ); ?></label></th>
-			<td><input type="password" name="<?php echo esc_attr( $option ); ?>" id="<?php echo esc_attr( $option ); ?>" value="<?php echo esc_attr( (string) get_option( $option, '' ) ); ?>" class="regular-text" autocomplete="off"></td>
+			<td>
+				<div class="wp-autoplugin-api-key-field">
+					<input type="password" name="<?php echo esc_attr( $option ); ?>" id="<?php echo esc_attr( $option ); ?>" value="<?php echo esc_attr( (string) get_option( $option, '' ) ); ?>" class="regular-text" autocomplete="off">
+					<button type="button" class="button wp-autoplugin-test-api-key" data-provider="<?php echo esc_attr( $provider ); ?>" aria-live="polite"><?php esc_html_e( 'Test', 'wp-autoplugin' ); ?></button>
+				</div>
+			</td>
 		</tr>
 		<?php
 	}

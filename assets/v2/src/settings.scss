@@ -45,6 +45,34 @@
 		gap: 8px;
 	}
 
+	.wp-autoplugin-api-key-field {
+		align-items: flex-start;
+		display: flex;
+		gap: 8px;
+		max-width: 640px;
+
+		.regular-text {
+			flex: 1 1 auto;
+			max-width: none;
+		}
+
+		.button {
+			flex: 0 0 auto;
+		}
+
+		.is-success {
+			border-color: #008a20;
+			color: #008a20;
+			font-weight: 600;
+		}
+
+		.is-error {
+			border-color: #b32d2e;
+			color: #b32d2e;
+			font-weight: 600;
+		}
+	}
+
 	.wp-autoplugin-model-effort {
 		align-items: center;
 		display: inline-flex;

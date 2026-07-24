@@ -28,6 +28,9 @@ type SettingsStrings = {
 	remove: string;
 	fillOutFields: string;
 	removeModel: string;
+	testing: string;
+	testOk: string;
+	testFail: string;
 	connected: string;
 	disconnected: string;
 	waiting: string;
@@ -42,6 +45,7 @@ type SettingsStrings = {
 };
 
 type SettingsConfig = {
+	apiKeyTestPath: string;
 	chatgptPath: string;
 	effortCapabilities: Record< string, EffortCapability >;
 	selectedEfforts: Record< string, string >;
@@ -87,8 +91,67 @@ const config = window.wpAutopluginV2Settings;
 
 if ( config ) {
 	initializeModelSettings( config );
+	initializeApiKeyTests( config );
 	initializeCustomModels( config );
 	initializeChatGPT( config );
+}
+
+function initializeApiKeyTests( settings: SettingsConfig ) {
+	document
+		.querySelectorAll< HTMLButtonElement >( '.wp-autoplugin-test-api-key' )
+		.forEach( ( button ) => {
+			const field = button.closest< HTMLElement >(
+				'.wp-autoplugin-api-key-field'
+			);
+			const input = field?.querySelector< HTMLInputElement >( 'input' );
+			const provider = button.dataset.provider || '';
+			const originalText = button.textContent || 'Test';
+			let resetTimer: number | undefined;
+
+			const setTemporaryState = ( text: string, className: string ) => {
+				button.classList.remove( 'is-success', 'is-error' );
+				button.classList.add( className );
+				button.disabled = false;
+				button.textContent = text;
+				resetTimer = window.setTimeout( () => {
+					button.classList.remove( 'is-success', 'is-error' );
+					button.textContent = originalText;
+				}, 3000 );
+			};
+
+			button.addEventListener( 'click', async () => {
+				const apiKey = input?.value.trim() || '';
+				if ( resetTimer !== undefined ) {
+					window.clearTimeout( resetTimer );
+				}
+				button.classList.remove( 'is-success', 'is-error' );
+
+				if ( ! apiKey || ! provider ) {
+					setTemporaryState( settings.strings.testFail, 'is-error' );
+					return;
+				}
+
+				button.disabled = true;
+				button.textContent = settings.strings.testing;
+				try {
+					const response = await apiFetch< { valid: boolean } >( {
+						path: `${
+							settings.apiKeyTestPath
+						}/${ encodeURIComponent( provider ) }/api-key/test`,
+						method: 'POST',
+						data: { api_key: apiKey },
+					} );
+					setTemporaryState(
+						response.valid
+							? settings.strings.testOk
+							: settings.strings.testFail,
+						response.valid ? 'is-success' : 'is-error'
+					);
+				} catch {
+					setTemporaryState( settings.strings.testFail, 'is-error' );
+				}
+			} );
+		} );
 }
 
 function initializeModelSettings( settings: SettingsConfig ) {

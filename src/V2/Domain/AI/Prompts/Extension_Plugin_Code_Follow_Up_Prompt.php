@@ -5,7 +5,7 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Versioned Code follow-ups for a staged extension plugin. */
 final class Extension_Plugin_Code_Follow_Up_Prompt {
 	public const SLUG    = 'extension-plugin-code-follow-up';
-	public const VERSION = 1;
+	public const VERSION = 2;
 
 	public function analysis_instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
@@ -48,7 +48,7 @@ PROMPT;
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
 
 		return <<<PROMPT
-Generate one complete file for a staged WordPress extension plugin change. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","content":"complete file contents"}. Do not use Markdown fences. The path must match exactly. Preserve established extension conventions and implement the supplied instruction. The output must be a complete non-empty PHP, JavaScript, or CSS file under 64 KiB. PHP must parse without execution. The desired extension main file must contain exactly one Plugin Name header; supporting PHP files must contain none. Never write or reproduce a file from the inspected target plugin or theme.
+Generate one complete file for a staged WordPress extension plugin change. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","content":"complete file contents"}. Do not use Markdown fences. The path must match exactly. Preserve established extension conventions and implement the supplied instruction. The output must be a complete non-empty PHP, JavaScript, or CSS file under 64 KiB. PHP must parse without execution. The desired extension main file must contain exactly one Plugin Name header and the exact header `Author: WP-Autoplugin`; supporting PHP files must contain none. Never write or reproduce a file from the inspected target plugin or theme.
 
 $runtime_constraints
 PROMPT;

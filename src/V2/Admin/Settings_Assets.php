@@ -55,6 +55,7 @@ final class Settings_Assets {
 		}
 
 		return [
+			'apiKeyTestPath'     => '/wp-autoplugin/v2/providers',
 			'chatgptPath'        => '/wp-autoplugin/v2/providers/chatgpt',
 			'effortCapabilities' => Model_Effort::capabilities(),
 			'selectedEfforts'    => $selected_efforts,
@@ -81,6 +82,9 @@ final class Settings_Assets {
 				'remove'            => __( 'Remove', 'wp-autoplugin' ),
 				'fillOutFields'     => __( 'Please enter a unique model name, endpoint URL, and API key.', 'wp-autoplugin' ),
 				'removeModel'       => __( 'Are you sure you want to remove this model?', 'wp-autoplugin' ),
+				'testing'           => __( 'Testing…', 'wp-autoplugin' ),
+				'testOk'            => __( 'OK', 'wp-autoplugin' ),
+				'testFail'          => __( 'Failed', 'wp-autoplugin' ),
 				'connected'         => __( 'Connected', 'wp-autoplugin' ),
 				'disconnected'      => __( 'Not connected', 'wp-autoplugin' ),
 				'waiting'           => __( 'Waiting for authorization…', 'wp-autoplugin' ),

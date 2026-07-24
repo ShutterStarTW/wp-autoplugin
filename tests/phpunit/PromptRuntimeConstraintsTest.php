@@ -54,6 +54,19 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_complete_plugin_code_prompts_require_wp_autoplugin_author(): void {
+		$prompts = [
+			( new New_Plugin_Code_Prompt() )->instructions(),
+			( new Extension_Plugin_Code_Prompt() )->instructions(),
+			( new New_Plugin_Code_Follow_Up_Prompt() )->file_instructions(),
+			( new Extension_Plugin_Code_Follow_Up_Prompt() )->file_instructions(),
+		];
+
+		foreach ( $prompts as $prompt ) {
+			$this->assertStringContainsString( 'Author: WP-Autoplugin', $prompt );
+		}
+	}
+
 	public function test_source_aware_planners_include_runtime_constraints(): void {
 		$method = new ReflectionMethod( Source_Agent::class, 'instructions' );
 		$method->setAccessible( true );

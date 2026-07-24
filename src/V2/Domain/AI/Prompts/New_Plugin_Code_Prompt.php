@@ -5,13 +5,13 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Builds one bounded, versioned prompt for each planned source file. */
 final class New_Plugin_Code_Prompt {
 	public const SLUG    = 'new-plugin-code';
-	public const VERSION = 2;
+	public const VERSION = 3;
 
 	public function instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
 
 		return <<<PROMPT
-You are implementing one file in a new WordPress plugin from an approved Plan. Return the complete production-ready file, not a patch. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. Do not create behavior or files outside the supplied Plan. Previously generated files are authoritative project context. The main plugin file must contain exactly one valid Plugin Name header; supporting PHP files must not contain a Plugin Name header.
+You are implementing one file in a new WordPress plugin from an approved Plan. Return the complete production-ready file, not a patch. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. Do not create behavior or files outside the supplied Plan. Previously generated files are authoritative project context. The main plugin file must contain exactly one valid Plugin Name header and the exact header `Author: WP-Autoplugin`; supporting PHP files must not contain a Plugin Name header.
 
 $runtime_constraints
 
