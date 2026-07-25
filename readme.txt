@@ -19,6 +19,7 @@ WP-Autoplugin v2 is a durable WordPress development workspace for new plugins an
 
 * Durable projects, workspace tabs, jobs, events, revisions, reviews, and usage records.
 * AI planning, source inspection, code generation, follow-up changes, and explanations.
+* Automatic root-level AGENTS.md project guidance across every AI stage for installed-plugin work.
 * Immutable staged revisions with source, diff, history, manual editing, and restore tools.
 * Structured AI Review reports and finding-resolution workflows.
 * Explicit plugin packaging, installation, activation, forks, direct modification, and rollback where supported.
@@ -97,6 +98,7 @@ Custom OpenAI-compatible endpoints are governed by the administrator's chosen se
 * Removed v1 flow pages, AJAX workers, provider adapters, admin assets, simple/complex generation mode, and AI Response Language registration.
 * Added durable Plan, Code, Review, Explain, revision, package, promotion, and rollback workflows.
 * Added native read-only source agents for supported models.
+* Added bounded root-level AGENTS.md instructions for installed-plugin projects.
 * Added v2 settings assets and Settings API persistence for credentials, model roles, effort, custom endpoints, and the experimental ChatGPT Subscription provider.
 
 == License ==

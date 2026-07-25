@@ -2,16 +2,21 @@
 
 namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 
+use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
+
 /** Versioned questions and staged A/M/D follow-ups for an installed target. */
 final class Existing_Target_Code_Follow_Up_Prompt {
 	public const SLUG    = 'existing-target-code-follow-up';
-	public const VERSION = 1;
+	public const VERSION = 2;
 
 	public function analysis_instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+		$plugin_instructions = Plugin_Instructions::prompt_policy();
 
 		return <<<PROMPT
 You are the coding agent for a staged, target-relative WordPress plugin or theme change set. Classify the administrator's newest message as either a question about the effective staged code or a concrete request to change the staged Add/Update/Delete set.
+
+$plugin_instructions
 
 $runtime_constraints
 
@@ -48,9 +53,12 @@ PROMPT;
 
 	public function file_instructions( string $operation ): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+		$plugin_instructions = Plugin_Instructions::prompt_policy();
 		if ( 'update' === $operation ) {
 			return <<<PROMPT
 Implement one bounded update to a staged WordPress target file. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","replacements":[{"search":"exact existing block","replace":"replacement block"}]}. Return 1-20 unique, non-overlapping exact replacements and no Markdown fences. Each search must occur exactly once in the supplied effective source. Do not replace the whole file. Preserve all unrelated source. PHP must remain parseable without execution. Never modify any other path.
+
+$plugin_instructions
 
 $runtime_constraints
 PROMPT;
@@ -58,6 +66,8 @@ PROMPT;
 
 		return <<<PROMPT
 Generate one complete new file for a staged WordPress target change. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","content":"complete file contents"}. Do not use Markdown fences. The path must match exactly. The output must be a complete non-empty PHP, JavaScript, or CSS file under 64 KiB. PHP must parse without execution. A supporting PHP file in a plugin target must not contain a Plugin Name header. Never modify any other target path.
+
+$plugin_instructions
 
 $runtime_constraints
 PROMPT;

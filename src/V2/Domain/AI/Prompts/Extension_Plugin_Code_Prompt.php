@@ -2,16 +2,21 @@
 
 namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 
+use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
+
 /** Builds one bounded prompt for each file in a separate hook-based extension plugin. */
 final class Extension_Plugin_Code_Prompt {
 	public const SLUG    = 'extension-plugin-code';
-	public const VERSION = 3;
+	public const VERSION = 4;
 
 	public function instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
+		$plugin_instructions = Plugin_Instructions::prompt_policy();
 
 		return <<<PROMPT
-You are implementing one file in a new WordPress extension plugin from an approved, source-verified Plan. Return the complete production-ready file, not a patch. The extension must integrate through the hooks and public APIs described by the Plan and must never copy, edit, replace, or delete files in the inspected target plugin or theme. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. Do not create behavior or files outside the supplied Plan. Previously generated files are authoritative extension-plugin context. The main extension file must contain exactly one valid Plugin Name header and the exact header `Author: WP-Autoplugin`; supporting PHP files must not contain a Plugin Name header.
+You are implementing one file in a new WordPress extension plugin from an approved, source-verified Plan. Return the complete production-ready file, not a patch. The extension must integrate through the hooks and public APIs described by the Plan and must never copy, edit, replace, or delete files in the inspected target plugin or theme. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. Do not create behavior or files outside the supplied Plan. Previously generated files are authoritative extension-plugin context. The main extension file must contain exactly one valid Plugin Name header and the exact header `Author: WP-Autoplugin`; supporting PHP files must contain none.
+
+$plugin_instructions
 
 $runtime_constraints
 

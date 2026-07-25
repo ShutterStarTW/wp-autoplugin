@@ -243,8 +243,20 @@ final class Review_Orchestrator {
 				return new \WP_Error( 'review_target_unavailable', __( 'The installed target could not be read safely for Review.', 'wp-autoplugin' ) );
 			}
 		}
+		$root_plugin_instructions = null;
+		if ( 'plugin' === ( $workspace['target_kind'] ?? '' ) ) {
+			try {
+				$instructions = ( new Source_Tools( (array) $workspace['target_metadata'] ) )->plugin_instructions();
+				if ( $instructions ) {
+					$root_plugin_instructions = [ 'path' => $instructions['path'], 'content' => $instructions['content'] ];
+				}
+			} catch ( \Throwable $error ) {
+				return new \WP_Error( 'review_plugin_instructions_unavailable', $error->getMessage() );
+			}
+		}
 		return [
 			'workspace' => [ 'id' => (int) $workspace['id'], 'request' => (string) $workspace['request'], 'operation' => (string) $workspace['operation'], 'target_kind' => (string) $workspace['target_kind'], 'target_ref' => (string) $workspace['target_ref'], 'target_name' => (string) ( $workspace['target_metadata']['name'] ?? $workspace['project_name'] ?? '' ) ],
+			'root_plugin_instructions' => $root_plugin_instructions,
 			'plan' => [ 'job_id' => (int) ( $plan['id'] ?? 0 ), 'content' => (string) ( $plan['result']['artifact']['content'] ?? $plan['result']['content'] ?? '' ), 'structured' => (array) ( $plan['result']['structured'] ?? [] ) ],
 			'revision' => [ 'id' => (int) $revision['id'], 'number' => (int) $revision['revision_number'], 'parent_revision_id' => $revision['parent_revision_id'], 'manifest' => $revision['project_manifest'], 'files' => $files, 'parent_changes' => $this->parent_changes( $parent_revision, $revision ), 'target_tree' => $target_tree ],
 			'previous_report' => $parent ? [ 'id' => (int) $parent['id'], 'revision_id' => (int) $parent['revision_id'], 'verdict' => $parent['verdict'], 'summary' => $parent['summary'], 'tests' => $parent['tests'] ] : null,

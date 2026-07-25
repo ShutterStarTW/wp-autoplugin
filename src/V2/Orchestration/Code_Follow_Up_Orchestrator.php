@@ -340,7 +340,10 @@ final class Code_Follow_Up_Orchestrator {
 		$message  = (string) $job['payload']['message'];
 		$feedback = (int) $run['retry_count'] ? substr( (string) $run['last_error'], 0, 500 ) : '';
 		$plan     = $this->plan_content( (int) $base['plan_job_id'] );
-		$target   = $this->target_metadata( $workspace );
+		$target   = $this->target_metadata( $workspace, (array) $base['project_manifest'] );
+		if ( is_wp_error( $target ) ) {
+			return $target;
+		}
 		if ( 'changes' === ( $base['project_manifest']['scope'] ?? '' ) ) {
 			$context = $this->target_analysis_context( $job, $workspace, $base );
 			if ( is_wp_error( $context ) ) {
@@ -386,7 +389,10 @@ final class Code_Follow_Up_Orchestrator {
 	/** @return array{instructions:string,input:string,current_content:string}|\WP_Error */
 	private function file_prompt( array $job, array $workspace, array $base, array $run, array $run_files, array $current, array $feedback ) {
 		$plan   = $this->plan_content( (int) $base['plan_job_id'] );
-		$target = $this->target_metadata( $workspace );
+		$target = $this->target_metadata( $workspace, (array) $run['target_manifest'] );
+		if ( is_wp_error( $target ) ) {
+			return $target;
+		}
 		if ( 'changes' === ( $run['target_manifest']['scope'] ?? '' ) ) {
 			$context = $this->change_file_context( $workspace, $base, $run, $run_files );
 			if ( is_wp_error( $context ) ) {
@@ -621,9 +627,28 @@ final class Code_Follow_Up_Orchestrator {
 		return (string) ( $plan['result']['artifact']['content'] ?? $plan['result']['content'] ?? '' );
 	}
 
-	/** @return array<string,mixed> */
-	private function target_metadata( array $workspace ): array {
-		return array_intersect_key( (array) ( $workspace['target_metadata'] ?? [] ), array_flip( [ 'kind', 'ref', 'name', 'version', 'author', 'description', 'active', 'source_files', 'lines', 'tokens', 'hooks' ] ) );
+	/** @return array<string,mixed>|\WP_Error */
+	private function target_metadata( array $workspace, array $manifest ) {
+		$target = array_intersect_key( (array) ( $workspace['target_metadata'] ?? [] ), array_flip( [ 'kind', 'ref', 'name', 'version', 'author', 'description', 'active', 'source_files', 'lines', 'tokens', 'hooks' ] ) );
+		if ( 'plugin' !== ( $workspace['target_kind'] ?? '' ) ) {
+			return $target;
+		}
+		try {
+			$tools    = new Source_Tools( (array) $workspace['target_metadata'] );
+			$expected = 'changes' === ( $manifest['scope'] ?? '' )
+				? (string) ( $manifest['target_fingerprint'] ?? '' )
+				: (string) ( $manifest['integration_target_fingerprint'] ?? '' );
+			if ( '' !== $expected && ! hash_equals( $expected, $tools->tree_fingerprint() ) ) {
+				return $this->target_changed();
+			}
+			$instructions = $tools->plugin_instructions();
+		} catch ( \Throwable $error ) {
+			return new \WP_Error( 'code_plugin_instructions_unavailable', $error->getMessage(), [ 'retryable' => false, 'ambiguous' => false ] );
+		}
+		if ( $instructions ) {
+			$target['root_plugin_instructions'] = [ 'path' => $instructions['path'], 'content' => $instructions['content'] ];
+		}
+		return $target;
 	}
 
 	/** @return array{slug:string,version:int} */

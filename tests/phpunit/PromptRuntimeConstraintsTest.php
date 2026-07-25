@@ -7,7 +7,9 @@ use WP_Autoplugin\V2\Domain\AI\Prompts\Extension_Plugin_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Code_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Plan_Prompt;
+use WP_Autoplugin\V2\Domain\AI\Prompts\Review_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\WordPress_Runtime_Constraints;
+use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
 use WP_Autoplugin\V2\Orchestration\Source_Agent;
 
 /** Ensures all active v2 Plan and Code prompts share the deployment constraints. */
@@ -73,8 +75,29 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		$run = [ 'tool_calls' => 0, 'source_bytes' => 0 ];
 
 		foreach ( [ 'modify', 'hook_extension' ] as $operation ) {
-			$prompt = $method->invoke( new Source_Agent(), $run, 'plan', false, $operation );
+			$prompt = $method->invoke( new Source_Agent(), $run, 'plan', false, $operation, false );
 			$this->assertStringContainsString( WordPress_Runtime_Constraints::instructions(), $prompt );
+		}
+	}
+
+	public function test_source_aware_prompts_apply_root_plugin_instructions_policy(): void {
+		$method = new ReflectionMethod( Source_Agent::class, 'instructions' );
+		$method->setAccessible( true );
+		$run     = [ 'tool_calls' => 0, 'source_bytes' => 0 ];
+		$prompts = [
+			$method->invoke( new Source_Agent(), $run, 'explain', false, 'modify', false ),
+			$method->invoke( new Source_Agent(), $run, 'plan', false, 'modify', false ),
+			( new Existing_Target_Code_Prompt() )->instructions( 'update' ),
+			( new Extension_Plugin_Code_Prompt() )->instructions(),
+			( new Existing_Target_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Existing_Target_Code_Follow_Up_Prompt() )->file_instructions( 'add' ),
+			( new Extension_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Extension_Plugin_Code_Follow_Up_Prompt() )->file_instructions(),
+			( new Review_Prompt() )->instructions( false, false ),
+		];
+
+		foreach ( $prompts as $prompt ) {
+			$this->assertStringContainsString( Plugin_Instructions::prompt_policy(), $prompt );
 		}
 	}
 }

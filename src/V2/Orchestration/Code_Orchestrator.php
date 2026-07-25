@@ -175,9 +175,14 @@ final class Code_Orchestrator {
 			}
 		}
 		$prompt   = $this->prompt( $workspace, (string) $current['operation'] );
+		$input    = $this->prompt_input( $prompt['instance'], $workspace, $plan, $manifest, $current, $source, $generated, $feedback );
+		if ( is_wp_error( $input ) ) {
+			$runs->release( (int) $run['id'], $token );
+			return $input;
+		}
 		$response = $transport->complete(
 			$prompt['instructions'],
-			$this->prompt_input( $prompt['instance'], $workspace, $plan, $manifest, $current, $source, $generated, $feedback ),
+			$input,
 			[ 'max_output_tokens' => 16384, 'json' => true ]
 		);
 
@@ -307,10 +312,18 @@ final class Code_Orchestrator {
 		return [ 'instance' => $instance, 'instructions' => $instructions ];
 	}
 
-	private function prompt_input( object $prompt, array $workspace, array $plan, array $manifest, array $current, array $source, array $generated, array $feedback ): string {
+	/** @return string|\WP_Error */
+	private function prompt_input( object $prompt, array $workspace, array $plan, array $manifest, array $current, array $source, array $generated, array $feedback ) {
 		$request = (string) $workspace['request'];
 		$content = $this->plan_content( $plan );
 		$target  = array_intersect_key( (array) $workspace['target_metadata'], array_flip( [ 'kind', 'ref', 'name', 'version', 'author', 'description', 'active', 'source_files', 'lines', 'tokens', 'hooks' ] ) );
+		$instructions = $this->plugin_instructions( $workspace, $manifest );
+		if ( is_wp_error( $instructions ) ) {
+			return $instructions;
+		}
+		if ( $instructions ) {
+			$target['root_plugin_instructions'] = [ 'path' => $instructions['path'], 'content' => $instructions['content'] ];
+		}
 		$current = [ 'path' => $current['path'], 'type' => $current['type'], 'description' => $current['description'], 'operation' => $current['operation'] ];
 		if ( $prompt instanceof Existing_Target_Code_Prompt ) {
 			return $prompt->input( $request, $content, $target, $manifest, $current, (array) ( $source['source_files'] ?? [] ), $generated, $feedback );
@@ -319,6 +332,25 @@ final class Code_Orchestrator {
 			return $prompt->input( $request, $content, $target, $manifest, $current, $generated, $feedback );
 		}
 		return $prompt->input( $request, $content, [ 'main_file' => $manifest['main_file'], 'files' => $manifest['files'] ], $current, $generated, $feedback );
+	}
+
+	/** @return array{path:string,content:string,bytes:int,content_hash:string}|null|\WP_Error */
+	private function plugin_instructions( array $workspace, array $manifest ) {
+		if ( 'plugin' !== ( $workspace['target_kind'] ?? '' ) ) {
+			return null;
+		}
+		try {
+			$tools    = new Source_Tools( (array) $workspace['target_metadata'] );
+			$expected = 'changes' === ( $manifest['scope'] ?? '' )
+				? (string) ( $manifest['target_fingerprint'] ?? '' )
+				: (string) ( $manifest['integration_target_fingerprint'] ?? '' );
+			if ( '' !== $expected && ! hash_equals( $expected, $tools->tree_fingerprint() ) ) {
+				return new \WP_Error( 'code_target_changed', __( 'The installed plugin changed after Code generation started. No revision was staged; regenerate the Plan before trying again.', 'wp-autoplugin' ) );
+			}
+			return $tools->plugin_instructions();
+		} catch ( \Throwable $error ) {
+			return new \WP_Error( 'code_plugin_instructions_unavailable', $error->getMessage() );
+		}
 	}
 
 	private function next_file_index( array $files ): ?int {

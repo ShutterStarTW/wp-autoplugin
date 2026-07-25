@@ -23,8 +23,10 @@ final class SourceToolsTest extends WP_UnitTestCase {
 	}
 
 	protected function tearDown(): void {
-		if ( is_link( $this->root . '/linked.php' ) ) {
-			unlink( $this->root . '/linked.php' );
+		foreach ( [ $this->root . '/linked.php', $this->root . '/AGENTS.md', $this->root . '/includes/AGENTS.md' ] as $path ) {
+			if ( is_file( $path ) || is_link( $path ) ) {
+				unlink( $path );
+			}
 		}
 		unlink( $this->root . '/includes/class-fixture.php' );
 		unlink( $this->root . '/plugin.php' );
@@ -97,6 +99,57 @@ final class SourceToolsTest extends WP_UnitTestCase {
 			$this->assertTrue( $result['error'] );
 			$this->assertSame( [], $result['inspected'] );
 		}
+	}
+
+	public function test_bootstrap_always_includes_root_plugin_instructions(): void {
+		$content = "# Project instructions\n\nUse tabs and preserve public hooks.\n";
+		file_put_contents( $this->root . '/AGENTS.md', $content );
+
+		$instructions = $this->tools->plugin_instructions();
+		$this->assertSame( 'AGENTS.md', $instructions['path'] );
+		$this->assertSame( $content, $instructions['content'] );
+		$this->assertSame( strlen( $content ), $instructions['bytes'] );
+		$this->assertSame( hash( 'sha256', $content ), $instructions['content_hash'] );
+
+		$bootstrap = $this->tools->bootstrap();
+		$this->assertStringContainsString( 'root_plugin_instructions', $bootstrap['content'] );
+		$this->assertStringContainsString( 'Use tabs and preserve public hooks.', $bootstrap['content'] );
+		$this->assertSame( $instructions['content_hash'], $bootstrap['inspected']['AGENTS.md'] );
+		$this->assertSame( $instructions['content_hash'], $bootstrap['audit']['agent_instructions']['content_hash'] );
+		$this->assertArrayNotHasKey( 'content', $bootstrap['audit']['agent_instructions'] );
+	}
+
+	public function test_nested_agents_file_is_not_treated_as_root_plugin_instructions(): void {
+		file_put_contents( $this->root . '/includes/AGENTS.md', "Nested instructions must not be loaded automatically.\n" );
+
+		$this->assertNull( $this->tools->plugin_instructions() );
+		$this->assertStringNotContainsString( 'Nested instructions must not be loaded automatically.', $this->tools->bootstrap()['content'] );
+	}
+
+	public function test_rejects_oversized_root_plugin_instructions_instead_of_truncating_them(): void {
+		file_put_contents( $this->root . '/AGENTS.md', str_repeat( 'a', 65537 ) );
+
+		$this->expectException( RuntimeException::class );
+		$this->expectExceptionMessage( '64 KiB' );
+		$this->tools->plugin_instructions();
+	}
+
+	public function test_rejects_invalid_root_plugin_instruction_text(): void {
+		file_put_contents( $this->root . '/AGENTS.md', "Invalid \xFF text.\n" );
+
+		$this->expectException( RuntimeException::class );
+		$this->expectExceptionMessage( 'valid UTF-8' );
+		$this->tools->plugin_instructions();
+	}
+
+	public function test_rejects_symlinked_root_plugin_instructions(): void {
+		if ( ! function_exists( 'symlink' ) || ! symlink( $this->root . '/plugin.php', $this->root . '/AGENTS.md' ) ) {
+			$this->markTestSkipped( 'Symlinks are unavailable in this environment.' );
+		}
+
+		$this->expectException( RuntimeException::class );
+		$this->expectExceptionMessage( 'safe regular file' );
+		$this->tools->plugin_instructions();
 	}
 
 	public function test_code_snapshot_reads_existing_actions_and_rejects_add_collisions(): void {

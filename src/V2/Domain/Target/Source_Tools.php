@@ -100,22 +100,45 @@ final class Source_Tools {
 	 * @return array{content:string,tree_fingerprint:string,inspected:array<string,string>,audit:array<string,mixed>}
 	 */
 	public function bootstrap(): array {
-		$tree      = $this->tree();
-		$structure = $this->tree_context( $tree );
-		$main      = $this->read_file( [ 'path' => $this->main_file, 'start_line' => 1, 'end_line' => 2000 ] );
-		return [
-			'content'          => "Target metadata:\n" . wp_json_encode( $this->public_metadata(), JSON_PRETTY_PRINT ) . "\n\nSource structure:\n" . $structure['content'] . "\n\nMain entry file:\n" . $main['content'],
-			'tree_fingerprint' => $this->fingerprint( $tree ),
-			'inspected'        => $main['inspected'],
-			'audit'            => [
-				'main_file'       => $this->main_file,
-				'main_read'       => $main['audit'],
-				'structure_files' => $structure['paths'],
-				'structure_total' => count( $tree ),
-				'structure_truncated' => count( $structure['paths'] ) < count( $tree ),
-				'metadata'        => $this->public_metadata(),
-			],
+		$tree         = $this->tree();
+		$structure    = $this->tree_context( $tree );
+		$main         = $this->read_file( [ 'path' => $this->main_file, 'start_line' => 1, 'end_line' => 2000 ] );
+		$instructions = $this->plugin_instructions();
+		$content      = "Target metadata:\n" . wp_json_encode( $this->public_metadata(), JSON_PRETTY_PRINT ) . "\n\nSource structure:\n" . $structure['content'] . "\n\nMain entry file:\n" . $main['content'];
+		$inspected    = $main['inspected'];
+		$audit        = [
+			'main_file'           => $this->main_file,
+			'main_read'           => $main['audit'],
+			'structure_files'     => $structure['paths'],
+			'structure_total'     => count( $tree ),
+			'structure_truncated' => count( $structure['paths'] ) < count( $tree ),
+			'metadata'            => $this->public_metadata(),
 		];
+		if ( $instructions ) {
+			$content .= "\n\nroot_plugin_instructions (from the installed plugin root AGENTS.md):\n<<<\n" . $instructions['content'] . "\n>>>";
+			$inspected[ $instructions['path'] ] = $instructions['content_hash'];
+			$audit['agent_instructions'] = [
+				'path'         => $instructions['path'],
+				'bytes'        => $instructions['bytes'],
+				'content_hash' => $instructions['content_hash'],
+			];
+		}
+
+		return [
+			'content'          => $content,
+			'tree_fingerprint' => $this->fingerprint( $tree ),
+			'inspected'        => $inspected,
+			'audit'            => $audit,
+		];
+	}
+
+	/**
+	 * Return optional root-level installed-plugin instructions.
+	 *
+	 * @return array{path:string,content:string,bytes:int,content_hash:string}|null
+	 */
+	public function plugin_instructions(): ?array {
+		return ( new Plugin_Instructions() )->read( $this->target, $this->root );
 	}
 
 	public function tree_fingerprint(): string {

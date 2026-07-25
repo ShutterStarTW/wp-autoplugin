@@ -5,6 +5,7 @@ namespace WP_Autoplugin\V2\Orchestration;
 use WP_Autoplugin\V2\Domain\AI\Agent_Task;
 use WP_Autoplugin\V2\Domain\AI\Plan_Response;
 use WP_Autoplugin\V2\Domain\AI\Prompts\WordPress_Runtime_Constraints;
+use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
 use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 use WP_Autoplugin\V2\Infrastructure\AI\Agent_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\Database\Agent_Run_Repository;
@@ -90,8 +91,8 @@ final class Source_Agent {
 					(int) $job['id'],
 					'agent_bootstrap',
 					'hook_extension' === (string) $workspace['operation']
-						? __( 'Provided target metadata, source structure, main entry file, and discovered hook contexts to the model.', 'wp-autoplugin' )
-						: __( 'Provided target metadata, the source structure, and the main entry file to the model.', 'wp-autoplugin' ),
+						? __( 'Provided target metadata, source structure, main entry file, any root AGENTS.md instructions, and discovered hook contexts to the model.', 'wp-autoplugin' )
+						: __( 'Provided target metadata, the source structure, the main entry file, and any root AGENTS.md instructions to the model.', 'wp-autoplugin' ),
 					(array) $bootstrap['audit']
 				);
 			} catch ( \Throwable $error ) {
@@ -272,7 +273,7 @@ final class Source_Agent {
 		$remaining_calls = max( 0, self::MAX_TOOL_CALLS - (int) $run['tool_calls'] );
 		$turn_limit      = min( self::MAX_TOOL_BATCH, $remaining_calls );
 		$remaining_bytes = max( 0, self::MAX_SOURCE_BYTES - (int) $run['source_bytes'] );
-		$budget = sprintf(
+		$budget = Plugin_Instructions::prompt_policy() . ' ' . sprintf(
 			'In this turn you may request at most %1$d tool calls, with %2$d calls and approximately %3$d source-result bytes remaining for the whole job. Never exceed the per-turn tool-call limit; split additional inspection across later turns.',
 			$turn_limit,
 			$remaining_calls,

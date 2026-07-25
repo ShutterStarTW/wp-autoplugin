@@ -18,6 +18,8 @@ AI output never writes directly to a target. Code is validated and staged first,
 
 Closing a workspace tab is non-destructive. Projects, jobs, revisions, files, reviews, events, and usage remain available when the workspace is reopened.
 
+Installed plugins can provide project-specific AI guidance in an exact root-level `AGENTS.md`. WP-Autoplugin automatically reads and supplies the complete file to Plan, Explain, Code, Code follow-up, Review, and Review-fix work for that plugin, including hook-extension projects targeting it. The file must be a regular, non-symlinked UTF-8 file no larger than 64 KiB; nested `AGENTS.md` files are not loaded automatically.
+
 ## Admin settings
 
 The native v2 settings screen keeps the existing upgrade-compatible option names for:
@@ -42,6 +44,7 @@ API usage may be billed by the selected provider.
 
 - All v2 REST resources require `manage_options`.
 - Source inspection is bounded, read-only, and constrained to the selected target root.
+- Root plugin `AGENTS.md` instructions cannot override v2 safety, staging, manifest, or independent-Review invariants.
 - API secrets never belong in jobs, events, revisions, usage, diagnostics, or browser bootstrap data.
 - Generated files are deterministic staged revisions, not direct AI writes.
 - Plugin package, install, activation, modification, and rollback actions require explicit approval and the relevant WordPress capabilities.
