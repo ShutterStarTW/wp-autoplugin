@@ -69,6 +69,23 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_plan_and_code_prompts_allow_markdown_and_plain_text_files(): void {
+		$prompts = [
+			( new New_Plugin_Plan_Prompt() )->initial_instructions(),
+			( new New_Plugin_Code_Prompt() )->instructions(),
+			( new Extension_Plugin_Code_Prompt() )->instructions(),
+			( new Existing_Target_Code_Prompt() )->instructions( 'add' ),
+			( new New_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Extension_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Existing_Target_Code_Follow_Up_Prompt() )->analysis_instructions(),
+		];
+
+		foreach ( $prompts as $prompt ) {
+			$this->assertStringContainsString( 'Markdown', $prompt );
+			$this->assertStringContainsString( 'plain', $prompt );
+		}
+	}
+
 	public function test_source_aware_planners_include_runtime_constraints(): void {
 		$method = new ReflectionMethod( Source_Agent::class, 'instructions' );
 		$method->setAccessible( true );

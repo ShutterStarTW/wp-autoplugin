@@ -74,6 +74,26 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_adds_markdown_and_plain_text_files_to_a_complete_project(): void {
+		$response = [
+			'outcome'  => 'changes',
+			'content'  => 'Add project documentation.',
+			'manifest' => $this->base,
+			'changes'  => [
+				[ 'path' => 'README.md', 'instruction' => 'Document installation and usage.' ],
+				[ 'path' => 'notes.txt', 'instruction' => 'Add the release notes.' ],
+			],
+		];
+		$response['manifest']['files'][] = [ 'path' => 'README.md', 'type' => 'md', 'description' => 'Usage documentation.' ];
+		$response['manifest']['files'][] = [ 'path' => 'notes.txt', 'type' => 'txt', 'description' => 'Release notes.' ];
+
+		$result = ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( [ 'README.md', 'notes.txt' ], $result['change_set']['added_paths'] );
+		$this->assertSame( [ 'md', 'txt' ], array_column( $result['files'], 'type' ) );
+	}
+
 	public function test_main_file_role_change_requires_both_retained_php_files(): void {
 		$target = [
 			'plugin_name' => 'Example',
@@ -170,5 +190,38 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 
 		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $identical ), $base ) );
 		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $delete ), $base ) );
+	}
+
+	public function test_change_set_allows_markdown_and_plain_text_generation(): void {
+		$base = [
+			'scope'         => 'changes',
+			'artifact_kind' => 'theme',
+			'operation'     => 'modify',
+			'plugin_name'   => 'Fixture Theme',
+			'main_file'     => '',
+			'target_ref'    => 'fixture-theme',
+			'files'         => [
+				[ 'path' => 'README.md', 'type' => 'md', 'description' => 'Current documentation.', 'operation' => 'update' ],
+			],
+		];
+		$response = [
+			'outcome'  => 'changes',
+			'content'  => 'Update the documentation and add release notes.',
+			'manifest' => [
+				'files' => [
+					[ 'path' => 'README.md', 'type' => 'md', 'description' => 'Updated documentation.', 'operation' => 'update' ],
+					[ 'path' => 'notes.txt', 'type' => 'txt', 'description' => 'Release notes.', 'operation' => 'add' ],
+				],
+			],
+			'changes'  => [
+				[ 'path' => 'README.md', 'instruction' => 'Document the new behavior.' ],
+				[ 'path' => 'notes.txt', 'instruction' => 'Summarize the release.' ],
+			],
+		];
+
+		$result = ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $base );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( [ 'md', 'txt' ], array_column( $result['files'], 'type' ) );
 	}
 }

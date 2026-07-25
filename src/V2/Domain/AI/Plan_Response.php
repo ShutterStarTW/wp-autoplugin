@@ -2,6 +2,7 @@
 
 namespace WP_Autoplugin\V2\Domain\AI;
 
+use WP_Autoplugin\V2\Domain\Revision\Code_Validator;
 use WP_Autoplugin\V2\Domain\Revision\Project_Root_Normalizer;
 
 /** Validates a native Plan agent's terminal response. */
@@ -184,7 +185,7 @@ final class Plan_Response {
 			$type        = is_string( $file['type'] ?? null ) ? sanitize_key( $file['type'] ) : '';
 			$action      = is_string( $file['action'] ?? null ) ? sanitize_key( $file['action'] ) : '';
 			$description = is_string( $file['description'] ?? null ) ? trim( $file['description'] ) : '';
-			if ( '' === $path || isset( $paths[ $path ] ) || ! in_array( $type, [ 'php', 'js', 'css' ], true ) || ! in_array( $action, [ 'add', 'update', 'delete' ], true ) || '' === $description ) {
+			if ( '' === $path || isset( $paths[ $path ] ) || ! in_array( $type, Code_Validator::GENERATED_TYPES, true ) || ! in_array( $action, [ 'add', 'update', 'delete' ], true ) || '' === $description ) {
 				return new \WP_Error( 'plan_agent_structure_invalid', __( 'The provider returned an invalid Plan file map. No Plan artifact was changed.', 'wp-autoplugin' ) );
 			}
 			$paths[ $path ] = true;

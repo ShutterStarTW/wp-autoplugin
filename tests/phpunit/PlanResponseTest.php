@@ -85,6 +85,32 @@ final class PlanResponseTest extends WP_UnitTestCase {
 		$this->assertSame( 'add', $result['structured']['project_structure']['files'][0]['action'] );
 	}
 
+	public function test_parses_markdown_and_plain_text_plan_files(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => "# Documented Plugin\n\nCreate the plugin and its documentation.",
+				'structured' => [
+					'plugin_name'       => 'Documented Plugin',
+					'main_file'         => 'documented-plugin.php',
+					'project_structure' => [
+						'directories' => [ 'docs' ],
+						'files'       => [
+							[ 'path' => 'documented-plugin.php', 'type' => 'php', 'description' => 'Bootstrap the plugin.', 'action' => 'add' ],
+							[ 'path' => 'README.md', 'type' => 'md', 'description' => 'Document installation and usage.', 'action' => 'add' ],
+							[ 'path' => 'docs/license-notice.txt', 'type' => 'txt', 'description' => 'Describe bundled notices.', 'action' => 'add' ],
+						],
+					],
+				],
+			]
+		);
+
+		$result = ( new Plan_Response() )->parse( (string) $response, false, 0, 'create' );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( [ 'php', 'md', 'txt' ], array_column( $result['structured']['project_structure']['files'], 'type' ) );
+	}
+
 	public function test_rejects_new_plugin_plan_that_updates_a_file(): void {
 		$response = wp_json_encode(
 			[

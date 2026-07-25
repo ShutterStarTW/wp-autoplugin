@@ -19,6 +19,8 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 					'files' => [
 						[ 'path' => 'example.php', 'type' => 'php', 'action' => 'add', 'description' => 'Bootstrap.' ],
 						[ 'path' => 'assets/style.css', 'type' => 'css', 'action' => 'add', 'description' => 'Styles.' ],
+						[ 'path' => 'README.md', 'type' => 'md', 'action' => 'add', 'description' => 'Usage documentation.' ],
+						[ 'path' => 'notes.txt', 'type' => 'txt', 'action' => 'add', 'description' => 'Release notes.' ],
 					],
 				],
 			]
@@ -26,7 +28,7 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 
 		$this->assertFalse( is_wp_error( $plan ) );
 		$this->assertSame( 'example.php', $plan['main_file'] );
-		$this->assertSame( [ 'assets/style.css', 'example.php' ], array_column( $plan['files'], 'path' ) );
+		$this->assertSame( [ 'assets/style.css', 'README.md', 'notes.txt', 'example.php' ], array_column( $plan['files'], 'path' ) );
 	}
 
 	public function test_legacy_plan_with_ambiguous_root_php_files_requires_regeneration(): void {
@@ -50,6 +52,36 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$expected = [ 'path' => 'example.php', 'type' => 'php' ];
 		$this->assertWPError( $this->validator->response( '{"path":"other.php","content":"<?php"}', $expected, 'example.php' ) );
 		$this->assertWPError( $this->validator->response( '```json {"path":"example.php","content":"<?php"} ```', $expected, 'example.php' ) );
+	}
+
+	public function test_generates_markdown_and_text_files_with_literal_fenced_examples(): void {
+		$manifest = [
+			'plugin_name' => 'Documented Plugin',
+			'main_file'   => 'documented-plugin.php',
+			'files'       => [
+				[ 'path' => 'README.md', 'type' => 'md', 'description' => 'Usage documentation.' ],
+				[ 'path' => 'notes.txt', 'type' => 'txt', 'description' => 'Release notes.' ],
+				[ 'path' => 'documented-plugin.php', 'type' => 'php', 'description' => 'Bootstrap.' ],
+			],
+		];
+		$markdown = "# Usage\n\n```php\nadd_action( 'init', 'example' );\n```\n";
+		$text     = "Plain text notes.\n";
+
+		$markdown_result = $this->validator->response(
+			(string) wp_json_encode( [ 'path' => 'README.md', 'content' => $markdown ] ),
+			[ 'path' => 'README.md', 'type' => 'md', 'operation' => 'add' ],
+			$manifest
+		);
+		$text_result = $this->validator->response(
+			(string) wp_json_encode( [ 'path' => 'notes.txt', 'content' => $text ] ),
+			[ 'path' => 'notes.txt', 'type' => 'txt', 'operation' => 'add' ],
+			$manifest
+		);
+
+		$this->assertFalse( is_wp_error( $markdown_result ) );
+		$this->assertSame( $markdown, $markdown_result['content'] );
+		$this->assertFalse( is_wp_error( $text_result ) );
+		$this->assertSame( $text, $text_result['content'] );
 	}
 
 	public function test_update_response_applies_only_exact_targeted_replacements(): void {
@@ -96,6 +128,27 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$this->assertSame( 'whole_file_replace', $whole_result->get_error_data()['issues'][0]['code'] );
 		$this->assertWPError( $ambiguous_result );
 		$this->assertSame( 'search_match_count', $ambiguous_result->get_error_data()['issues'][0]['code'] );
+	}
+
+	public function test_updates_markdown_with_a_fenced_example(): void {
+		$original = "# Usage\n\nOld example.\n";
+		$response = wp_json_encode(
+			[
+				'path'         => 'README.md',
+				'replacements' => [
+					[ 'search' => 'Old example.', 'replace' => "```php\nexample();\n```" ],
+				],
+			]
+		);
+		$result = $this->validator->update_response(
+			(string) $response,
+			[ 'path' => 'README.md', 'type' => 'md', 'operation' => 'update' ],
+			[ 'scope' => 'changes', 'artifact_kind' => 'theme', 'main_file' => '' ],
+			$original
+		);
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertStringContainsString( "```php\nexample();\n```", $result['content'] );
 	}
 
 	public function test_project_rejects_php_syntax_and_invalid_plugin_headers(): void {

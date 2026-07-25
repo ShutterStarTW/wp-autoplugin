@@ -524,6 +524,7 @@ const MAX_PROMPT_IMAGES = 6;
 const MAX_PROMPT_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_PROMPT_IMAGE_TOTAL = 20 * 1024 * 1024;
 const PROMPT_IMAGE_TYPES = [ 'image/jpeg', 'image/png', 'image/webp' ];
+const GENERATED_FILE_TYPES = [ 'php', 'js', 'css', 'md', 'txt' ];
 let promptComposerSequence = 0;
 
 async function postJob(
@@ -4039,7 +4040,7 @@ function CodeStage( {
 		planned.map( ( file, index ) => ( {
 			id: index,
 			path: file.path,
-			type: file.type as 'php' | 'js' | 'css',
+			type: file.type,
 			change_type: file.action as 'add' | 'update' | 'delete',
 			content_hash: '',
 			size: 0,
@@ -4939,11 +4940,11 @@ function CodeGenerationPanel( {
 				<Notice status="warning" isDismissible={ false }>
 					{ requiresMainFile
 						? __(
-								'This Plan needs a valid main plugin file and 1–20 added PHP, JavaScript, or CSS files. Regenerate the Plan structure before generating Code.',
+								'This Plan needs a valid main plugin file and 1–20 added PHP, JavaScript, CSS, Markdown, or plain-text files. Regenerate the Plan structure before generating Code.',
 								'wp-autoplugin'
 						  )
 						: __(
-								'This Plan needs 1–20 valid Add, Update, or Delete actions for PHP, JavaScript, or CSS files. Regenerate the Plan structure before generating Code.',
+								'This Plan needs 1–20 valid Add, Update, or Delete actions for PHP, JavaScript, CSS, Markdown, or plain-text files. Regenerate the Plan structure before generating Code.',
 								'wp-autoplugin'
 						  ) }
 				</Notice>
@@ -5493,7 +5494,7 @@ function planFiles(
 				.filter(
 					( file ) =>
 						!! file.path &&
-						[ 'php', 'js', 'css' ].includes( file.type ) &&
+						GENERATED_FILE_TYPES.includes( file.type ) &&
 						[ 'add', 'update', 'delete' ].includes( file.action )
 				)
 		: [];

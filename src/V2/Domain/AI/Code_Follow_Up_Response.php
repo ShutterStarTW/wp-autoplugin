@@ -68,6 +68,9 @@ final class Code_Follow_Up_Response {
 			if ( '' === $path || ! isset( $target_paths[ $path ] ) || isset( $instructions[ $path ] ) || '' === $instruction || strlen( $instruction ) > self::MAX_INSTRUCTION_BYTES ) {
 				return $this->error( 'code_follow_up_instruction', __( 'Every change instruction must be bounded, unique, and identify a desired file.', 'wp-autoplugin' ) );
 			}
+			if ( ! in_array( $target_paths[ $path ]['type'], Code_Validator::GENERATED_TYPES, true ) ) {
+				return $this->error( 'code_follow_up_target_type', __( 'AI Code follow-ups can generate only PHP, JavaScript, CSS, Markdown, and plain-text files.', 'wp-autoplugin' ) );
+			}
 			$total_bytes += strlen( $instruction );
 			$instructions[ $path ] = $instruction;
 		}
@@ -156,9 +159,6 @@ final class Code_Follow_Up_Response {
 			$instruction = $instructions[ $path ] ?? '';
 			if ( 'delete' === $operation && '' !== $instruction ) {
 				return $this->error( 'code_follow_up_delete_instruction', __( 'A staged deletion must not request generated replacement content.', 'wp-autoplugin' ) );
-			}
-			if ( '' !== $instruction && ! in_array( $file['type'], [ 'php', 'js', 'css' ], true ) ) {
-				return $this->error( 'code_follow_up_target_type', __( 'AI Code follow-ups can generate only PHP, JavaScript, and CSS target files.', 'wp-autoplugin' ) );
 			}
 			if ( ! $previous || $previous['type'] !== $file['type'] || $previous['operation'] !== $operation ) {
 				$changed = true;

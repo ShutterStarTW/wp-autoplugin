@@ -2,15 +2,14 @@
 
 namespace WP_Autoplugin\V2\Domain\Revision;
 
-use WP_Autoplugin\V2\Domain\AI\Json_Response;
-
 /** Deterministic validation for complete plugin projects and target-relative change sets. */
 final class Code_Validator {
 	public const MAX_FILES             = 20;
 	public const MAX_FILE_BYTES        = 65536;
 	public const MAX_PROJECT_BYTES     = 262144;
 	public const MAX_MANUAL_FILE_BYTES = 262144;
-	private const SUPPORTED_TYPES  = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'md', 'txt', 'xml', 'html' ];
+	public const GENERATED_TYPES       = [ 'php', 'js', 'css', 'md', 'txt' ];
+	private const SUPPORTED_TYPES      = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'md', 'txt', 'xml', 'html' ];
 
 	/**
 	 * Normalize and validate structured Plan metadata before billable work.
@@ -47,12 +46,13 @@ final class Code_Validator {
 		$files = [];
 		foreach ( $raw as $file ) {
 			$action = is_array( $file ) ? sanitize_key( (string) ( $file['action'] ?? '' ) ) : '';
-			if ( 'add' !== $action ) {
+			$type   = is_array( $file ) ? sanitize_key( (string) ( $file['type'] ?? '' ) ) : '';
+			if ( 'add' !== $action || ! in_array( $type, self::GENERATED_TYPES, true ) ) {
 				return new \WP_Error( 'code_plan_manifest_invalid', __( 'The Plan file map is invalid. Regenerate the Plan before generating Code.', 'wp-autoplugin' ) );
 			}
 			$files[] = [
 				'path'        => is_array( $file ) ? $file['path'] ?? '' : '',
-				'type'        => is_array( $file ) ? $file['type'] ?? '' : '',
+				'type'        => $type,
 				'description' => is_array( $file ) ? $file['description'] ?? '' : '',
 				'operation'   => 'add',
 			];
@@ -157,10 +157,10 @@ final class Code_Validator {
 	 * @return array<string, string>|\WP_Error
 	 */
 	public function response( string $response, array $expected, $policy ) {
-		if ( str_contains( $response, '```' ) ) {
+		$decoded = json_decode( trim( $response ), true );
+		if ( ! is_array( $decoded ) && str_contains( $response, '```' ) ) {
 			return $this->error( $expected['path'], 0, 'markdown_fence', __( 'The response must be JSON without Markdown code fences.', 'wp-autoplugin' ) );
 		}
-		$decoded = json_decode( Json_Response::strip_fence( $response ), true );
 		if ( ! is_array( $decoded ) || ! is_string( $decoded['path'] ?? null ) || ! is_string( $decoded['content'] ?? null ) ) {
 			return $this->error( $expected['path'], 0, 'response_shape', __( 'The provider response must contain only path and complete content.', 'wp-autoplugin' ) );
 		}
@@ -197,10 +197,10 @@ final class Code_Validator {
 	 */
 	public function update_response( string $response, array $expected, array $manifest, string $original ) {
 		$path = (string) ( $expected['path'] ?? '' );
-		if ( str_contains( $response, '```' ) ) {
+		$decoded = json_decode( trim( $response ), true );
+		if ( ! is_array( $decoded ) && str_contains( $response, '```' ) ) {
 			return $this->error( $path, 0, 'markdown_fence', __( 'The response must be JSON without Markdown code fences.', 'wp-autoplugin' ) );
 		}
-		$decoded = json_decode( Json_Response::strip_fence( $response ), true );
 		if (
 			! is_array( $decoded )
 			|| [ 'path', 'replacements' ] !== array_values( array_intersect( [ 'path', 'replacements' ], array_keys( $decoded ) ) )
@@ -346,9 +346,13 @@ final class Code_Validator {
 		}
 		$files = [];
 		foreach ( $raw as $file ) {
+			$type = is_array( $file ) ? sanitize_key( (string) ( $file['type'] ?? '' ) ) : '';
+			if ( ! in_array( $type, self::GENERATED_TYPES, true ) ) {
+				return new \WP_Error( 'code_plan_manifest_invalid', __( 'The Plan file map is invalid. Regenerate the Plan before generating Code.', 'wp-autoplugin' ) );
+			}
 			$files[] = [
 				'path'        => is_array( $file ) ? $file['path'] ?? '' : '',
-				'type'        => is_array( $file ) ? $file['type'] ?? '' : '',
+				'type'        => $type,
 				'description' => is_array( $file ) ? $file['description'] ?? '' : '',
 				'operation'   => is_array( $file ) ? $file['action'] ?? '' : '',
 			];
