@@ -19,6 +19,8 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 					'files' => [
 						[ 'path' => 'example.php', 'type' => 'php', 'action' => 'add', 'description' => 'Bootstrap.' ],
 						[ 'path' => 'assets/style.css', 'type' => 'css', 'action' => 'add', 'description' => 'Styles.' ],
+						[ 'path' => 'block.json', 'type' => 'json', 'action' => 'add', 'description' => 'Block metadata.' ],
+						[ 'path' => 'templates/notice.html', 'type' => 'html', 'action' => 'add', 'description' => 'Notice template.' ],
 						[ 'path' => 'README.md', 'type' => 'md', 'action' => 'add', 'description' => 'Usage documentation.' ],
 						[ 'path' => 'notes.txt', 'type' => 'txt', 'action' => 'add', 'description' => 'Release notes.' ],
 					],
@@ -28,7 +30,7 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 
 		$this->assertFalse( is_wp_error( $plan ) );
 		$this->assertSame( 'example.php', $plan['main_file'] );
-		$this->assertSame( [ 'assets/style.css', 'README.md', 'notes.txt', 'example.php' ], array_column( $plan['files'], 'path' ) );
+		$this->assertSame( [ 'assets/style.css', 'block.json', 'templates/notice.html', 'README.md', 'notes.txt', 'example.php' ], array_column( $plan['files'], 'path' ) );
 	}
 
 	public function test_legacy_plan_with_ambiguous_root_php_files_requires_regeneration(): void {
@@ -84,6 +86,43 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$this->assertSame( $text, $text_result['content'] );
 	}
 
+	public function test_generates_valid_json_and_html_and_rejects_invalid_json(): void {
+		$manifest = [
+			'plugin_name' => 'Block Plugin',
+			'main_file'   => 'block-plugin.php',
+			'files'       => [
+				[ 'path' => 'block.json', 'type' => 'json', 'description' => 'Block metadata.' ],
+				[ 'path' => 'templates/notice.html', 'type' => 'html', 'description' => 'Notice fragment.' ],
+				[ 'path' => 'block-plugin.php', 'type' => 'php', 'description' => 'Bootstrap.' ],
+			],
+		];
+		$json = "{\n\t\"apiVersion\": 3,\n\t\"name\": \"example/block\"\n}\n";
+		$html = "<section class=\"notice\"><strong>Ready</strong></section>\n";
+
+		$json_result = $this->validator->response(
+			(string) wp_json_encode( [ 'path' => 'block.json', 'content' => $json ] ),
+			[ 'path' => 'block.json', 'type' => 'json', 'operation' => 'add' ],
+			$manifest
+		);
+		$html_result = $this->validator->response(
+			(string) wp_json_encode( [ 'path' => 'templates/notice.html', 'content' => $html ] ),
+			[ 'path' => 'templates/notice.html', 'type' => 'html', 'operation' => 'add' ],
+			$manifest
+		);
+		$invalid_json = $this->validator->response(
+			(string) wp_json_encode( [ 'path' => 'block.json', 'content' => '{"apiVersion":}' ] ),
+			[ 'path' => 'block.json', 'type' => 'json', 'operation' => 'add' ],
+			$manifest
+		);
+
+		$this->assertFalse( is_wp_error( $json_result ) );
+		$this->assertSame( $json, $json_result['content'] );
+		$this->assertFalse( is_wp_error( $html_result ) );
+		$this->assertSame( $html, $html_result['content'] );
+		$this->assertWPError( $invalid_json );
+		$this->assertSame( 'json_syntax', $invalid_json->get_error_data()['issues'][0]['code'] );
+	}
+
 	public function test_update_response_applies_only_exact_targeted_replacements(): void {
 		$original = "<?php\nfunction fixture_value() {\n\treturn 1;\n}\n";
 		$expected = [ 'path' => 'functions.php', 'type' => 'php', 'operation' => 'update' ];
@@ -128,6 +167,32 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$this->assertSame( 'whole_file_replace', $whole_result->get_error_data()['issues'][0]['code'] );
 		$this->assertWPError( $ambiguous_result );
 		$this->assertSame( 'search_match_count', $ambiguous_result->get_error_data()['issues'][0]['code'] );
+	}
+
+	public function test_update_response_preserves_valid_json(): void {
+		$original = "{\n\t\"enabled\": false,\n\t\"label\": \"Example\"\n}\n";
+		$expected = [ 'path' => 'settings.json', 'type' => 'json', 'operation' => 'update' ];
+		$manifest = [ 'scope' => 'changes', 'artifact_kind' => 'theme', 'main_file' => '' ];
+		$valid = wp_json_encode(
+			[
+				'path'         => 'settings.json',
+				'replacements' => [ [ 'search' => '"enabled": false', 'replace' => '"enabled": true' ] ],
+			]
+		);
+		$invalid = wp_json_encode(
+			[
+				'path'         => 'settings.json',
+				'replacements' => [ [ 'search' => '"enabled": false', 'replace' => '"enabled": }' ] ],
+			]
+		);
+
+		$valid_result   = $this->validator->update_response( (string) $valid, $expected, $manifest, $original );
+		$invalid_result = $this->validator->update_response( (string) $invalid, $expected, $manifest, $original );
+
+		$this->assertFalse( is_wp_error( $valid_result ) );
+		$this->assertStringContainsString( '"enabled": true', $valid_result['content'] );
+		$this->assertWPError( $invalid_result );
+		$this->assertSame( 'json_syntax', $invalid_result->get_error_data()['issues'][0]['code'] );
 	}
 
 	public function test_updates_markdown_with_a_fenced_example(): void {

@@ -5,13 +5,13 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Builds one bounded, versioned prompt for each planned source file. */
 final class New_Plugin_Code_Prompt {
 	public const SLUG    = 'new-plugin-code';
-	public const VERSION = 4;
+	public const VERSION = 5;
 
 	public function instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
 
 		return <<<PROMPT
-You are implementing one PHP, JavaScript, CSS, Markdown, or plain-text file in a new WordPress plugin from an approved Plan. Return the complete production-ready file, not a patch. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. For Markdown and plain-text files, produce the complete supporting documentation or text requested by the Plan. Do not create behavior or files outside the supplied Plan. Previously generated files are authoritative project context. The main plugin file must contain exactly one valid Plugin Name header and the exact header `Author: WP-Autoplugin`; supporting PHP files must contain none.
+You are implementing one PHP, JavaScript, CSS, JSON, HTML, Markdown, or plain-text file in a new WordPress plugin from an approved Plan. Return the complete production-ready file, not a patch. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. JSON file content must be syntactically valid JSON. HTML may be a complete document or a fragment, as required by the Plan. For Markdown and plain-text files, produce the complete supporting documentation or text requested by the Plan. Do not create behavior or files outside the supplied Plan. Previously generated files are authoritative project context. The main plugin file must contain exactly one valid Plugin Name header and the exact header `Author: WP-Autoplugin`; supporting PHP files must contain none.
 
 $runtime_constraints
 

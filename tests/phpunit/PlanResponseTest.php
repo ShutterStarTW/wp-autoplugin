@@ -85,7 +85,7 @@ final class PlanResponseTest extends WP_UnitTestCase {
 		$this->assertSame( 'add', $result['structured']['project_structure']['files'][0]['action'] );
 	}
 
-	public function test_parses_markdown_and_plain_text_plan_files(): void {
+	public function test_parses_supported_non_code_plan_files(): void {
 		$response = wp_json_encode(
 			[
 				'outcome'    => 'artifact',
@@ -97,6 +97,8 @@ final class PlanResponseTest extends WP_UnitTestCase {
 						'directories' => [ 'docs' ],
 						'files'       => [
 							[ 'path' => 'documented-plugin.php', 'type' => 'php', 'description' => 'Bootstrap the plugin.', 'action' => 'add' ],
+							[ 'path' => 'block.json', 'type' => 'json', 'description' => 'Define block metadata.', 'action' => 'add' ],
+							[ 'path' => 'templates/notice.html', 'type' => 'html', 'description' => 'Render a notice fragment.', 'action' => 'add' ],
 							[ 'path' => 'README.md', 'type' => 'md', 'description' => 'Document installation and usage.', 'action' => 'add' ],
 							[ 'path' => 'docs/license-notice.txt', 'type' => 'txt', 'description' => 'Describe bundled notices.', 'action' => 'add' ],
 						],
@@ -108,7 +110,7 @@ final class PlanResponseTest extends WP_UnitTestCase {
 		$result = ( new Plan_Response() )->parse( (string) $response, false, 0, 'create' );
 
 		$this->assertFalse( is_wp_error( $result ) );
-		$this->assertSame( [ 'php', 'md', 'txt' ], array_column( $result['structured']['project_structure']['files'], 'type' ) );
+		$this->assertSame( [ 'php', 'json', 'html', 'md', 'txt' ], array_column( $result['structured']['project_structure']['files'], 'type' ) );
 	}
 
 	public function test_rejects_new_plugin_plan_that_updates_a_file(): void {

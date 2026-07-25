@@ -8,7 +8,7 @@ final class Code_Validator {
 	public const MAX_FILE_BYTES        = 65536;
 	public const MAX_PROJECT_BYTES     = 262144;
 	public const MAX_MANUAL_FILE_BYTES = 262144;
-	public const GENERATED_TYPES       = [ 'php', 'js', 'css', 'md', 'txt' ];
+	public const GENERATED_TYPES       = [ 'php', 'js', 'css', 'json', 'html', 'md', 'txt' ];
 	private const SUPPORTED_TYPES      = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'md', 'txt', 'xml', 'html' ];
 
 	/**
@@ -480,6 +480,21 @@ final class Code_Validator {
 		}
 		if ( in_array( $type, [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss' ], true ) && str_contains( $content, '```' ) ) {
 			$issues[] = $this->issue( $path, 0, 'markdown_fence', __( 'File content cannot contain Markdown code fences.', 'wp-autoplugin' ) );
+		}
+		if ( 'json' === $type && '' !== trim( $content ) ) {
+			json_decode( $content, true );
+			if ( JSON_ERROR_NONE !== json_last_error() ) {
+				$issues[] = $this->issue(
+					$path,
+					0,
+					'json_syntax',
+					sprintf(
+						/* translators: %s: JSON parser error. */
+						__( 'JSON syntax error: %s', 'wp-autoplugin' ),
+						json_last_error_msg()
+					)
+				);
+			}
 		}
 		if ( 'php' === $type && '' !== $content ) {
 			$tokens = token_get_all( $content );

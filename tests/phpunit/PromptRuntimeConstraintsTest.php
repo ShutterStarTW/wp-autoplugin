@@ -69,7 +69,7 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		}
 	}
 
-	public function test_plan_and_code_prompts_allow_markdown_and_plain_text_files(): void {
+	public function test_plan_and_code_prompts_allow_supported_non_code_files(): void {
 		$prompts = [
 			( new New_Plugin_Plan_Prompt() )->initial_instructions(),
 			( new New_Plugin_Code_Prompt() )->instructions(),
@@ -81,6 +81,8 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		];
 
 		foreach ( $prompts as $prompt ) {
+			$this->assertStringContainsString( 'JSON', $prompt );
+			$this->assertStringContainsString( 'HTML', $prompt );
 			$this->assertStringContainsString( 'Markdown', $prompt );
 			$this->assertStringContainsString( 'plain', $prompt );
 		}

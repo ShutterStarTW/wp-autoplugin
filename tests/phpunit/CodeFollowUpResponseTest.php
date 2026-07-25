@@ -74,24 +74,28 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 		);
 	}
 
-	public function test_adds_markdown_and_plain_text_files_to_a_complete_project(): void {
+	public function test_adds_supported_non_code_files_to_a_complete_project(): void {
 		$response = [
 			'outcome'  => 'changes',
 			'content'  => 'Add project documentation.',
 			'manifest' => $this->base,
 			'changes'  => [
+				[ 'path' => 'block.json', 'instruction' => 'Define the block metadata.' ],
+				[ 'path' => 'templates/notice.html', 'instruction' => 'Create the notice fragment.' ],
 				[ 'path' => 'README.md', 'instruction' => 'Document installation and usage.' ],
 				[ 'path' => 'notes.txt', 'instruction' => 'Add the release notes.' ],
 			],
 		];
+		$response['manifest']['files'][] = [ 'path' => 'block.json', 'type' => 'json', 'description' => 'Block metadata.' ];
+		$response['manifest']['files'][] = [ 'path' => 'templates/notice.html', 'type' => 'html', 'description' => 'Notice fragment.' ];
 		$response['manifest']['files'][] = [ 'path' => 'README.md', 'type' => 'md', 'description' => 'Usage documentation.' ];
 		$response['manifest']['files'][] = [ 'path' => 'notes.txt', 'type' => 'txt', 'description' => 'Release notes.' ];
 
 		$result = ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base );
 
 		$this->assertFalse( is_wp_error( $result ) );
-		$this->assertSame( [ 'README.md', 'notes.txt' ], $result['change_set']['added_paths'] );
-		$this->assertSame( [ 'md', 'txt' ], array_column( $result['files'], 'type' ) );
+		$this->assertSame( [ 'block.json', 'templates/notice.html', 'README.md', 'notes.txt' ], $result['change_set']['added_paths'] );
+		$this->assertSame( [ 'json', 'html', 'md', 'txt' ], array_column( $result['files'], 'type' ) );
 	}
 
 	public function test_main_file_role_change_requires_both_retained_php_files(): void {
@@ -192,7 +196,7 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $delete ), $base ) );
 	}
 
-	public function test_change_set_allows_markdown_and_plain_text_generation(): void {
+	public function test_change_set_allows_supported_non_code_generation(): void {
 		$base = [
 			'scope'         => 'changes',
 			'artifact_kind' => 'theme',
@@ -211,17 +215,21 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 				'files' => [
 					[ 'path' => 'README.md', 'type' => 'md', 'description' => 'Updated documentation.', 'operation' => 'update' ],
 					[ 'path' => 'notes.txt', 'type' => 'txt', 'description' => 'Release notes.', 'operation' => 'add' ],
+					[ 'path' => 'block.json', 'type' => 'json', 'description' => 'Block metadata.', 'operation' => 'add' ],
+					[ 'path' => 'templates/notice.html', 'type' => 'html', 'description' => 'Notice fragment.', 'operation' => 'add' ],
 				],
 			],
 			'changes'  => [
 				[ 'path' => 'README.md', 'instruction' => 'Document the new behavior.' ],
 				[ 'path' => 'notes.txt', 'instruction' => 'Summarize the release.' ],
+				[ 'path' => 'block.json', 'instruction' => 'Define the block metadata.' ],
+				[ 'path' => 'templates/notice.html', 'instruction' => 'Create the notice fragment.' ],
 			],
 		];
 
 		$result = ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $base );
 
 		$this->assertFalse( is_wp_error( $result ) );
-		$this->assertSame( [ 'md', 'txt' ], array_column( $result['files'], 'type' ) );
+		$this->assertSame( [ 'md', 'txt', 'json', 'html' ], array_column( $result['files'], 'type' ) );
 	}
 }
