@@ -2567,18 +2567,24 @@ function WorkspaceLauncher( {
 						/>
 					</div>
 					<div className="workspace-launcher__actions">
-						{ requiresPlan && modelSettings && (
-							<StageModelControl
-								modelRole="planner"
-								context={
-									target?.kind === 'new_plugin'
-										? 'direct'
-										: 'native'
-								}
-								settings={ modelSettings }
-								onUpdate={ onUpdateModel }
-							/>
-						) }
+						{ ( requiresPlan || operation === 'explain' ) &&
+							modelSettings && (
+								<StageModelControl
+									modelRole={
+										operation === 'explain'
+											? 'reviewer'
+											: 'planner'
+									}
+									context={
+										operation !== 'explain' &&
+										target?.kind === 'new_plugin'
+											? 'direct'
+											: 'native'
+									}
+									settings={ modelSettings }
+									onUpdate={ onUpdateModel }
+								/>
+							) }
 						<Button
 							variant="primary"
 							disabled={
