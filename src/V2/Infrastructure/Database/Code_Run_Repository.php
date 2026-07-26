@@ -306,6 +306,65 @@ final class Code_Run_Repository extends Repository {
 		}
 	}
 
+	/** Advance a fully generated follow-up into its independent request-compliance pass. */
+	public function begin_compliance( int $run_id, string $token ): bool {
+		$query = $this->wpdb->prepare(
+			'UPDATE ' . Installer::table( 'code_runs' ) . ' SET phase = %s, generation = generation + 1, retry_count = 0, last_error = NULL, lease_token = NULL, lease_expires_at = NULL, updated_at = %s WHERE id = %d AND lease_token = %s',
+			'compliance',
+			$this->now(),
+			$run_id,
+			$token
+		);
+		return 1 === $this->wpdb->query( $query ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
+	}
+
+	/**
+	 * Regenerate the affected file and every later file once after a compliance mismatch.
+	 *
+	 * @param array<string, mixed>             $instructions Updated durable change metadata.
+	 * @param array<int, array<string, mixed>> $issues       Bounded compliance feedback.
+	 * @param array<string, int>               $usage        Compliance-call usage.
+	 */
+	public function retry_compliance( int $run_id, string $token, int $from_sequence, array $instructions, array $issues, array $usage, string $message ): bool {
+		$this->wpdb->query( 'START TRANSACTION' );
+		try {
+			$files = Installer::table( 'code_run_files' );
+			$query = $this->wpdb->prepare(
+				"UPDATE $files SET status = %s, content = NULL, content_hash = NULL, error_metadata = %s, updated_at = %s WHERE run_id = %d AND sequence >= %d",
+				'pending',
+				$this->json( [ 'message' => substr( $message, 0, 500 ), 'issues' => $issues ] ),
+				$this->now(),
+				$run_id,
+				$from_sequence
+			);
+			if ( false === $this->wpdb->query( $query ) ) { // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
+				throw new \RuntimeException( __( 'Could not reset Code files after the request-compliance check.', 'wp-autoplugin' ) );
+			}
+			$updated = $this->wpdb->query(
+				$this->wpdb->prepare(
+					'UPDATE ' . Installer::table( 'code_runs' ) . ' SET phase = %s, generation = generation + 1, next_file_index = %d, retry_count = 0, change_instructions = %s, input_tokens = input_tokens + %d, output_tokens = output_tokens + %d, last_error = %s, lease_token = NULL, lease_expires_at = NULL, updated_at = %s WHERE id = %d AND lease_token = %s',
+					'files',
+					$from_sequence,
+					$this->json( $instructions ),
+					max( 0, (int) ( $usage['input_tokens'] ?? 0 ) ),
+					max( 0, (int) ( $usage['output_tokens'] ?? 0 ) ),
+					substr( $message, 0, 500 ),
+					$this->now(),
+					$run_id,
+					$token
+				)
+			);
+			if ( 1 !== $updated ) {
+				throw new \RuntimeException( __( 'The Code compliance lease expired before regeneration could start.', 'wp-autoplugin' ) );
+			}
+			$this->wpdb->query( 'COMMIT' );
+			return true;
+		} catch ( \Throwable $error ) {
+			$this->wpdb->query( 'ROLLBACK' );
+			throw $error;
+		}
+	}
+
 	/** Complete a question without creating a revision. */
 	public function complete_answer( int $run_id, string $token, string $content, array $usage ): bool {
 		$updated = $this->wpdb->query(

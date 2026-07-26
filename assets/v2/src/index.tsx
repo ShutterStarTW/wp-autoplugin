@@ -155,7 +155,13 @@ type PromptAttachment = {
 
 type CodeProgress = {
 	mode?: 'generate' | 'regenerate' | 'follow_up';
-	phase?: 'analysis' | 'files' | 'completed' | 'failed' | 'cancelled';
+	phase?:
+		| 'analysis'
+		| 'files'
+		| 'compliance'
+		| 'completed'
+		| 'failed'
+		| 'cancelled';
 	outcome?: 'answer' | 'revision' | null;
 	total: number;
 	completed: number;
@@ -5484,11 +5490,27 @@ function CodeProgress( {
 } ) {
 	const progress = job.code_progress;
 	const analyzing = progress?.phase === 'analysis';
+	const checkingRequest = progress?.phase === 'compliance';
 	let heading = __( 'Generating staged revision', 'wp-autoplugin' );
 	if ( analyzing ) {
 		heading = __( 'Analyzing Code follow-up', 'wp-autoplugin' );
+	} else if ( checkingRequest ) {
+		heading = __( 'Checking the latest request', 'wp-autoplugin' );
 	} else if ( progress?.mode === 'follow_up' ) {
 		heading = __( 'Generating Code changes', 'wp-autoplugin' );
+	}
+	let progressLabel = progress
+		? sprintf(
+				/* translators: 1: completed file count, 2: total file count. */
+				__( '%1$d of %2$d files', 'wp-autoplugin' ),
+				progress.completed,
+				progress.total
+		  )
+		: '';
+	if ( analyzing ) {
+		progressLabel = __( 'Analysis', 'wp-autoplugin' );
+	} else if ( checkingRequest ) {
+		progressLabel = __( 'Request compliance', 'wp-autoplugin' );
 	}
 	return (
 		<div className={ `code-progress ${ compact ? 'is-compact' : '' }` }>
@@ -5514,16 +5536,7 @@ function CodeProgress( {
 			/>
 			{ progress && (
 				<div className="code-progress__meta">
-					<span>
-						{ analyzing
-							? __( 'Analysis', 'wp-autoplugin' )
-							: sprintf(
-									/* translators: 1: completed file count, 2: total file count. */
-									__( '%1$d of %2$d files', 'wp-autoplugin' ),
-									progress.completed,
-									progress.total
-							  ) }
-					</span>
+					<span>{ progressLabel }</span>
 					<span>{ modelIdentity( progress ) }</span>
 					<span>
 						{ sprintf(

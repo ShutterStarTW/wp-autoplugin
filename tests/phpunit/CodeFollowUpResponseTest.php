@@ -26,12 +26,28 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 		$this->assertSame( 'answer', $result['outcome'] );
 	}
 
+	public function test_change_requires_resolved_request_and_acceptance_criteria(): void {
+		$response = [
+			'outcome'  => 'changes',
+			'content'  => 'Update the behavior.',
+			'manifest' => $this->base,
+			'changes'  => [ [ 'path' => 'assets/app.js', 'instruction' => 'Update the behavior.' ] ],
+		];
+
+		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base ) );
+		$response['resolved_request']    = 'Update the requested behavior.';
+		$response['acceptance_criteria'] = [];
+		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base ) );
+	}
+
 	public function test_normalizes_add_update_delete_and_main_file_last(): void {
 		$response = wp_json_encode(
 			[
-				'outcome'  => 'changes',
-				'content'  => 'Replace the stylesheet with an admin script.',
-				'manifest' => [
+				'outcome'             => 'changes',
+				'content'             => 'Replace the stylesheet with an admin script.',
+				'resolved_request'    => 'Replace the stylesheet with an admin script.',
+				'acceptance_criteria' => [ 'The plugin uses the new admin script instead of the old stylesheet.' ],
+				'manifest'            => [
 					'plugin_name' => 'Example',
 					'main_file'   => 'example.php',
 					'files'       => [
@@ -40,7 +56,7 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 						[ 'path' => 'example.php', 'type' => 'php', 'description' => 'Bootstrap.' ],
 					],
 				],
-				'changes'  => [
+				'changes'             => [
 					[ 'path' => 'assets/app.js', 'instruction' => 'Update the existing behavior.' ],
 					[ 'path' => 'assets/admin.js', 'instruction' => 'Create the admin behavior.' ],
 					[ 'path' => 'example.php', 'instruction' => 'Enqueue the admin script.' ],
@@ -53,6 +69,8 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 		$this->assertSame( [ 'assets/admin.js' ], $result['change_set']['added_paths'] );
 		$this->assertSame( [ 'assets/style.css' ], $result['change_set']['deleted_paths'] );
 		$this->assertSame( [ 'assets/app.js', 'example.php' ], $result['change_set']['updated_paths'] );
+		$this->assertSame( 'Replace the stylesheet with an admin script.', $result['resolved_request'] );
+		$this->assertCount( 1, $result['acceptance_criteria'] );
 		$this->assertSame( 'example.php', $result['files'][ count( $result['files'] ) - 1 ]['path'] );
 	}
 
@@ -76,10 +94,12 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 
 	public function test_adds_supported_non_code_files_to_a_complete_project(): void {
 		$response = [
-			'outcome'  => 'changes',
-			'content'  => 'Add project documentation.',
-			'manifest' => $this->base,
-			'changes'  => [
+			'outcome'             => 'changes',
+			'content'             => 'Add project documentation.',
+			'resolved_request'    => 'Add the requested project documentation files.',
+			'acceptance_criteria' => [ 'The project includes metadata, a template, a README, and release notes.' ],
+			'manifest'            => $this->base,
+			'changes'             => [
 				[ 'path' => 'block.json', 'instruction' => 'Define the block metadata.' ],
 				[ 'path' => 'templates/notice.html', 'instruction' => 'Create the notice fragment.' ],
 				[ 'path' => 'README.md', 'instruction' => 'Document installation and usage.' ],
@@ -108,10 +128,12 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 			],
 		];
 		$response = [
-			'outcome'  => 'changes',
-			'content'  => 'Move the plugin header.',
-			'manifest' => $target,
-			'changes'  => [ [ 'path' => 'new-main.php', 'instruction' => 'Create the new main file.' ] ],
+			'outcome'             => 'changes',
+			'content'             => 'Move the plugin header.',
+			'resolved_request'    => 'Move the plugin header to the new main file.',
+			'acceptance_criteria' => [ 'Only the new main file contains the plugin header.' ],
+			'manifest'            => $target,
+			'changes'             => [ [ 'path' => 'new-main.php', 'instruction' => 'Create the new main file.' ] ],
 		];
 
 		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base ) );
@@ -120,10 +142,12 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 	public function test_preserves_extension_identity_for_complete_project_changes(): void {
 		$base = array_merge( $this->base, [ 'scope' => 'project', 'artifact_kind' => 'plugin', 'operation' => 'hook_extension' ] );
 		$response = [
-			'outcome'  => 'changes',
-			'content'  => 'Update the extension behavior.',
-			'manifest' => $this->base,
-			'changes'  => [ [ 'path' => 'assets/app.js', 'instruction' => 'Update the hook callback behavior.' ] ],
+			'outcome'             => 'changes',
+			'content'             => 'Update the extension behavior.',
+			'resolved_request'    => 'Update the extension hook callback behavior.',
+			'acceptance_criteria' => [ 'The staged callback implements the requested behavior.' ],
+			'manifest'            => $this->base,
+			'changes'             => [ [ 'path' => 'assets/app.js', 'instruction' => 'Update the hook callback behavior.' ] ],
 		];
 
 		$result = ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $base );
@@ -149,16 +173,18 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 			],
 		];
 		$response = [
-			'outcome'  => 'changes',
-			'content'  => 'Keep the PHP update, unstage the old deletion, and replace a script.',
-			'manifest' => [
+			'outcome'             => 'changes',
+			'content'             => 'Keep the PHP update, unstage the old deletion, and replace a script.',
+			'resolved_request'    => 'Keep the PHP update, unstage the old deletion, and replace the script.',
+			'acceptance_criteria' => [ 'The desired staged change set contains only the requested actions.' ],
+			'manifest'            => [
 				'files' => [
 					[ 'path' => 'functions.php', 'type' => 'php', 'description' => 'Refine behavior.', 'operation' => 'update' ],
 					[ 'path' => 'assets/new.js', 'type' => 'js', 'description' => 'New behavior.', 'operation' => 'add' ],
 					[ 'path' => 'assets/obsolete.js', 'type' => 'js', 'description' => 'Remove obsolete behavior.', 'operation' => 'delete' ],
 				],
 			],
-			'changes'  => [
+			'changes'             => [
 				[ 'path' => 'functions.php', 'instruction' => 'Refine only the staged callback.' ],
 				[ 'path' => 'assets/new.js', 'instruction' => 'Create the replacement behavior.' ],
 			],
@@ -209,9 +235,11 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 			],
 		];
 		$response = [
-			'outcome'  => 'changes',
-			'content'  => 'Update the documentation and add release notes.',
-			'manifest' => [
+			'outcome'             => 'changes',
+			'content'             => 'Update the documentation and add release notes.',
+			'resolved_request'    => 'Update the documentation and add the requested non-code files.',
+			'acceptance_criteria' => [ 'All requested documentation and metadata files are staged.' ],
+			'manifest'            => [
 				'files' => [
 					[ 'path' => 'README.md', 'type' => 'md', 'description' => 'Updated documentation.', 'operation' => 'update' ],
 					[ 'path' => 'notes.txt', 'type' => 'txt', 'description' => 'Release notes.', 'operation' => 'add' ],
@@ -219,7 +247,7 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 					[ 'path' => 'templates/notice.html', 'type' => 'html', 'description' => 'Notice fragment.', 'operation' => 'add' ],
 				],
 			],
-			'changes'  => [
+			'changes'             => [
 				[ 'path' => 'README.md', 'instruction' => 'Document the new behavior.' ],
 				[ 'path' => 'notes.txt', 'instruction' => 'Summarize the release.' ],
 				[ 'path' => 'block.json', 'instruction' => 'Define the block metadata.' ],

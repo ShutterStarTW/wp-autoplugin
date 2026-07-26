@@ -2,6 +2,7 @@
 
 use WP_Autoplugin\V2\Domain\AI\Prompts\Existing_Target_Code_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Existing_Target_Code_Follow_Up_Prompt;
+use WP_Autoplugin\V2\Domain\AI\Prompts\Code_Follow_Up_Compliance_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Extension_Plugin_Code_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Extension_Plugin_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Code_Follow_Up_Prompt;
@@ -108,15 +109,84 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 			$method->invoke( new Source_Agent(), $run, 'plan', false, 'modify', false ),
 			( new Existing_Target_Code_Prompt() )->instructions( 'update' ),
 			( new Extension_Plugin_Code_Prompt() )->instructions(),
-			( new Existing_Target_Code_Follow_Up_Prompt() )->analysis_instructions(),
-			( new Existing_Target_Code_Follow_Up_Prompt() )->file_instructions( 'add' ),
-			( new Extension_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
-			( new Extension_Plugin_Code_Follow_Up_Prompt() )->file_instructions(),
 			( new Review_Prompt() )->instructions( false, false ),
 		];
 
 		foreach ( $prompts as $prompt ) {
 			$this->assertStringContainsString( Plugin_Instructions::prompt_policy(), $prompt );
 		}
+
+		$follow_ups = [
+			( new Existing_Target_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Existing_Target_Code_Follow_Up_Prompt() )->file_instructions( 'add' ),
+			( new Extension_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Extension_Plugin_Code_Follow_Up_Prompt() )->file_instructions(),
+			( new Code_Follow_Up_Compliance_Prompt() )->instructions(),
+		];
+		foreach ( $follow_ups as $prompt ) {
+			$this->assertStringContainsString( Plugin_Instructions::prompt_policy( true ), $prompt );
+			$this->assertStringNotContainsString( 'approved-Plan', $prompt );
+		}
+	}
+
+	public function test_code_follow_up_prompts_make_the_latest_request_authoritative(): void {
+		$prompts = [
+			( new New_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Extension_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Existing_Target_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Code_Follow_Up_Compliance_Prompt() )->instructions(),
+		];
+
+		foreach ( $prompts as $prompt ) {
+			$this->assertStringContainsString( "newest message is the authoritative request", $prompt );
+			$this->assertStringContainsString( 'reference Plan', $prompt );
+			$this->assertStringContainsString( '"change it"', $prompt );
+			$this->assertStringContainsString( 'Never ignore the requested change', $prompt );
+		}
+	}
+
+	public function test_extension_follow_up_preserves_conversation_references_without_approving_the_old_plan(): void {
+		$history = [
+			[
+				'message' => 'Will this add the menu item under Superdraft?',
+				'outcome' => 'answer',
+				'content' => 'No. To nest it, use add_submenu_page() with Superdraft’s parent slug.',
+			],
+		];
+		$prompt = new Extension_Plugin_Code_Follow_Up_Prompt();
+		$input  = json_decode(
+			$prompt->analysis_input( 'Create the extension.', 'Use add_menu_page().', [], [], [], $history, 'Please change it' ),
+			true
+		);
+
+		$this->assertSame( 'Use add_menu_page().', $input['reference_plan'] );
+		$this->assertArrayNotHasKey( 'approved_plan', $input );
+		$this->assertSame( $history, $input['recent_code_conversation'] );
+		$this->assertSame( 'Please change it', $input['authoritative_latest_request'] );
+		$this->assertSame( 'authoritative_latest_request', array_key_last( $input ) );
+	}
+
+	public function test_file_generation_receives_the_resolved_request_without_the_old_plan(): void {
+		$input = json_decode(
+			( new Extension_Plugin_Code_Follow_Up_Prompt() )->file_input(
+				'Please change it',
+				[],
+				'Nest the settings page under Superdraft.',
+				[ 'Use add_submenu_page(), not add_menu_page().' ],
+				[],
+				[ [ 'path' => 'extension.php', 'content' => 'old' ] ],
+				[ 'plugin_name' => 'Extension', 'main_file' => 'extension.php', 'files' => [ [ 'path' => 'extension.php', 'type' => 'php' ] ] ],
+				[ [ 'path' => 'extension.php', 'content' => 'old' ] ],
+				[ 'path' => 'extension.php', 'type' => 'php', 'operation' => 'update', 'description' => 'Use the submenu API.' ],
+				[]
+			),
+			true
+		);
+
+		$this->assertSame( 'Nest the settings page under Superdraft.', $input['resolved_request'] );
+		$this->assertArrayNotHasKey( 'reference_plan', $input );
+		$this->assertArrayNotHasKey( 'approved_plan', $input );
+		$this->assertArrayNotHasKey( 'original_workspace_request', $input );
+		$this->assertSame( 'Please change it', $input['authoritative_latest_request'] );
 	}
 }

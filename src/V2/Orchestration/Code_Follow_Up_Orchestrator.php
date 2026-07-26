@@ -2,7 +2,9 @@
 
 namespace WP_Autoplugin\V2\Orchestration;
 
+use WP_Autoplugin\V2\Domain\AI\Code_Follow_Up_Compliance_Response;
 use WP_Autoplugin\V2\Domain\AI\Code_Follow_Up_Response;
+use WP_Autoplugin\V2\Domain\AI\Prompts\Code_Follow_Up_Compliance_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Existing_Target_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Extension_Plugin_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Code_Follow_Up_Prompt;
@@ -100,11 +102,17 @@ final class Code_Follow_Up_Orchestrator {
 		if ( 'analysis' === $run['phase'] ) {
 			return $this->analyze( $job, $workspace, $base, $run, $token, $jobs, $runs );
 		}
-		if ( 'files' !== $run['phase'] ) {
+		if ( 'files' === $run['phase'] ) {
+			return $this->generate_file( $job, $workspace, $base, $run, $token, $jobs, $runs );
+		}
+		if ( 'compliance' === $run['phase'] ) {
+			return $this->verify_compliance( $job, $workspace, $base, $run, $token, $jobs, $runs );
+		}
+		if ( ! in_array( $run['phase'], [ 'analysis', 'files', 'compliance' ], true ) ) {
 			$runs->release( (int) $run['id'], $token );
 			return new \WP_Error( 'code_follow_up_phase', __( 'The Code follow-up has an invalid durable phase.', 'wp-autoplugin' ) );
 		}
-		return $this->generate_file( $job, $workspace, $base, $run, $token, $jobs, $runs );
+		return [ '_continuation' => true ];
 	}
 
 	private function analyze( array $job, array $workspace, array $base, array $run, string $token, Job_Repository $jobs, Code_Run_Repository $runs ) {
@@ -177,7 +185,15 @@ final class Code_Follow_Up_Orchestrator {
 			$parsed['manifest'] = $prepared;
 		}
 
-		$runs->complete_analysis_changes( (int) $run['id'], $token, $parsed['manifest'], $parsed['change_set'], $parsed['content'], $parsed['files'], $usage );
+		$change_metadata = array_merge(
+			$parsed['change_set'],
+			[
+				'resolved_request'    => $parsed['resolved_request'],
+				'acceptance_criteria' => $parsed['acceptance_criteria'],
+				'compliance_attempts' => 0,
+			]
+		);
+		$runs->complete_analysis_changes( (int) $run['id'], $token, $parsed['manifest'], $change_metadata, $parsed['content'], $parsed['files'], $usage );
 		$jobs->update( (int) $job['id'], [ 'progress' => $parsed['files'] ? 15 : 90 ] );
 		$jobs->event(
 			(int) $job['id'],
@@ -189,9 +205,6 @@ final class Code_Follow_Up_Orchestrator {
 		if ( ! $run ) {
 			return new \WP_Error( 'code_follow_up_state', __( 'Could not reload Code follow-up state.', 'wp-autoplugin' ) );
 		}
-		if ( ! $parsed['files'] ) {
-			return $this->stage( $job, $base, $run );
-		}
 		( new Queue() )->dispatch( (int) $job['id'], (int) $run['generation'], true );
 		return [ '_continuation' => true ];
 	}
@@ -200,8 +213,15 @@ final class Code_Follow_Up_Orchestrator {
 		$files = $runs->files( (int) $run['id'] );
 		$index = (int) $run['next_file_index'];
 		if ( $index >= count( $files ) ) {
-			$runs->release( (int) $run['id'], $token );
-			return $this->stage( $job, $base, $run );
+			$next_generation = (int) $run['generation'] + 1;
+			if ( ! $runs->begin_compliance( (int) $run['id'], $token ) ) {
+				return new \WP_Error( 'code_follow_up_compliance_state', __( 'Could not start the Code request-compliance check.', 'wp-autoplugin' ) );
+			}
+			$jobs->update( (int) $job['id'], [ 'progress' => 96 ] );
+			$jobs->event( (int) $job['id'], 'code_follow_up_compliance_queued', __( 'Checking the generated Code against the latest request.', 'wp-autoplugin' ), [ 'phase' => 'compliance' ] );
+			$run = $runs->find_by_job( (int) $job['id'] );
+			( new Queue() )->dispatch( (int) $job['id'], (int) ( $run['generation'] ?? $next_generation ), true );
+			return [ '_continuation' => true ];
 		}
 
 		$current  = $files[ $index ];
@@ -271,12 +291,134 @@ final class Code_Follow_Up_Orchestrator {
 		$jobs->event( (int) $job['id'], 'code_follow_up_file_completed', sprintf( __( 'Completed %s.', 'wp-autoplugin' ), $current['path'] ), [ 'phase' => 'files', 'path' => $current['path'], 'operation' => $current['operation'], 'completed' => $completed, 'total' => count( $files ) ] );
 
 		$next_generation = (int) $run['generation'] + 1;
-		$run = $runs->find_by_job( (int) $job['id'] );
-		if ( $run && $completed === count( $files ) ) {
-			return $this->stage( $job, $base, $run );
-		}
+		$run             = $runs->find_by_job( (int) $job['id'] );
 		( new Queue() )->dispatch( (int) $job['id'], (int) ( $run['generation'] ?? $next_generation ), true );
 		return [ '_continuation' => true ];
+	}
+
+	private function verify_compliance( array $job, array $workspace, array $base, array $run, string $token, Job_Repository $jobs, Code_Run_Repository $runs ) {
+		$candidate = 'changes' === ( $run['target_manifest']['scope'] ?? '' )
+			? $this->change_set_files( $workspace, $base, $run )
+			: $this->project_files( $base, $run );
+		if ( is_wp_error( $candidate ) ) {
+			$runs->release( (int) $run['id'], $token );
+			return $candidate;
+		}
+		$target = $this->target_metadata( $workspace, (array) $run['target_manifest'] );
+		if ( is_wp_error( $target ) ) {
+			$runs->release( (int) $run['id'], $token );
+			return $target;
+		}
+
+		$metadata = (array) $run['change_instructions'];
+		$prompt   = new Code_Follow_Up_Compliance_Prompt();
+		$source   = array_map(
+			static fn( array $file ): array => [
+				'path'      => (string) $file['path'],
+				'type'      => (string) $file['type'],
+				'operation' => (string) ( $file['change_type'] ?? 'add' ),
+				'content'   => (string) $file['content'],
+			],
+			$candidate
+		);
+		$transport = ( new Direct_Transport_Factory() )->create_for( $run['provider'], $run['model'], $run['effort'] );
+		if ( is_wp_error( $transport ) ) {
+			$runs->release( (int) $run['id'], $token );
+			return $transport;
+		}
+
+		$jobs->event( (int) $job['id'], 'code_follow_up_compliance_started', __( 'Verifying that the generated Code satisfies the latest administrator request.', 'wp-autoplugin' ), [ 'phase' => 'compliance' ] );
+		$response = $transport->complete(
+			$prompt->instructions(),
+			$prompt->input(
+				(string) $job['payload']['message'],
+				$this->history( (int) $job['workspace_id'], (int) $job['id'] ),
+				(string) ( $metadata['resolved_request'] ?? '' ),
+				(array) ( $metadata['acceptance_criteria'] ?? [] ),
+				$target,
+				(array) $run['target_manifest'],
+				$source
+			),
+			[ 'max_output_tokens' => 4096, 'json' => true, 'prompt_images' => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ) ]
+		);
+
+		$latest = $jobs->find( (int) $job['id'] );
+		if ( ! $latest || $latest['cancel_requested'] ) {
+			if ( ! is_wp_error( $response ) ) {
+				$cancel_usage = (array) ( $response['usage'] ?? [] );
+				( new Usage_Repository() )->record( (int) $job['id'], $transport->provider(), $transport->model(), 'code', $cancel_usage );
+				$runs->account_usage( (int) $run['id'], $token, $cancel_usage );
+			}
+			return $this->cancel( $run, $token, $jobs, $runs );
+		}
+		if ( ( new Revision_Repository() )->latest_id( (int) $job['workspace_id'] ) !== (int) $base['id'] ) {
+			$runs->release( (int) $run['id'], $token );
+			return $this->conflict();
+		}
+		if ( is_wp_error( $response ) ) {
+			return $this->retry_compliance_check_or_fail( $response, $job, $run, $token, $jobs, $runs );
+		}
+
+		$usage = (array) ( $response['usage'] ?? [] );
+		( new Usage_Repository() )->record( (int) $job['id'], $transport->provider(), $transport->model(), 'code', $usage );
+		if ( 'final' !== ( $response['type'] ?? '' ) || ! is_string( $response['content'] ?? null ) ) {
+			$runs->account_usage( (int) $run['id'], $token, $usage );
+			return $this->retry_compliance_check_or_fail( new \WP_Error( 'code_follow_up_compliance_response', __( 'The provider did not return a complete Code compliance result.', 'wp-autoplugin' ), [ 'retryable' => true ] ), $job, $run, $token, $jobs, $runs );
+		}
+		$parsed = ( new Code_Follow_Up_Compliance_Response() )->parse( $response['content'], (array) ( $run['target_manifest']['files'] ?? [] ) );
+		if ( is_wp_error( $parsed ) ) {
+			$runs->account_usage( (int) $run['id'], $token, $usage );
+			return $this->retry_compliance_check_or_fail( $parsed, $job, $run, $token, $jobs, $runs );
+		}
+		if ( 'pass' === $parsed['outcome'] ) {
+			$runs->account_usage( (int) $run['id'], $token, $usage );
+			$jobs->event( (int) $job['id'], 'code_follow_up_compliance_passed', __( 'The generated Code satisfies the latest request.', 'wp-autoplugin' ), [ 'phase' => 'compliance' ] );
+			$run = $runs->find_by_job( (int) $job['id'] );
+			return $run ? $this->stage( $job, $base, $run ) : new \WP_Error( 'code_follow_up_state', __( 'Could not reload the verified Code follow-up.', 'wp-autoplugin' ) );
+		}
+
+		$run_files = $runs->files( (int) $run['id'] );
+		$sequences = array_column( $run_files, 'sequence', 'path' );
+		$repairable = (int) ( $metadata['compliance_attempts'] ?? 0 ) < 1;
+		$from       = null;
+		foreach ( $parsed['issues'] as $issue ) {
+			$path = (string) $issue['path'];
+			if ( '' === $path || ! array_key_exists( $path, $sequences ) ) {
+				$repairable = false;
+				break;
+			}
+			$from = null === $from ? (int) $sequences[ $path ] : min( $from, (int) $sequences[ $path ] );
+		}
+		if ( $repairable && null !== $from ) {
+			$metadata['compliance_attempts'] = (int) ( $metadata['compliance_attempts'] ?? 0 ) + 1;
+			$next_generation                 = (int) $run['generation'] + 1;
+			$runs->retry_compliance( (int) $run['id'], $token, $from, $metadata, $parsed['issues'], $usage, $parsed['content'] );
+			$jobs->update( (int) $job['id'], [ 'status' => 'retrying', 'progress' => 15 ] );
+			$jobs->event(
+				(int) $job['id'],
+				'code_follow_up_compliance_retry',
+				__( 'The generated Code missed the latest request. Regenerating the affected files once with corrective feedback.', 'wp-autoplugin' ),
+				[
+					'phase' => 'files',
+					'paths' => array_values( array_unique( array_filter( array_column( $parsed['issues'], 'path' ) ) ) ),
+				],
+				'warning'
+			);
+			$run = $runs->find_by_job( (int) $job['id'] );
+			( new Queue() )->dispatch( (int) $job['id'], (int) ( $run['generation'] ?? $next_generation ), true );
+			return [ '_continuation' => true ];
+		}
+
+		$runs->account_usage( (int) $run['id'], $token, $usage );
+		$runs->release( (int) $run['id'], $token );
+		return new \WP_Error(
+			'code_follow_up_request_mismatch',
+			sprintf(
+				/* translators: %s: bounded compliance mismatch. */
+				__( 'The generated Code did not satisfy the latest request, so no revision was created: %s', 'wp-autoplugin' ),
+				$parsed['content']
+			)
+		);
 	}
 
 	private function stage( array $job, array $base, array $run ) {
@@ -388,8 +530,10 @@ final class Code_Follow_Up_Orchestrator {
 
 	/** @return array{instructions:string,input:string,current_content:string}|\WP_Error */
 	private function file_prompt( array $job, array $workspace, array $base, array $run, array $run_files, array $current, array $feedback ) {
-		$plan   = $this->plan_content( (int) $base['plan_job_id'] );
-		$target = $this->target_metadata( $workspace, (array) $run['target_manifest'] );
+		$target   = $this->target_metadata( $workspace, (array) $run['target_manifest'] );
+		$history  = $this->history( (int) $job['workspace_id'], (int) $job['id'] );
+		$metadata = (array) $run['change_instructions'];
+		$message  = (string) $job['payload']['message'];
 		if ( is_wp_error( $target ) ) {
 			return $target;
 		}
@@ -402,9 +546,10 @@ final class Code_Follow_Up_Orchestrator {
 			return [
 				'instructions'    => $prompt->file_instructions( (string) $current['operation'] ),
 				'input'           => $prompt->file_input(
-					(string) $workspace['request'],
-					(string) $job['payload']['message'],
-					$plan,
+					$message,
+					$history,
+					(string) ( $metadata['resolved_request'] ?? '' ),
+					(array) ( $metadata['acceptance_criteria'] ?? [] ),
 					$target,
 					$run['target_manifest'],
 					$context['effective'],
@@ -425,7 +570,7 @@ final class Code_Follow_Up_Orchestrator {
 			$prompt = new Extension_Plugin_Code_Follow_Up_Prompt();
 			return [
 				'instructions'    => $prompt->file_instructions(),
-				'input'           => $prompt->file_input( (string) $workspace['request'], (string) $job['payload']['message'], $plan, $target, $base_source, $run['target_manifest'], $effective, $current, $feedback ),
+				'input'           => $prompt->file_input( $message, $history, (string) ( $metadata['resolved_request'] ?? '' ), (array) ( $metadata['acceptance_criteria'] ?? [] ), $target, $base_source, $run['target_manifest'], $effective, $current, $feedback ),
 				'current_content' => $this->source_content( $base_source, (string) $current['path'] ),
 			];
 		}
@@ -433,7 +578,7 @@ final class Code_Follow_Up_Orchestrator {
 		$prompt = new New_Plugin_Code_Follow_Up_Prompt();
 		return [
 			'instructions'    => $prompt->file_instructions(),
-			'input'           => $prompt->file_input( (string) $workspace['request'], (string) $job['payload']['message'], $base_source, $run['target_manifest'], $effective, $current, $feedback ),
+			'input'           => $prompt->file_input( $message, $history, (string) ( $metadata['resolved_request'] ?? '' ), (array) ( $metadata['acceptance_criteria'] ?? [] ), $base_source, $run['target_manifest'], $effective, $current, $feedback ),
 			'current_content' => $this->source_content( $base_source, (string) $current['path'] ),
 		];
 	}
@@ -728,6 +873,24 @@ final class Code_Follow_Up_Orchestrator {
 			$runs->retry_analysis( (int) $run['id'], $token, $error->get_error_message() );
 			$jobs->update( (int) $job['id'], [ 'status' => 'retrying' ] );
 			$jobs->event( (int) $job['id'], 'code_follow_up_analysis_retry', __( 'Retrying the Code follow-up analysis with bounded feedback.', 'wp-autoplugin' ), [ 'phase' => 'analysis', 'attempt' => (int) $run['retry_count'] + 2 ], 'warning' );
+			( new Queue() )->schedule( (int) $job['id'], (int) $run['generation'] + 1, 2 ** (int) $run['retry_count'] );
+			return [ '_continuation' => true ];
+		}
+		$runs->release( (int) $run['id'], $token );
+		return $error;
+	}
+
+	private function retry_compliance_check_or_fail( \WP_Error $error, array $job, array $run, string $token, Job_Repository $jobs, Code_Run_Repository $runs ) {
+		$data = (array) $error->get_error_data();
+		if ( ! empty( $data['ambiguous'] ) ) {
+			$runs->release( (int) $run['id'], $token );
+			return $this->timeout_error();
+		}
+		$retryable = ! array_key_exists( 'retryable', $data ) || ! empty( $data['retryable'] );
+		if ( $retryable && (int) $run['retry_count'] < 2 ) {
+			$runs->retry_analysis( (int) $run['id'], $token, $error->get_error_message() );
+			$jobs->update( (int) $job['id'], [ 'status' => 'retrying' ] );
+			$jobs->event( (int) $job['id'], 'code_follow_up_compliance_response_retry', __( 'Retrying the Code request-compliance check with bounded format feedback.', 'wp-autoplugin' ), [ 'phase' => 'compliance', 'attempt' => (int) $run['retry_count'] + 2 ], 'warning' );
 			( new Queue() )->schedule( (int) $job['id'], (int) $run['generation'] + 1, 2 ** (int) $run['retry_count'] );
 			return [ '_continuation' => true ];
 		}

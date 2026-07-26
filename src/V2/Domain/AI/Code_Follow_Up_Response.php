@@ -7,6 +7,9 @@ use WP_Autoplugin\V2\Domain\Revision\Code_Validator;
 /** Strictly parses and normalizes the Code follow-up analysis contract. */
 final class Code_Follow_Up_Response {
 	private const MAX_CONTENT_BYTES      = 32768;
+	private const MAX_REQUEST_BYTES      = 4096;
+	private const MAX_CRITERION_BYTES    = 1024;
+	private const MAX_CRITERIA           = 8;
 	private const MAX_INSTRUCTION_BYTES  = 4096;
 	private const MAX_INSTRUCTIONS_BYTES = 32768;
 
@@ -33,6 +36,19 @@ final class Code_Follow_Up_Response {
 		}
 		if ( 'changes' !== $outcome || ! is_array( $decoded['manifest'] ?? null ) || ! is_array( $decoded['changes'] ?? null ) ) {
 			return $this->error( 'code_follow_up_shape', __( 'The Code follow-up response must classify as answer or provide a complete changes manifest.', 'wp-autoplugin' ) );
+		}
+		$resolved_request = is_string( $decoded['resolved_request'] ?? null ) ? trim( $decoded['resolved_request'] ) : '';
+		$criteria         = $decoded['acceptance_criteria'] ?? null;
+		if ( '' === $resolved_request || strlen( $resolved_request ) > self::MAX_REQUEST_BYTES || ! is_array( $criteria ) || ! $criteria || count( $criteria ) > self::MAX_CRITERIA ) {
+			return $this->error( 'code_follow_up_request_contract', __( 'A Code change requires one resolved request and one to eight bounded acceptance criteria.', 'wp-autoplugin' ) );
+		}
+		$acceptance_criteria = [];
+		foreach ( $criteria as $criterion ) {
+			$criterion = is_string( $criterion ) ? trim( $criterion ) : '';
+			if ( '' === $criterion || strlen( $criterion ) > self::MAX_CRITERION_BYTES ) {
+				return $this->error( 'code_follow_up_acceptance_criterion', __( 'Every Code acceptance criterion must be bounded and non-empty.', 'wp-autoplugin' ) );
+			}
+			$acceptance_criteria[] = $criterion;
 		}
 
 		$validator = new Code_Validator();
@@ -79,7 +95,7 @@ final class Code_Follow_Up_Response {
 		}
 
 		if ( 'changes' === $base['scope'] ) {
-			return $this->parse_change_set( $content, $base, $manifest, $instructions );
+			return $this->parse_change_set( $content, $resolved_request, $acceptance_criteria, $base, $manifest, $instructions );
 		}
 
 		$added   = array_values( array_diff( array_keys( $target_paths ), array_keys( $base_paths ) ) );
@@ -125,11 +141,13 @@ final class Code_Follow_Up_Response {
 		}
 
 		return [
-			'outcome'       => 'changes',
-			'content'       => $content,
-			'manifest'      => $manifest,
-			'files'         => $files,
-			'change_set'    => [
+			'outcome'             => 'changes',
+			'content'             => $content,
+			'resolved_request'    => $resolved_request,
+			'acceptance_criteria' => $acceptance_criteria,
+			'manifest'            => $manifest,
+			'files'               => $files,
+			'change_set'          => [
 				'added_paths'   => $added,
 				'updated_paths' => $updated,
 				'deleted_paths' => $deleted,
@@ -146,7 +164,7 @@ final class Code_Follow_Up_Response {
 	 * @param array<string, string> $instructions
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	private function parse_change_set( string $content, array $base, array $manifest, array $instructions ) {
+	private function parse_change_set( string $content, string $resolved_request, array $acceptance_criteria, array $base, array $manifest, array $instructions ) {
 		$base_paths   = array_column( $base['files'], null, 'path' );
 		$target_paths = array_column( $manifest['files'], null, 'path' );
 		$work         = [];
@@ -194,11 +212,13 @@ final class Code_Follow_Up_Response {
 		}
 
 		return [
-			'outcome'    => 'changes',
-			'content'    => $content,
-			'manifest'   => $manifest,
-			'files'      => $work,
-			'change_set' => $change_set,
+			'outcome'             => 'changes',
+			'content'             => $content,
+			'resolved_request'    => $resolved_request,
+			'acceptance_criteria' => $acceptance_criteria,
+			'manifest'            => $manifest,
+			'files'               => $work,
+			'change_set'          => $change_set,
 		];
 	}
 
