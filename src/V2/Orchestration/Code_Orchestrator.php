@@ -64,8 +64,12 @@ final class Code_Orchestrator {
 				}
 				$manifest['target_fingerprint'] = $snapshot['target_fingerprint'];
 				$manifest['base_hashes']        = $snapshot['base_hashes'];
-				if ( 'plugin' === ( $manifest['artifact_kind'] ?? '' ) ) {
-					$complete = ( new Package_Builder() )->fingerprint_target( (string) $workspace['target_ref'], false );
+				if ( in_array( (string) ( $manifest['artifact_kind'] ?? '' ), [ 'plugin', 'theme' ], true ) ) {
+					$complete = ( new Package_Builder() )->fingerprint_target(
+						(string) $workspace['target_ref'],
+						'theme' === (string) $manifest['artifact_kind'],
+						(string) $manifest['artifact_kind']
+					);
 					if ( is_wp_error( $complete ) ) {
 						return $complete;
 					}

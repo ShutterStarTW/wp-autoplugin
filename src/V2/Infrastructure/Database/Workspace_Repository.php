@@ -2,6 +2,8 @@
 
 namespace WP_Autoplugin\V2\Infrastructure\Database;
 
+use WP_Autoplugin\V2\Domain\Target\Target_Scanner;
+
 /**
  * Persists targets, projects, and staged workspaces as one atomic operation.
  */
@@ -495,6 +497,11 @@ final class Workspace_Repository extends Repository {
 		}
 		$row['latest_job_id']   = $row['latest_job_id'] ? (int) $row['latest_job_id'] : null;
 		$row['target_metadata'] = $this->decode( $row['target_metadata'] );
+		$row['target_metadata'] = ( new Target_Scanner() )->refresh_metadata(
+			(string) ( $row['target_kind'] ?? '' ),
+			(string) ( $row['target_ref'] ?? '' ),
+			(array) $row['target_metadata']
+		);
 
 		return $row;
 	}

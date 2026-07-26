@@ -30,6 +30,17 @@ type Target = {
 	author: string;
 	description: string;
 	active: boolean;
+	stylesheet?: string;
+	template?: string;
+	is_child?: boolean;
+	is_block_theme?: boolean;
+	parent_ref?: string;
+	parent_available?: boolean;
+	parent_name?: string;
+	parent_version?: string;
+	active_as_stylesheet?: boolean;
+	active_as_template?: boolean;
+	in_use?: boolean;
 	source_files: number;
 	lines: number;
 	tokens: number;
@@ -53,9 +64,12 @@ type Job = {
 			| 'project'
 			| 'fork'
 			| 'replacement'
+			| 'theme_replacement'
 			| 'install_project'
 			| 'install_fork'
-			| 'modify_original';
+			| 'modify_original'
+			| 'install_theme_copy'
+			| 'modify_theme_original';
 		plan_artifact_job_id?: number;
 		parent_revision_id?: number;
 		revision_id?: number;
@@ -96,6 +110,12 @@ type Job = {
 		promotion_id?: number;
 		status?: string;
 		mode?: string;
+		action?: 'activate' | 'rollback';
+		artifact_kind?: 'plugin' | 'theme';
+		target_ref?: string;
+		plugin_file?: string;
+		template?: string;
+		is_child?: boolean;
 		expires_at?: string;
 		base_revision_id?: number;
 		added_paths?: string[];
@@ -404,6 +424,9 @@ type ReleaseCapability = {
 	can_install: boolean;
 	can_activate: boolean;
 	can_modify: boolean;
+	can_install_themes: boolean;
+	can_modify_themes: boolean;
+	themes_url: string;
 	disabled_reasons: string[];
 };
 
@@ -5677,6 +5700,15 @@ function ReviewStage( {
 			}-wp-autoplugin-fork`
 		)
 	);
+	const [ themeCopySlug, setThemeCopySlug ] = useState( () =>
+		slugify(
+			`${
+				workspace.target_metadata.stylesheet ||
+				workspace.target_ref ||
+				'theme'
+			}-wp-autoplugin-copy`
+		)
+	);
 	const [ viewer, setViewer ] = useState< {
 		file: RevisionFile;
 		finding: ReviewFinding;
@@ -5890,7 +5922,7 @@ function ReviewStage( {
 	const releaseSafe = [ 'all_clear', 'cleared_with_dismissals' ].includes(
 		history?.current.status || ''
 	);
-	const themeReleaseDisabled =
+	const themeChanges =
 		revision?.project_manifest?.scope === 'changes' &&
 		revision.project_manifest.artifact_kind === 'theme';
 	const pluginProject =
@@ -6073,7 +6105,9 @@ function ReviewStage( {
 			: null;
 	}
 
-	async function queuePackage( mode: 'project' | 'fork' | 'replacement' ) {
+	async function queuePackage(
+		mode: 'project' | 'fork' | 'replacement' | 'theme_replacement'
+	) {
 		if ( ! revision ) {
 			return;
 		}
@@ -6081,17 +6115,20 @@ function ReviewStage( {
 		if ( override === null ) {
 			return;
 		}
+		let destinationSlug = slugify(
+			revision.project_manifest?.plugin_name || ''
+		);
+		if ( mode === 'fork' ) {
+			destinationSlug = forkSlug;
+		} else if ( mode === 'theme_replacement' ) {
+			destinationSlug = workspace.target_ref;
+		}
 		const created = await onQueueEndpoint(
 			`${ rest }/revisions/${ revision.id }/release-packages`,
 			{
 				expected_latest_revision_id: revision.id,
 				mode,
-				destination_slug:
-					mode === 'fork'
-						? forkSlug
-						: slugify(
-								revision.project_manifest?.plugin_name || ''
-						  ),
+				destination_slug: destinationSlug,
 				review_report_id: report?.id || undefined,
 				review_override: override,
 			}
@@ -6104,7 +6141,12 @@ function ReviewStage( {
 	}
 
 	async function queuePromotion(
-		mode: 'install_project' | 'install_fork' | 'modify_original'
+		mode:
+			| 'install_project'
+			| 'install_fork'
+			| 'modify_original'
+			| 'install_theme_copy'
+			| 'modify_theme_original'
 	) {
 		if ( ! revision ) {
 			return;
@@ -6114,14 +6156,19 @@ function ReviewStage( {
 			return;
 		}
 		let targetConfirmation = '';
-		if ( mode === 'modify_original' ) {
+		if ( mode === 'modify_original' || mode === 'modify_theme_original' ) {
 			if (
 				// eslint-disable-next-line no-alert
 				! window.confirm(
-					__(
-						'Modify the original plugin directly? Upstream updates remain enabled and may overwrite these changes. Rollback restores files only, not database or runtime side effects, and becomes unavailable if affected files drift.',
-						'wp-autoplugin'
-					)
+					mode === 'modify_theme_original'
+						? __(
+								'Modify the original inactive theme directly? Upstream updates remain enabled and may overwrite these changes. Rollback restores files only, not database or runtime side effects, and becomes unavailable if affected files drift.',
+								'wp-autoplugin'
+						  )
+						: __(
+								'Modify the original plugin directly? Upstream updates remain enabled and may overwrite these changes. Rollback restores files only, not database or runtime side effects, and becomes unavailable if affected files drift.',
+								'wp-autoplugin'
+						  )
 				)
 			) {
 				return;
@@ -6130,7 +6177,7 @@ function ReviewStage( {
 				// eslint-disable-next-line no-alert
 				window.prompt(
 					sprintf(
-						/* translators: %s: Exact plugin reference. */
+						/* translators: %s: Exact target reference. */
 						__( 'Type %s to confirm', 'wp-autoplugin' ),
 						workspace.target_ref
 					),
@@ -6140,17 +6187,20 @@ function ReviewStage( {
 				return;
 			}
 		}
+		let destinationSlug = slugify(
+			revision.project_manifest?.plugin_name || ''
+		);
+		if ( mode === 'install_fork' ) {
+			destinationSlug = forkSlug;
+		} else if ( mode === 'install_theme_copy' ) {
+			destinationSlug = themeCopySlug;
+		}
 		await onQueueEndpoint(
 			`${ rest }/revisions/${ revision.id }/promotions`,
 			{
 				expected_latest_revision_id: revision.id,
 				mode,
-				destination_slug:
-					mode === 'install_fork'
-						? forkSlug
-						: slugify(
-								revision.project_manifest?.plugin_name || ''
-						  ),
+				destination_slug: destinationSlug,
 				review_report_id: report?.id || undefined,
 				review_override: override,
 				target_confirmation: targetConfirmation,
@@ -6909,11 +6959,16 @@ function ReviewStage( {
 					revision={ revision }
 					capability={ releaseCapability }
 					active={ !! activeArtifactJob }
-					themeDisabled={ themeReleaseDisabled }
+					themeChanges={ themeChanges }
+					themeTarget={
+						themeChanges ? workspace.target_metadata : null
+					}
 					pluginProject={ pluginProject }
 					pluginChanges={ pluginChanges }
 					forkSlug={ forkSlug }
 					onForkSlug={ setForkSlug }
+					themeCopySlug={ themeCopySlug }
+					onThemeCopySlug={ setThemeCopySlug }
 					onPackage={ queuePackage }
 					onPromotion={ queuePromotion }
 					releaseJobs={ releaseJobs }
@@ -7282,11 +7337,14 @@ function ReleasePanel( {
 	revision,
 	capability,
 	active,
-	themeDisabled,
+	themeChanges,
+	themeTarget,
 	pluginProject,
 	pluginChanges,
 	forkSlug,
 	onForkSlug,
+	themeCopySlug,
+	onThemeCopySlug,
 	onPackage,
 	onPromotion,
 	releaseJobs,
@@ -7301,14 +7359,24 @@ function ReleasePanel( {
 	revision: RevisionManifest;
 	capability: ReleaseCapability | null;
 	active: boolean;
-	themeDisabled: boolean;
+	themeChanges: boolean;
+	themeTarget: Target | null;
 	pluginProject: boolean;
 	pluginChanges: boolean;
 	forkSlug: string;
 	onForkSlug: ( value: string ) => void;
-	onPackage: ( mode: 'project' | 'fork' | 'replacement' ) => void;
+	themeCopySlug: string;
+	onThemeCopySlug: ( value: string ) => void;
+	onPackage: (
+		mode: 'project' | 'fork' | 'replacement' | 'theme_replacement'
+	) => void;
 	onPromotion: (
-		mode: 'install_project' | 'install_fork' | 'modify_original'
+		mode:
+			| 'install_project'
+			| 'install_fork'
+			| 'modify_original'
+			| 'install_theme_copy'
+			| 'modify_theme_original'
 	) => void;
 	releaseJobs: Job[];
 	onQueueEndpoint: ( path: string, data: object ) => Promise< Job | null >;
@@ -7320,7 +7388,7 @@ function ReleasePanel( {
 	onToggleTest: ( index: number, checked: boolean ) => void;
 } ) {
 	const [ showAllActivity, setShowAllActivity ] = useState( false );
-	const installed = [ ...releaseJobs ]
+	const installedPlugin = [ ...releaseJobs ]
 		.filter(
 			( candidate ) =>
 				! releaseJobs.some(
@@ -7340,9 +7408,21 @@ function ReleasePanel( {
 			( job ) =>
 				job.task === 'promotion' &&
 				job.result?.outcome === 'promotion' &&
-				job.result.status === 'installed'
+				job.result.status === 'installed' &&
+				[ 'install_project', 'install_fork' ].includes(
+					job.result.mode || ''
+				)
 		);
-	const direct = [ ...releaseJobs ]
+	const installedTheme = [ ...releaseJobs ]
+		.reverse()
+		.find(
+			( job ) =>
+				job.task === 'promotion' &&
+				job.result?.outcome === 'promotion' &&
+				job.result.status === 'installed' &&
+				job.result.mode === 'install_theme_copy'
+		);
+	const directPlugin = [ ...releaseJobs ]
 		.filter(
 			( candidate ) =>
 				! releaseJobs.some(
@@ -7362,7 +7442,28 @@ function ReleasePanel( {
 				job.result?.mode === 'modify_original' &&
 				job.result.status === 'completed'
 		);
+	const directTheme = [ ...releaseJobs ]
+		.filter(
+			( candidate ) =>
+				! releaseJobs.some(
+					( action ) =>
+						action.task === 'promotion' &&
+						action.result?.outcome === 'promotion_action' &&
+						action.result?.action === 'rollback' &&
+						action.result?.promotion_id ===
+							candidate.result?.promotion_id &&
+						action.result?.status === 'rolled_back'
+				)
+		)
+		.reverse()
+		.find(
+			( job ) =>
+				job.task === 'promotion' &&
+				job.result?.mode === 'modify_theme_original' &&
+				job.result.status === 'completed'
+		);
 	const disabled = active || ! revision.id;
+	const themeInUse = !! themeTarget?.in_use;
 	const completedTests = manualTests.reduce(
 		( count, _test, index ) =>
 			checkedTests.has( index ) ? count + 1 : count,
@@ -7378,6 +7479,11 @@ function ReleasePanel( {
 	} else if ( pluginChanges ) {
 		releaseTitle = __(
 			'Package and deploy these changes',
+			'wp-autoplugin'
+		);
+	} else if ( themeChanges ) {
+		releaseTitle = __(
+			'Package and deploy these theme changes',
 			'wp-autoplugin'
 		);
 	}
@@ -7477,7 +7583,7 @@ function ReleasePanel( {
 						</Notice>
 					) ) }
 
-					{ installed?.result?.promotion_id && (
+					{ installedPlugin?.result?.promotion_id && (
 						<Notice status="success" isDismissible={ false }>
 							<p>
 								{ __(
@@ -7492,28 +7598,97 @@ function ReleasePanel( {
 								}
 								onClick={ () =>
 									onQueueEndpoint(
-										`${ rest }/promotions/${ installed.result?.promotion_id }/activate`,
+										`${ rest }/promotions/${ installedPlugin.result?.promotion_id }/activate`,
 										{}
 									)
 								}
 							>
-								{ installed.result.mode === 'install_fork'
+								{ installedPlugin.result.mode === 'install_fork'
 									? __( 'Switch to fork', 'wp-autoplugin' )
 									: __( 'Activate', 'wp-autoplugin' ) }
 							</Button>
 						</Notice>
 					) }
 
-					{ themeDisabled && (
-						<>
-							<Notice status="info" isDismissible={ false }>
+					{ installedTheme?.result?.promotion_id && (
+						<Notice status="success" isDismissible={ false }>
+							<p>
 								{ __(
-									'Theme release is not available yet. Review and finding fixes remain fully available.',
+									'The theme copy was installed and left inactive. Preview or activate it from Appearance → Themes.',
 									'wp-autoplugin'
 								) }
-							</Notice>
+							</p>
+							<Button
+								variant="primary"
+								href={ capability?.themes_url }
+							>
+								{ __( 'Open Themes', 'wp-autoplugin' ) }
+							</Button>
+						</Notice>
+					) }
+
+					{ themeChanges && (
+						<>
+							{ themeInUse && (
+								<Notice
+									status="warning"
+									isDismissible={ false }
+								>
+									{ themeTarget?.active_as_stylesheet
+										? __(
+												'This theme is active. ZIP download and copy installation remain available, but direct modification and rollback are blocked while it is in use.',
+												'wp-autoplugin'
+										  )
+										: __(
+												'This theme is the parent of the active child theme. ZIP download and copy installation remain available, but direct modification and rollback are blocked while it is in use.',
+												'wp-autoplugin'
+										  ) }
+								</Notice>
+							) }
+							<div className="release-panel__fork-intro">
+								<strong>
+									{ __(
+										'Install an inactive theme copy',
+										'wp-autoplugin'
+									) }
+								</strong>
+								<p>
+									{ themeTarget?.is_child
+										? sprintf(
+												/* translators: %s: Parent theme name or slug. */
+												__(
+													'The copy remains a child of %s and preserves its Template header.',
+													'wp-autoplugin'
+												),
+												themeTarget.parent_name ||
+													themeTarget.parent_ref ||
+													themeTarget.template ||
+													''
+										  )
+										: __(
+												'The copy is a complete standalone theme fork.',
+												'wp-autoplugin'
+										  ) }
+								</p>
+								<TextControl
+									label={ __(
+										'Theme copy slug',
+										'wp-autoplugin'
+									) }
+									value={ themeCopySlug }
+									onChange={ ( value ) =>
+										onThemeCopySlug( slugify( value ) )
+									}
+								/>
+							</div>
 							<div className="release-panel__action-card">
-								<Button variant="secondary" disabled>
+								<Button
+									variant="secondary"
+									disabled={ disabled || ! capability?.zip }
+									onClick={ () =>
+										onPackage( 'theme_replacement' )
+									}
+								>
 									{ __(
 										'Download theme ZIP',
 										'wp-autoplugin'
@@ -7521,22 +7696,113 @@ function ReleasePanel( {
 								</Button>
 								<p>
 									{ __(
-										'Theme packaging is not available yet.',
+										'Create a replacement package with the original theme slug for manual deployment.',
 										'wp-autoplugin'
 									) }
 								</p>
 							</div>
 							<div className="release-panel__action-card">
-								<Button variant="secondary" disabled>
+								<Button
+									variant="primary"
+									disabled={
+										disabled ||
+										! capability?.can_install_themes ||
+										! themeCopySlug
+									}
+									onClick={ () =>
+										onPromotion( 'install_theme_copy' )
+									}
+								>
 									{ __( 'Install as copy', 'wp-autoplugin' ) }
 								</Button>
 								<p>
 									{ __(
-										'Theme installation is not available yet.',
+										'Install the verified copy without activating or switching the current theme.',
 										'wp-autoplugin'
 									) }
 								</p>
 							</div>
+							<p className="release-panel__testing-empty">
+								{ __(
+									'Theme files only are released. Customizer, Site Editor, global styles, templates, and other database-held settings are not copied.',
+									'wp-autoplugin'
+								) }
+							</p>
+							<details className="release-panel__fork-details">
+								<summary>
+									{ __( 'Copy details', 'wp-autoplugin' ) }
+								</summary>
+								<dl className="release-panel__transform-preview">
+									<div>
+										<dt>
+											{ __(
+												'Theme Name',
+												'wp-autoplugin'
+											) }
+										</dt>
+										<dd>
+											{ themeTarget?.name } —{ ' ' }
+											WP-Autoplugin Copy
+										</dd>
+									</div>
+									<div>
+										<dt>
+											{ __(
+												'Update URI',
+												'wp-autoplugin'
+											) }
+										</dt>
+										<dd>
+											<code>
+												https://wp-autoplugin.local/theme-copy/
+												{ themeCopySlug }
+											</code>
+										</dd>
+									</div>
+									<div>
+										<dt>
+											{ __( 'Version', 'wp-autoplugin' ) }
+										</dt>
+										<dd>
+											{ __(
+												'Patch version bump',
+												'wp-autoplugin'
+											) }
+										</dd>
+									</div>
+								</dl>
+							</details>
+							<details className="release-panel__advanced">
+								<summary>
+									{ __(
+										'Advanced: modify original',
+										'wp-autoplugin'
+									) }
+								</summary>
+								<p>
+									{ __(
+										'Upstream theme updates may overwrite direct changes. File rollback cannot undo database or runtime side effects and is blocked whenever the theme is active or is the parent of the active child theme.',
+										'wp-autoplugin'
+									) }
+								</p>
+								<Button
+									variant="secondary"
+									isDestructive
+									disabled={
+										disabled ||
+										themeInUse ||
+										! capability?.can_modify_themes
+									}
+									onClick={ () =>
+										onPromotion( 'modify_theme_original' )
+									}
+								>
+									{ __(
+										'Modify original theme',
+										'wp-autoplugin'
+									) }
+								</Button>
+							</details>
 						</>
 					) }
 
@@ -7750,7 +8016,7 @@ function ReleasePanel( {
 						</>
 					) }
 
-					{ direct?.result?.promotion_id && (
+					{ directPlugin?.result?.promotion_id && (
 						<Notice status="warning" isDismissible={ false }>
 							<p>
 								{ __(
@@ -7764,12 +8030,43 @@ function ReleasePanel( {
 								disabled={ active || ! capability?.can_modify }
 								onClick={ () =>
 									onQueueEndpoint(
-										`${ rest }/promotions/${ direct.result?.promotion_id }/rollback`,
+										`${ rest }/promotions/${ directPlugin.result?.promotion_id }/rollback`,
 										{}
 									)
 								}
 							>
 								{ __( 'Rollback files', 'wp-autoplugin' ) }
+							</Button>
+						</Notice>
+					) }
+
+					{ directTheme?.result?.promotion_id && (
+						<Notice status="warning" isDismissible={ false }>
+							<p>
+								{ __(
+									'The original theme files were modified. Rollback remains available only while the theme is not in use and every affected file matches the promoted state.',
+									'wp-autoplugin'
+								) }
+							</p>
+							<Button
+								variant="secondary"
+								isDestructive
+								disabled={
+									active ||
+									themeInUse ||
+									! capability?.can_modify_themes
+								}
+								onClick={ () =>
+									onQueueEndpoint(
+										`${ rest }/promotions/${ directTheme.result?.promotion_id }/rollback`,
+										{}
+									)
+								}
+							>
+								{ __(
+									'Rollback theme files',
+									'wp-autoplugin'
+								) }
 							</Button>
 						</Notice>
 					) }
@@ -7872,7 +8169,7 @@ function ReleasePanel( {
 						<h4>{ __( 'Release activity', 'wp-autoplugin' ) }</h4>
 						<p>
 							{ __(
-								'Recent packages, installations, forks, and errors.',
+								'Recent packages, installations, copies, direct changes, rollbacks, and errors.',
 								'wp-autoplugin'
 							) }
 						</p>
@@ -7969,6 +8266,11 @@ function releaseActivityTitle( job: Job ): string {
 		return __( 'Release action cancelled', 'wp-autoplugin' );
 	}
 	if ( job.task === 'package' ) {
+		if ( mode === 'theme_replacement' ) {
+			return job.status === 'completed'
+				? __( 'Theme ZIP created', 'wp-autoplugin' )
+				: __( 'Creating theme ZIP', 'wp-autoplugin' );
+		}
 		return job.status === 'completed'
 			? __( 'ZIP package created', 'wp-autoplugin' )
 			: __( 'Creating ZIP package', 'wp-autoplugin' );
@@ -7981,8 +8283,20 @@ function releaseActivityTitle( job: Job ): string {
 			return __( 'Switched to fork', 'wp-autoplugin' );
 		}
 		if ( job.result.status === 'rolled_back' ) {
-			return __( 'Plugin files rolled back', 'wp-autoplugin' );
+			return job.result.artifact_kind === 'theme'
+				? __( 'Theme files rolled back', 'wp-autoplugin' )
+				: __( 'Plugin files rolled back', 'wp-autoplugin' );
 		}
+	}
+	if ( mode === 'install_theme_copy' ) {
+		return job.status === 'completed'
+			? __( 'Theme copy installed', 'wp-autoplugin' )
+			: __( 'Installing theme copy', 'wp-autoplugin' );
+	}
+	if ( mode === 'modify_theme_original' ) {
+		return job.status === 'completed'
+			? __( 'Original theme modified', 'wp-autoplugin' )
+			: __( 'Modifying original theme', 'wp-autoplugin' );
 	}
 	if ( mode === 'install_fork' ) {
 		return job.status === 'completed'
@@ -8010,10 +8324,44 @@ function releaseActivityDescription( job: Job ): string {
 		job.result?.outcome === 'promotion' &&
 		job.result.status === 'installed'
 	) {
+		if ( job.result.artifact_kind === 'theme' ) {
+			return __(
+				'Installed successfully and left inactive. Preview or activate it from Appearance → Themes.',
+				'wp-autoplugin'
+			);
+		}
 		return __(
 			'Installed successfully. Activation remains a separate action.',
 			'wp-autoplugin'
 		);
+	}
+	if (
+		job.result?.outcome === 'promotion' &&
+		job.result.status === 'completed'
+	) {
+		return job.result.artifact_kind === 'theme'
+			? __(
+					'The inactive original theme files now match this revision; drift-safe file rollback is available.',
+					'wp-autoplugin'
+			  )
+			: __(
+					'The original plugin files now match this revision; drift-safe file rollback is available.',
+					'wp-autoplugin'
+			  );
+	}
+	if (
+		job.result?.outcome === 'promotion_action' &&
+		job.result.status === 'rolled_back'
+	) {
+		return job.result.artifact_kind === 'theme'
+			? __(
+					'The direct theme file changes were restored.',
+					'wp-autoplugin'
+			  )
+			: __(
+					'The direct plugin file changes were restored.',
+					'wp-autoplugin'
+			  );
 	}
 	if ( job.latest_event?.message ) {
 		return job.latest_event.message;

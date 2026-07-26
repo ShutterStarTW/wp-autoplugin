@@ -56,7 +56,8 @@ final class Promotion_Service {
 			( new Release_Repository() )->update_promotion(
 				(int) $promotion['id'],
 				[
-					'status' => 'installed', 'destination_plugin_file' => $plugin_file, 'destination_slug' => $built['slug'],
+					'status' => 'installed', 'artifact_kind' => 'plugin', 'destination_target_ref' => $plugin_file,
+					'destination_plugin_file' => $plugin_file, 'destination_slug' => $built['slug'],
 					'target_fingerprint' => $built['tree_fingerprint'], 'header_transforms' => $built['header_transforms'],
 					'active_before' => 0, 'active_after' => 0, 'finished_at' => current_time( 'mysql', true ),
 				]

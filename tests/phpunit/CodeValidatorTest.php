@@ -413,4 +413,25 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$this->assertWPError( $plan );
 		$this->assertSame( 'code_change_main_file_delete', $plan->get_error_code() );
 	}
+
+	public function test_existing_theme_plan_cannot_delete_root_stylesheet(): void {
+		$plan = $this->validator->plan(
+			[
+				'project_structure' => [
+					'files' => [
+						[ 'path' => 'style.css', 'type' => 'css', 'action' => 'delete', 'description' => 'Remove the stylesheet.' ],
+					],
+				],
+			],
+			[
+				'operation'       => 'modify',
+				'target_kind'     => 'theme',
+				'target_ref'      => 'fixture-theme',
+				'target_metadata' => [ 'kind' => 'theme', 'ref' => 'fixture-theme', 'name' => 'Fixture Theme' ],
+			]
+		);
+
+		$this->assertWPError( $plan );
+		$this->assertSame( 'code_change_theme_stylesheet_delete', $plan->get_error_code() );
+	}
 }

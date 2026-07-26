@@ -1,6 +1,7 @@
 <?php
 
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
+use WP_Autoplugin\V2\Infrastructure\Database\Release_Repository;
 
 /** Verifies additive Code-slice schema upgrades. */
 final class SchemaUpgradeTest extends WP_UnitTestCase {
@@ -177,5 +178,81 @@ final class SchemaUpgradeTest extends WP_UnitTestCase {
 			$this->assertSame( Installer::table( $table ), $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', Installer::table( $table ) ) ) );
 		}
 		$wpdb->delete( $revisions, [ 'id' => $revision_id ] );
+	}
+
+	public function test_version_eleven_upgrade_preserves_plugin_release_history_and_hydrates_generic_refs(): void {
+		global $wpdb;
+
+		Installer::activate();
+		$packages   = Installer::table( 'release_packages' );
+		$promotions = Installer::table( 'promotions' );
+		foreach ( [ 'target_ref', 'artifact_kind' ] as $column ) {
+			$wpdb->query( "ALTER TABLE $packages DROP COLUMN $column" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		}
+		foreach ( [ 'destination_target_ref', 'source_target_ref', 'artifact_kind' ] as $column ) {
+			$wpdb->query( "ALTER TABLE $promotions DROP COLUMN $column" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		}
+		$wpdb->query( "ALTER TABLE $promotions MODIFY mode varchar(20) NOT NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+
+		$job_id = wp_rand( 700000, 799999 );
+		$now    = current_time( 'mysql', true );
+		$wpdb->insert(
+			$packages,
+			[
+				'job_id'         => $job_id,
+				'workspace_id'   => 987658,
+				'revision_id'    => 765432,
+				'mode'           => 'replacement',
+				'status'         => 'ready',
+				'slug'           => 'fixture-plugin',
+				'plugin_file'    => 'fixture-plugin/fixture-plugin.php',
+				'review_override' => 0,
+				'created_by'     => 1,
+				'created_at'     => $now,
+				'updated_at'     => $now,
+			]
+		);
+		$package_id = (int) $wpdb->insert_id;
+		$wpdb->insert(
+			$promotions,
+			[
+				'job_id'                  => $job_id + 1,
+				'workspace_id'            => 987658,
+				'revision_id'             => 765432,
+				'mode'                    => 'modify_original',
+				'status'                  => 'completed',
+				'source_plugin_file'      => 'fixture-plugin/fixture-plugin.php',
+				'destination_plugin_file' => 'fixture-plugin/fixture-plugin.php',
+				'destination_slug'        => 'fixture-plugin',
+				'review_override'         => 0,
+				'created_by'              => 1,
+				'created_at'              => $now,
+				'updated_at'              => $now,
+			]
+		);
+		$promotion_id = (int) $wpdb->insert_id;
+		update_option( 'wp_autoplugin_v2_schema_version', '11', false );
+
+		Installer::maybe_upgrade();
+
+		$this->assertSame( Installer::SCHEMA_VERSION, get_option( 'wp_autoplugin_v2_schema_version' ) );
+		foreach ( [ 'artifact_kind', 'target_ref' ] as $column ) {
+			$this->assertSame( $column, $wpdb->get_var( "SHOW COLUMNS FROM $packages LIKE '$column'" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		}
+		foreach ( [ 'artifact_kind', 'source_target_ref', 'destination_target_ref' ] as $column ) {
+			$this->assertSame( $column, $wpdb->get_var( "SHOW COLUMNS FROM $promotions LIKE '$column'" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		}
+		$this->assertSame( 'varchar(30)', $wpdb->get_var( "SHOW COLUMNS FROM $promotions LIKE 'mode'", 1 ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		$release = new Release_Repository();
+		$package = $release->package( $package_id );
+		$promotion = $release->promotion( $promotion_id );
+		$this->assertSame( 'plugin', $package['artifact_kind'] );
+		$this->assertSame( 'fixture-plugin/fixture-plugin.php', $package['target_ref'] );
+		$this->assertSame( 'plugin', $promotion['artifact_kind'] );
+		$this->assertSame( 'fixture-plugin/fixture-plugin.php', $promotion['source_target_ref'] );
+		$this->assertSame( 'fixture-plugin/fixture-plugin.php', $promotion['destination_target_ref'] );
+
+		$wpdb->delete( $packages, [ 'id' => $package_id ] );
+		$wpdb->delete( $promotions, [ 'id' => $promotion_id ] );
 	}
 }

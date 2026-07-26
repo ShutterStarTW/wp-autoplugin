@@ -7,6 +7,8 @@ use WP_Autoplugin\V2\Infrastructure\Database\Release_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 use WP_Autoplugin\V2\Release\Package_Builder;
+use WP_Autoplugin\V2\Release\Release_Matrix;
+use WP_Autoplugin\V2\Release\Theme_Package_Builder;
 
 /** Builds one authenticated, expiring release ZIP in a durable package job. */
 final class Package_Orchestrator {
@@ -25,17 +27,24 @@ final class Package_Orchestrator {
 			return new \WP_Error( 'release_revision_conflict', __( 'Only the latest staged revision can be packaged.', 'wp-autoplugin' ) );
 		}
 		$mode = sanitize_key( (string) ( $job['payload']['mode'] ?? '' ) );
-		$slug = sanitize_title( (string) ( $job['payload']['destination_slug'] ?? $revision['project_manifest']['plugin_name'] ?? '' ) );
+		$kind = (string) ( $revision['project_manifest']['artifact_kind'] ?? 'plugin' );
+		if ( ! Release_Matrix::allows( 'package', (string) ( $revision['project_manifest']['scope'] ?? '' ), $kind, $mode ) ) {
+			return new \WP_Error( 'release_package_matrix', __( 'That package mode is not valid for this revision artifact.', 'wp-autoplugin' ) );
+		}
+		$slug = sanitize_title( (string) ( $job['payload']['destination_slug'] ?? $revision['project_manifest']['plugin_name'] ?? $workspace['target_ref'] ?? '' ) );
 		$release = new Release_Repository();
 		$existing = $release->package_by_job( (int) $job['id'] );
 		if ( $existing && 'ready' === $existing['status'] ) {
 			return $this->result( $existing );
 		}
-		$package = $existing ?: $release->create_package( $job, $revision, $mode, $slug, 'project' === $mode ? null : (string) $workspace['target_ref'], ! empty( $job['payload']['review_override'] ) );
+		$target_ref = 'project' === $mode ? null : (string) $workspace['target_ref'];
+		$package = $existing ?: $release->create_package( $job, $revision, $mode, $slug, $target_ref, ! empty( $job['payload']['review_override'] ), $kind );
 		$jobs = new Job_Repository();
 		$jobs->update( (int) $job['id'], [ 'progress' => 20 ] );
-		$jobs->event( (int) $job['id'], 'package_started', __( 'Building a private revision-bound plugin package.', 'wp-autoplugin' ), [ 'package_id' => (int) $package['id'], 'mode' => $mode, 'revision_id' => (int) $revision['id'] ] );
-		$built = ( new Package_Builder() )->build( $workspace, $revision, $mode, $slug );
+		$jobs->event( (int) $job['id'], 'package_started', __( 'Building a private revision-bound release package.', 'wp-autoplugin' ), [ 'package_id' => (int) $package['id'], 'mode' => $mode, 'revision_id' => (int) $revision['id'], 'artifact_kind' => $kind ] );
+		$built = 'theme' === $kind
+			? ( new Theme_Package_Builder() )->build( $workspace, $revision, 'replacement', $slug )
+			: ( new Package_Builder() )->build( $workspace, $revision, $mode, $slug );
 		if ( is_wp_error( $built ) ) {
 			$release->fail_package( (int) $package['id'], $built->get_error_message() );
 			return $built;
@@ -54,11 +63,17 @@ final class Package_Orchestrator {
 			return new \WP_Error( 'release_package_save', __( 'The completed package metadata could not be saved.', 'wp-autoplugin' ) );
 		}
 		$package = $release->package( (int) $package['id'] );
-		$jobs->event( (int) $job['id'], 'package_ready', __( 'The private plugin ZIP is ready for authenticated download.', 'wp-autoplugin' ), [ 'package_id' => (int) $package['id'], 'sha256' => $package['sha256'], 'size' => (int) $package['size'] ] );
+		$jobs->event( (int) $job['id'], 'package_ready', __( 'The private release ZIP is ready for authenticated download.', 'wp-autoplugin' ), [ 'package_id' => (int) $package['id'], 'sha256' => $package['sha256'], 'size' => (int) $package['size'], 'artifact_kind' => $kind ] );
 		return $this->result( $package );
 	}
 
 	private function result( array $package ): array {
-		return [ 'outcome' => 'package', 'package_id' => (int) $package['id'], 'revision_id' => (int) $package['revision_id'], 'mode' => $package['mode'], 'status' => $package['status'], 'slug' => $package['slug'], 'plugin_file' => $package['plugin_file'], 'sha256' => $package['sha256'], 'size' => (int) $package['size'], 'header_transforms' => $package['header_transforms'], 'expires_at' => $package['expires_at'] ];
+		return [
+			'outcome' => 'package', 'package_id' => (int) $package['id'], 'revision_id' => (int) $package['revision_id'],
+			'mode' => $package['mode'], 'status' => $package['status'], 'artifact_kind' => $package['artifact_kind'],
+			'slug' => $package['slug'], 'target_ref' => $package['target_ref'], 'plugin_file' => $package['plugin_file'],
+			'sha256' => $package['sha256'], 'size' => (int) $package['size'],
+			'header_transforms' => $package['header_transforms'], 'expires_at' => $package['expires_at'],
+		];
 	}
 }

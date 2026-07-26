@@ -7,6 +7,8 @@ use WP_Autoplugin\V2\Infrastructure\Database\Release_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
 use WP_Autoplugin\V2\Release\Promotion_Service;
+use WP_Autoplugin\V2\Release\Release_Matrix;
+use WP_Autoplugin\V2\Release\Theme_Promotion_Service;
 
 /** Runs one install/fork/in-place promotion as durable artifact work. */
 final class Promotion_Orchestrator {
@@ -26,13 +28,32 @@ final class Promotion_Orchestrator {
 				return new \WP_Error( 'promotion_action_missing', __( 'The promotion for this action is unavailable.', 'wp-autoplugin' ) );
 			}
 			$jobs = new Job_Repository();
-			$jobs->event( (int) $job['id'], 'promotion_action_started', 'activate' === $action ? __( 'Plugin activation started.', 'wp-autoplugin' ) : __( 'Conflict-safe file rollback started.', 'wp-autoplugin' ), [ 'promotion_id' => (int) $promotion['id'], 'action' => $action ] );
-			$operation = 'activate' === $action ? ( new Promotion_Service() )->activate( $promotion ) : ( new Promotion_Service() )->rollback( $promotion );
+			$kind = (string) ( $promotion['artifact_kind'] ?? 'plugin' );
+			if ( 'activate' === $action && 'theme' === $kind ) {
+				return new \WP_Error( 'theme_promotion_activation', __( 'Theme switching is not performed by WP-Autoplugin.', 'wp-autoplugin' ) );
+			}
+			$jobs->event( (int) $job['id'], 'promotion_action_started', 'activate' === $action ? __( 'Plugin activation started.', 'wp-autoplugin' ) : __( 'Conflict-safe file rollback started.', 'wp-autoplugin' ), [ 'promotion_id' => (int) $promotion['id'], 'action' => $action, 'artifact_kind' => $kind ] );
+			if ( 'activate' === $action ) {
+				$operation = ( new Promotion_Service() )->activate( $promotion );
+			} else {
+				$operation = 'theme' === $kind
+					? ( new Theme_Promotion_Service() )->rollback( $promotion )
+					: ( new Promotion_Service() )->rollback( $promotion );
+			}
 			if ( is_wp_error( $operation ) ) {
 				return $operation;
 			}
 			$jobs->event( (int) $job['id'], 'promotion_action_completed', 'activate' === $action ? __( 'Plugin activation completed.', 'wp-autoplugin' ) : __( 'File rollback completed.', 'wp-autoplugin' ), [ 'promotion_id' => (int) $promotion['id'], 'action' => $action, 'status' => $operation['status'] ] );
-			return array_merge( [ 'outcome' => 'promotion_action', 'promotion_id' => (int) $promotion['id'], 'action' => $action ], $operation );
+			return array_merge(
+				[
+					'outcome'       => 'promotion_action',
+					'promotion_id'  => (int) $promotion['id'],
+					'action'        => $action,
+					'artifact_kind' => $kind,
+					'target_ref'    => $operation['target_ref'] ?? $operation['plugin_file'] ?? $promotion['destination_target_ref'] ?? null,
+				],
+				$operation
+			);
 		}
 		$revisions = new Revision_Repository();
 		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
@@ -41,25 +62,34 @@ final class Promotion_Orchestrator {
 			return new \WP_Error( 'promotion_revision_conflict', __( 'Only the latest staged revision can be promoted.', 'wp-autoplugin' ) );
 		}
 		$mode = sanitize_key( (string) ( $job['payload']['mode'] ?? '' ) );
-		if ( ! in_array( $mode, [ 'install_project', 'install_fork', 'modify_original' ], true ) ) {
+		if ( ! in_array( $mode, [ 'install_project', 'install_fork', 'modify_original', 'install_theme_copy', 'modify_theme_original' ], true ) ) {
 			return new \WP_Error( 'promotion_mode', __( 'The requested promotion mode is invalid.', 'wp-autoplugin' ) );
+		}
+		$kind = (string) ( $revision['project_manifest']['artifact_kind'] ?? 'plugin' );
+		if ( ! Release_Matrix::allows( 'promotion', (string) ( $revision['project_manifest']['scope'] ?? '' ), $kind, $mode ) ) {
+			return new \WP_Error( 'promotion_matrix', __( 'That promotion mode is not valid for this revision artifact.', 'wp-autoplugin' ) );
+		}
+		if ( in_array( $mode, [ 'modify_original', 'modify_theme_original' ], true ) && (string) ( $job['payload']['target_confirmation'] ?? '' ) !== (string) $workspace['target_ref'] ) {
+			return new \WP_Error( 'promotion_confirmation', __( 'Direct modification requires the exact target reference as confirmation.', 'wp-autoplugin' ) );
 		}
 		$release   = new Release_Repository();
 		$promotion = $release->promotion_by_job( (int) $job['id'] );
 		$slug      = sanitize_title( (string) ( $job['payload']['destination_slug'] ?? '' ) );
 		$source    = 'install_project' === $mode ? null : (string) $workspace['target_ref'];
-		$destination = 'modify_original' === $mode ? (string) $workspace['target_ref'] : null;
+		$destination = in_array( $mode, [ 'modify_original', 'modify_theme_original' ], true ) ? (string) $workspace['target_ref'] : null;
 		if ( ! $promotion ) {
-			$promotion = $release->create_promotion( $job, $revision, $mode, $source, $destination, $slug ?: null, ! empty( $job['payload']['review_override'] ) );
+			$promotion = $release->create_promotion( $job, $revision, $mode, $source, $destination, $slug ?: null, ! empty( $job['payload']['review_override'] ), $kind );
 		}
 		$jobs = new Job_Repository();
 		$jobs->update( (int) $job['id'], [ 'progress' => 15 ] );
-		$jobs->event( (int) $job['id'], 'promotion_started', __( 'The plugin promotion preflight started.', 'wp-autoplugin' ), [ 'promotion_id' => (int) $promotion['id'], 'mode' => $mode, 'revision_id' => (int) $revision['id'] ] );
+		$jobs->event( (int) $job['id'], 'promotion_started', __( 'The release promotion preflight started.', 'wp-autoplugin' ), [ 'promotion_id' => (int) $promotion['id'], 'mode' => $mode, 'revision_id' => (int) $revision['id'], 'artifact_kind' => $kind ] );
 
-		$service = new Promotion_Service();
+		$service = 'theme' === $kind ? new Theme_Promotion_Service() : new Promotion_Service();
 		try {
-			if ( 'modify_original' === $mode ) {
+			if ( 'modify_original' === $mode || 'modify_theme_original' === $mode ) {
 				$operation = $service->modify( $promotion, $workspace, $revision );
+			} elseif ( 'install_theme_copy' === $mode ) {
+				$operation = $service->install_copy( $promotion, $workspace, $revision, $slug );
 			} else {
 				$operation = $service->install( $promotion, $workspace, $revision, 'install_fork' === $mode ? 'fork' : 'project', $slug );
 			}
@@ -74,7 +104,9 @@ final class Promotion_Orchestrator {
 			}
 			return $operation;
 		}
-		$jobs->event( (int) $job['id'], 'promotion_completed', __( 'The plugin promotion completed.', 'wp-autoplugin' ), [ 'promotion_id' => (int) $promotion['id'], 'status' => $operation['status'], 'plugin_file' => $operation['plugin_file'] ] );
-		return array_merge( [ 'outcome' => 'promotion', 'promotion_id' => (int) $promotion['id'], 'revision_id' => (int) $revision['id'], 'mode' => $mode ], $operation );
+		$operation['artifact_kind'] = $kind;
+		$operation['target_ref'] = $operation['target_ref'] ?? $operation['plugin_file'] ?? $destination;
+		$jobs->event( (int) $job['id'], 'promotion_completed', __( 'The release promotion completed.', 'wp-autoplugin' ), [ 'promotion_id' => (int) $promotion['id'], 'status' => $operation['status'], 'target_ref' => $operation['target_ref'] ?? $operation['plugin_file'] ?? '', 'artifact_kind' => $kind ] );
+		return array_merge( [ 'outcome' => 'promotion', 'promotion_id' => (int) $promotion['id'], 'revision_id' => (int) $revision['id'], 'mode' => $mode, 'artifact_kind' => $kind ], $operation );
 	}
 }

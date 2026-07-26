@@ -19,6 +19,8 @@ use WP_Autoplugin\V2\Infrastructure\Database\Review_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Release_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
 use WP_Autoplugin\V2\Domain\AI\Prompt_Image_Validator;
+use WP_Autoplugin\V2\Release\Release_Matrix;
+use WP_Autoplugin\V2\Release\Theme_Promotion_Service;
 
 /**
  * Capability-checked REST interface for the v2 admin application.
@@ -243,7 +245,7 @@ final class Routes {
 			'args'                => [
 				'id'                          => [ 'type' => 'integer', 'minimum' => 1 ],
 				'expected_latest_revision_id' => [ 'required' => true, 'type' => 'integer', 'minimum' => 1 ],
-				'mode'                        => [ 'required' => true, 'type' => 'string', 'enum' => [ 'project', 'fork', 'replacement' ] ],
+				'mode'                        => [ 'required' => true, 'type' => 'string', 'enum' => [ 'project', 'fork', 'replacement', 'theme_replacement' ] ],
 				'destination_slug'            => [ 'type' => 'string', 'default' => '', 'sanitize_callback' => 'sanitize_title' ],
 				'review_report_id'            => [ 'type' => 'integer', 'minimum' => 1 ],
 				'review_override'             => [ 'type' => 'boolean', 'default' => false ],
@@ -268,7 +270,7 @@ final class Routes {
 			'args'                => [
 				'id'                          => [ 'type' => 'integer', 'minimum' => 1 ],
 				'expected_latest_revision_id' => [ 'required' => true, 'type' => 'integer', 'minimum' => 1 ],
-				'mode'                        => [ 'required' => true, 'type' => 'string', 'enum' => [ 'install_project', 'install_fork', 'modify_original' ] ],
+				'mode'                        => [ 'required' => true, 'type' => 'string', 'enum' => [ 'install_project', 'install_fork', 'modify_original', 'install_theme_copy', 'modify_theme_original' ] ],
 				'destination_slug'            => [ 'type' => 'string', 'default' => '', 'sanitize_callback' => 'sanitize_title' ],
 				'review_report_id'            => [ 'type' => 'integer', 'minimum' => 1 ],
 				'review_override'             => [ 'type' => 'boolean', 'default' => false ],
@@ -317,7 +319,10 @@ final class Routes {
 				'can_install'           => $file_mods && $single_site && current_user_can( 'install_plugins' ),
 				'can_activate'          => $file_mods && $single_site && current_user_can( 'activate_plugins' ),
 				'can_modify'            => $file_mods && $single_site && current_user_can( 'update_plugins' ),
-				'disabled_reasons'      => array_values( array_filter( [ ! $file_mods ? __( 'WordPress file modifications are disabled.', 'wp-autoplugin' ) : '', ! $single_site ? __( 'Plugin installation, activation, direct modification, and rollback are not available on multisite yet.', 'wp-autoplugin' ) : '' ] ) ),
+				'can_install_themes'    => $file_mods && $single_site && current_user_can( 'install_themes' ),
+				'can_modify_themes'     => $file_mods && $single_site && current_user_can( 'update_themes' ),
+				'themes_url'            => admin_url( 'themes.php' ),
+				'disabled_reasons'      => array_values( array_filter( [ ! $file_mods ? __( 'WordPress file modifications are disabled.', 'wp-autoplugin' ) : '', ! $single_site ? __( 'Plugin and theme installation, activation, direct modification, and rollback are not available on multisite yet.', 'wp-autoplugin' ) : '' ] ) ),
 			],
 		] );
 	}
@@ -872,7 +877,9 @@ final class Routes {
 		}
 		$payload = $prepared['payload'];
 		$payload['mode'] = (string) $request['mode'];
-		$payload['destination_slug'] = (string) ( $request['destination_slug'] ?: sanitize_title( (string) ( $prepared['revision']['project_manifest']['plugin_name'] ?? '' ) ) );
+		$payload['destination_slug'] = 'theme_replacement' === $payload['mode']
+			? (string) $prepared['workspace']['target_ref']
+			: (string) ( $request['destination_slug'] ?: sanitize_title( (string) ( $prepared['revision']['project_manifest']['plugin_name'] ?? '' ) ) );
 		return $this->queue_artifact_job( (int) $prepared['workspace']['id'], 'package', $payload );
 	}
 
@@ -957,15 +964,27 @@ final class Routes {
 		if ( 'modify_original' === $mode && ! current_user_can( 'update_plugins' ) ) {
 			return new \WP_Error( 'wp_autoplugin_modify_capability', __( 'You are not allowed to modify plugins.', 'wp-autoplugin' ), [ 'status' => 403 ] );
 		}
-		if ( is_multisite() || ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS ) ) {
-			return new \WP_Error( 'wp_autoplugin_promotion_disabled', is_multisite() ? __( 'Plugin filesystem mutation is not available on multisite yet.', 'wp-autoplugin' ) : __( 'WordPress file modifications are disabled.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		if ( 'install_theme_copy' === $mode && ! current_user_can( 'install_themes' ) ) {
+			return new \WP_Error( 'wp_autoplugin_install_theme_capability', __( 'You are not allowed to install themes.', 'wp-autoplugin' ), [ 'status' => 403 ] );
 		}
-		if ( 'modify_original' === $mode && (string) $request['target_confirmation'] !== (string) $prepared['workspace']['target_ref'] ) {
-			return new \WP_Error( 'wp_autoplugin_target_confirmation', __( 'Direct modification requires the exact target plugin reference as confirmation.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		if ( 'modify_theme_original' === $mode && ! current_user_can( 'update_themes' ) ) {
+			return new \WP_Error( 'wp_autoplugin_modify_theme_capability', __( 'You are not allowed to modify themes.', 'wp-autoplugin' ), [ 'status' => 403 ] );
+		}
+		if ( is_multisite() || ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS ) ) {
+			return new \WP_Error( 'wp_autoplugin_promotion_disabled', is_multisite() ? __( 'Plugin and theme filesystem mutation is not available on multisite yet.', 'wp-autoplugin' ) : __( 'WordPress file modifications are disabled.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+		if ( in_array( $mode, [ 'modify_original', 'modify_theme_original' ], true ) && (string) $request['target_confirmation'] !== (string) $prepared['workspace']['target_ref'] ) {
+			return new \WP_Error( 'wp_autoplugin_target_confirmation', __( 'Direct modification requires the exact target reference as confirmation.', 'wp-autoplugin' ), [ 'status' => 400 ] );
+		}
+		$theme_service = 'modify_theme_original' === $mode ? new Theme_Promotion_Service() : null;
+		if ( $theme_service && $theme_service->in_use( (string) $prepared['workspace']['target_ref'] ) ) {
+			return new \WP_Error( 'wp_autoplugin_theme_in_use', $theme_service->in_use_reason( (string) $prepared['workspace']['target_ref'] ), [ 'status' => 409 ] );
 		}
 		$payload = $prepared['payload'];
 		$payload['mode'] = $mode;
-		$payload['destination_slug'] = (string) ( $request['destination_slug'] ?: sanitize_title( (string) ( $prepared['revision']['project_manifest']['plugin_name'] ?? '' ) ) );
+		$payload['destination_slug'] = 'install_theme_copy' === $mode
+			? (string) ( $request['destination_slug'] ?: sanitize_title( (string) $prepared['workspace']['target_ref'] . '-wp-autoplugin-copy' ) )
+			: (string) ( $request['destination_slug'] ?: sanitize_title( (string) ( $prepared['revision']['project_manifest']['plugin_name'] ?? '' ) ) );
 		$payload['target_confirmation'] = (string) $request['target_confirmation'];
 		return $this->queue_artifact_job( (int) $prepared['workspace']['id'], 'promotion', $payload );
 	}
@@ -978,6 +997,10 @@ final class Routes {
 	}
 
 	public function activate_promotion( \WP_REST_Request $request ) {
+		$promotion = ( new Release_Repository() )->promotion( (int) $request['id'] );
+		if ( $promotion && 'theme' === ( $promotion['artifact_kind'] ?? 'plugin' ) ) {
+			return new \WP_Error( 'wp_autoplugin_theme_switch_unavailable', __( 'Theme switching is not performed by WP-Autoplugin. Use Appearance → Themes to preview or activate the installed copy.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
 		if ( ! current_user_can( 'activate_plugins' ) ) {
 			return new \WP_Error( 'wp_autoplugin_activate_capability', __( 'You are not allowed to activate plugins.', 'wp-autoplugin' ), [ 'status' => 403 ] );
 		}
@@ -985,8 +1008,10 @@ final class Routes {
 	}
 
 	public function rollback_promotion( \WP_REST_Request $request ) {
-		if ( ! current_user_can( 'update_plugins' ) ) {
-			return new \WP_Error( 'wp_autoplugin_rollback_capability', __( 'You are not allowed to roll back plugin files.', 'wp-autoplugin' ), [ 'status' => 403 ] );
+		$promotion = ( new Release_Repository() )->promotion( (int) $request['id'] );
+		$theme     = $promotion && 'theme' === ( $promotion['artifact_kind'] ?? 'plugin' );
+		if ( ! current_user_can( $theme ? 'update_themes' : 'update_plugins' ) ) {
+			return new \WP_Error( 'wp_autoplugin_rollback_capability', $theme ? __( 'You are not allowed to roll back theme files.', 'wp-autoplugin' ) : __( 'You are not allowed to roll back plugin files.', 'wp-autoplugin' ), [ 'status' => 403 ] );
 		}
 		return $this->queue_promotion_action( (int) $request['id'], 'rollback' );
 	}
@@ -1007,16 +1032,18 @@ final class Routes {
 		}
 		$manifest = (array) $revision['project_manifest'];
 		$mode     = (string) $request['mode'];
-		$project  = 'project' === ( $manifest['scope'] ?? '' ) && 'plugin' === ( $manifest['artifact_kind'] ?? '' );
-		$plugin_changes = 'changes' === ( $manifest['scope'] ?? '' ) && 'plugin' === ( $manifest['artifact_kind'] ?? '' );
-		$valid = 'package' === $resource
-			? ( ( 'project' === $mode && $project ) || ( in_array( $mode, [ 'fork', 'replacement' ], true ) && $plugin_changes ) )
-			: ( ( 'install_project' === $mode && $project ) || ( in_array( $mode, [ 'install_fork', 'modify_original' ], true ) && $plugin_changes ) );
+		$theme_changes = 'changes' === ( $manifest['scope'] ?? '' ) && 'theme' === ( $manifest['artifact_kind'] ?? '' );
+		$valid = Release_Matrix::allows(
+			$resource,
+			(string) ( $manifest['scope'] ?? '' ),
+			(string) ( $manifest['artifact_kind'] ?? '' ),
+			$mode
+		);
 		if ( ! $valid ) {
-			$message = 'theme' === ( $manifest['artifact_kind'] ?? '' )
-				? __( 'Theme release is not available yet.', 'wp-autoplugin' )
-				: __( 'That release action is not valid for this revision artifact.', 'wp-autoplugin' );
-			return new \WP_Error( 'wp_autoplugin_release_matrix', $message, [ 'status' => 409 ] );
+			return new \WP_Error( 'wp_autoplugin_release_matrix', __( 'That release action is not valid for this revision artifact.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+		if ( $theme_changes && ! preg_match( '/^[a-f0-9]{64}$/', (string) ( $manifest['complete_target_fingerprint'] ?? '' ) ) ) {
+			return new \WP_Error( 'wp_autoplugin_theme_release_legacy', __( 'Regenerate Code before releasing this theme revision.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		$reviews = new Review_Repository();
 		$state   = $reviews->workspace_status( (int) $workspace['id'], $revision_id );
@@ -1065,7 +1092,10 @@ final class Routes {
 			return new \WP_Error( 'wp_autoplugin_promotion_not_found', __( 'Promotion not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		if ( is_multisite() || ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS ) ) {
-			return new \WP_Error( 'wp_autoplugin_promotion_disabled', __( 'Plugin filesystem mutation is disabled for this site.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+			return new \WP_Error( 'wp_autoplugin_promotion_disabled', __( 'Plugin and theme filesystem mutation is disabled for this site.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+		if ( 'activate' === $action && 'theme' === ( $promotion['artifact_kind'] ?? 'plugin' ) ) {
+			return new \WP_Error( 'wp_autoplugin_theme_switch_unavailable', __( 'Theme switching is not performed by WP-Autoplugin.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		return $this->queue_artifact_job( (int) $promotion['workspace_id'], 'promotion', [ 'action' => $action, 'promotion_id' => $promotion_id, 'revision_id' => (int) $promotion['revision_id'] ] );
 	}

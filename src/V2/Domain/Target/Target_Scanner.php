@@ -34,6 +34,31 @@ final class Target_Scanner {
 	}
 
 	/**
+	 * Refresh volatile theme identity and in-use state without rescanning source statistics.
+	 *
+	 * @param array<string, mixed> $metadata Persisted target metadata.
+	 * @return array<string, mixed>
+	 */
+	public function refresh_metadata( string $kind, string $ref, array $metadata ): array {
+		if ( 'theme' !== $kind ) {
+			return $metadata;
+		}
+		$theme = wp_get_theme( $ref );
+		if ( ! $theme->exists() ) {
+			return $metadata;
+		}
+		return array_merge(
+			$metadata,
+			[
+				'kind' => 'theme',
+				'ref'  => $ref,
+				'name' => (string) $theme->get( 'Name' ),
+			],
+			$this->theme_identity( $theme )
+		);
+	}
+
+	/**
 	 * @return array<int, array<string, mixed>>
 	 */
 	private function plugins(): array {
@@ -69,23 +94,45 @@ final class Target_Scanner {
 	 */
 	private function themes(): array {
 		$targets = [];
-
 		foreach ( wp_get_themes() as $slug => $theme ) {
 			$targets[] = $this->describe(
 				'theme',
 				(string) $slug,
 				(string) $theme->get( 'Name' ),
 				wp_normalize_path( $theme->get_stylesheet_directory() ),
-				[
-					'version'     => (string) $theme->get( 'Version' ),
-					'author'      => wp_strip_all_tags( (string) $theme->get( 'Author' ) ),
-					'description' => wp_strip_all_tags( (string) $theme->get( 'Description' ) ),
-					'active'      => get_stylesheet() === $slug,
-				]
+				$this->theme_identity( $theme )
 			);
 		}
 
 		return $targets;
+	}
+
+	/** @return array<string, mixed> */
+	private function theme_identity( \WP_Theme $theme ): array {
+		$stylesheet    = (string) $theme->get_stylesheet();
+		$template      = (string) $theme->get_template();
+		$is_child      = '' !== $template && $template !== $stylesheet;
+		$parent        = $is_child ? $theme->parent() : false;
+		$parent_valid  = $is_child && $parent instanceof \WP_Theme && $parent->exists() && ! $parent->errors();
+		$active_child  = get_stylesheet() === $stylesheet;
+		$active_parent = get_template() === $stylesheet;
+		return [
+			'version'              => (string) $theme->get( 'Version' ),
+			'author'               => wp_strip_all_tags( (string) $theme->get( 'Author' ) ),
+			'description'          => wp_strip_all_tags( (string) $theme->get( 'Description' ) ),
+			'active'               => $active_child,
+			'stylesheet'           => $stylesheet,
+			'template'             => $template,
+			'is_child'             => $is_child,
+			'is_block_theme'       => $theme->is_block_theme(),
+			'parent_ref'           => $is_child ? $template : '',
+			'parent_available'     => $parent_valid,
+			'parent_name'          => $parent instanceof \WP_Theme ? (string) $parent->get( 'Name' ) : '',
+			'parent_version'       => $parent instanceof \WP_Theme ? (string) $parent->get( 'Version' ) : '',
+			'active_as_stylesheet' => $active_child,
+			'active_as_template'   => $active_parent,
+			'in_use'               => $active_child || $active_parent,
+		];
 	}
 
 	/**

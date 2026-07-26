@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
  * Creates and upgrades v2 operational tables.
  */
 final class Installer {
-	public const SCHEMA_VERSION = '11';
+	public const SCHEMA_VERSION = '12';
 	private const OPTION_NAME   = 'wp_autoplugin_v2_schema_version';
 
 	/**
@@ -431,6 +431,8 @@ final class Installer {
 			review_report_id bigint(20) unsigned NULL,
 			mode varchar(20) NOT NULL,
 			status varchar(20) NOT NULL DEFAULT 'queued',
+			artifact_kind varchar(20) NOT NULL DEFAULT 'plugin',
+			target_ref varchar(500) NULL,
 			slug varchar(100) NOT NULL,
 			plugin_file varchar(500) NULL,
 			temp_path text NULL,
@@ -457,8 +459,11 @@ final class Installer {
 			workspace_id bigint(20) unsigned NOT NULL,
 			revision_id bigint(20) unsigned NOT NULL,
 			review_report_id bigint(20) unsigned NULL,
-			mode varchar(20) NOT NULL,
+			mode varchar(30) NOT NULL,
 			status varchar(30) NOT NULL DEFAULT 'queued',
+			artifact_kind varchar(20) NOT NULL DEFAULT 'plugin',
+			source_target_ref varchar(500) NULL,
+			destination_target_ref varchar(500) NULL,
 			source_plugin_file varchar(500) NULL,
 			destination_plugin_file varchar(500) NULL,
 			destination_slug varchar(100) NULL,
@@ -575,6 +580,8 @@ final class Installer {
 		);
 		$release_packages        = self::table( 'release_packages' );
 		$release_package_columns = [
+			'artifact_kind'       => "ALTER TABLE $release_packages ADD artifact_kind varchar(20) NOT NULL DEFAULT 'plugin' AFTER status",
+			'target_ref'          => "ALTER TABLE $release_packages ADD target_ref varchar(500) NULL AFTER artifact_kind",
 			'source_fingerprint'   => "ALTER TABLE $release_packages ADD source_fingerprint char(64) NULL AFTER size",
 			'artifact_fingerprint' => "ALTER TABLE $release_packages ADD artifact_fingerprint char(64) NULL AFTER source_fingerprint",
 			'header_transforms'    => "ALTER TABLE $release_packages ADD header_transforms longtext NULL AFTER artifact_fingerprint",
@@ -586,13 +593,29 @@ final class Installer {
 			array_keys( $release_package_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $release_packages, $column )
 		);
+		$promotions        = self::table( 'promotions' );
+		$promotion_columns = [
+			'artifact_kind'          => "ALTER TABLE $promotions ADD artifact_kind varchar(20) NOT NULL DEFAULT 'plugin' AFTER status",
+			'source_target_ref'      => "ALTER TABLE $promotions ADD source_target_ref varchar(500) NULL AFTER artifact_kind",
+			'destination_target_ref' => "ALTER TABLE $promotions ADD destination_target_ref varchar(500) NULL AFTER source_target_ref",
+		];
+		foreach ( $promotion_columns as $column => $alter ) {
+			maybe_add_column( $promotions, $column, $alter );
+		}
+		if ( 'varchar(30)' !== self::column_type( $promotions, 'mode' ) ) {
+			$wpdb->query( "ALTER TABLE $promotions MODIFY mode varchar(30) NOT NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
+		}
+		$promotion_ready = ! array_filter(
+			array_keys( $promotion_columns ),
+			static fn( string $column ): bool => ! self::column_exists( $promotions, $column )
+		) && 'varchar(30)' === self::column_type( $promotions, 'mode' );
 		$review_release_tables = [ 'review_reports', 'review_findings', 'review_finding_events', 'release_packages', 'promotions', 'promotion_files' ];
 		$review_release_ready  = ! array_filter(
 			$review_release_tables,
 			static fn( string $table ): bool => ! self::table_exists( self::table( $table ) )
 		);
 		$prompt_attachment_ready = self::table_exists( self::table( 'prompt_attachments' ) ) && self::table_exists( self::table( 'job_prompt_attachments' ) );
-		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && $revision_file_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) && $review_release_ready && $release_package_ready && $prompt_attachment_ready ) {
+		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && $revision_file_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) && $review_release_ready && $release_package_ready && $promotion_ready && $prompt_attachment_ready ) {
 			update_option( self::OPTION_NAME, self::SCHEMA_VERSION, false );
 		}
 	}
@@ -605,6 +628,14 @@ final class Installer {
 
 		$query = $wpdb->prepare( "SHOW COLUMNS FROM $table LIKE %s", $column ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
 		return null !== $wpdb->get_var( $query ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
+	}
+
+	private static function column_type( string $table, string $column ): string {
+		global $wpdb;
+
+		$query = $wpdb->prepare( "SHOW COLUMNS FROM $table LIKE %s", $column ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
+		$row   = $wpdb->get_row( $query, ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
+		return strtolower( (string) ( $row['Type'] ?? '' ) );
 	}
 
 	private static function table_exists( string $table ): bool {

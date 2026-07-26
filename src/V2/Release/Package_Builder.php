@@ -136,7 +136,12 @@ final class Package_Builder {
 				wp_delete_file( $archive );
 				return new \WP_Error( 'release_package_verify', __( 'The completed package could not be verified.', 'wp-autoplugin' ) );
 			}
-			return [ 'path' => $archive, 'sha256' => $hash, 'size' => (int) $size, 'slug' => $slug, 'plugin_file' => $slug . '/' . $main_relative, 'source_tree_fingerprint' => $source_fingerprint, 'tree_fingerprint' => $tree['fingerprint'], 'header_transforms' => $headers ];
+			return [
+				'path' => $archive, 'sha256' => $hash, 'size' => (int) $size, 'slug' => $slug,
+				'artifact_kind' => 'plugin', 'target_ref' => $slug . '/' . $main_relative,
+				'plugin_file' => $slug . '/' . $main_relative, 'source_tree_fingerprint' => $source_fingerprint,
+				'tree_fingerprint' => $tree['fingerprint'], 'header_transforms' => $headers,
+			];
 		} catch ( \Throwable $error ) {
 			if ( is_file( $archive ) ) {
 				wp_delete_file( $archive );
@@ -151,7 +156,7 @@ final class Package_Builder {
 	public function scan_tree( string $root, bool $exclude_vcs = false, bool $enforce_limits = true ) {
 		$root_real = realpath( $root );
 		if ( false === $root_real || ! is_dir( $root_real ) ) {
-			return new \WP_Error( 'release_tree_missing', __( 'The plugin tree is unavailable.', 'wp-autoplugin' ) );
+			return new \WP_Error( 'release_tree_missing', __( 'The release tree is unavailable.', 'wp-autoplugin' ) );
 		}
 		$max_files = max( 1, (int) apply_filters( 'wp_autoplugin_v2_release_max_files', 25000 ) );
 		$max_total = max( 1, (int) apply_filters( 'wp_autoplugin_v2_release_max_bytes', 268435456 ) );
@@ -161,7 +166,7 @@ final class Package_Builder {
 		$iterator  = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root_real, \FilesystemIterator::SKIP_DOTS ) );
 		foreach ( $iterator as $file ) {
 			if ( $file->isLink() ) {
-				return new \WP_Error( 'release_symlink', __( 'Plugin packages cannot contain symbolic links.', 'wp-autoplugin' ) );
+				return new \WP_Error( 'release_symlink', __( 'Release packages cannot contain symbolic links.', 'wp-autoplugin' ) );
 			}
 			if ( ! $file->isFile() ) {
 				continue;
@@ -174,11 +179,11 @@ final class Package_Builder {
 			$size = (int) $file->getSize();
 			$total += $size;
 			if ( $enforce_limits && ( count( $rows ) + 1 > $max_files || $size > $max_file || $total > $max_total ) ) {
-				return new \WP_Error( 'release_tree_limit', __( 'The plugin tree exceeds the configured package file or size limit.', 'wp-autoplugin' ) );
+				return new \WP_Error( 'release_tree_limit', __( 'The release tree exceeds the configured package file or size limit.', 'wp-autoplugin' ) );
 			}
 			$hash = hash_file( 'sha256', $file->getPathname() );
 			if ( false === $hash ) {
-				return new \WP_Error( 'release_tree_read', __( 'A plugin file could not be fingerprinted.', 'wp-autoplugin' ) );
+				return new \WP_Error( 'release_tree_read', __( 'A release file could not be fingerprinted.', 'wp-autoplugin' ) );
 			}
 			$rows[] = $relative . "\0" . $hash . "\0" . $size;
 		}
@@ -186,9 +191,9 @@ final class Package_Builder {
 		return [ 'fingerprint' => hash( 'sha256', implode( "\n", $rows ) ), 'files' => count( $rows ), 'size' => $total ];
 	}
 
-	/** Fingerprint the complete bounded installed plugin tree, excluding only VCS metadata. */
-	public function fingerprint_target( string $plugin_file, bool $enforce_limits = true ) {
-		$root = $this->target_root( $plugin_file );
+	/** Fingerprint the complete bounded installed plugin or theme tree, excluding only VCS metadata. */
+	public function fingerprint_target( string $target_ref, bool $enforce_limits = true, string $artifact_kind = 'plugin' ) {
+		$root = $this->target_root( $target_ref, $artifact_kind );
 		if ( is_wp_error( $root ) ) {
 			return $root;
 		}
@@ -210,19 +215,48 @@ final class Package_Builder {
 	}
 
 	/** @return string|\WP_Error */
-	public function target_root( string $plugin_file ) {
-		$plugin_file = wp_normalize_path( $plugin_file );
-		if ( str_starts_with( $plugin_file, '/' ) || str_contains( $plugin_file, '..' ) || preg_match( '/[\x00-\x1F]/', $plugin_file ) ) {
-			return new \WP_Error( 'release_target_path', __( 'The target plugin path is invalid.', 'wp-autoplugin' ) );
+	public function target_root( string $target_ref, string $artifact_kind = 'plugin' ) {
+		$target_ref = wp_normalize_path( $target_ref );
+		if ( str_starts_with( $target_ref, '/' ) || str_contains( $target_ref, '..' ) || preg_match( '/[\x00-\x1F]/', $target_ref ) ) {
+			return new \WP_Error( 'release_target_path', __( 'The release target path is invalid.', 'wp-autoplugin' ) );
 		}
-		$directory = dirname( $plugin_file );
-		$path      = WP_PLUGIN_DIR . '/' . ( '.' === $directory ? $plugin_file : $directory );
-		$real      = realpath( $path );
-		$plugins   = trailingslashit( wp_normalize_path( realpath( WP_PLUGIN_DIR ) ?: WP_PLUGIN_DIR ) );
-		if ( false === $real || ! str_starts_with( trailingslashit( wp_normalize_path( $real ) ), $plugins ) || is_link( $path ) ) {
-			return new \WP_Error( 'release_target_path', __( 'The target plugin path is unavailable or unsafe.', 'wp-autoplugin' ) );
+
+		if ( 'theme' === $artifact_kind ) {
+			$theme = wp_get_theme( $target_ref );
+			$path  = $theme->exists() ? $theme->get_stylesheet_directory() : '';
+			$boundary = $theme->exists() ? $theme->get_theme_root() : '';
+		} else {
+			$directory = dirname( $target_ref );
+			$path      = WP_PLUGIN_DIR . '/' . ( '.' === $directory ? $target_ref : $directory );
+			$boundary  = WP_PLUGIN_DIR;
+		}
+
+		$real      = $path ? realpath( $path ) : false;
+		$root_real = $boundary ? realpath( $boundary ) : false;
+		$root      = trailingslashit( wp_normalize_path( $root_real ?: $boundary ) );
+		if ( false === $real || '' === $root || ! str_starts_with( trailingslashit( wp_normalize_path( $real ) ), $root ) || $this->has_symlink_component( $path, $boundary ) ) {
+			return new \WP_Error( 'release_target_path', __( 'The release target path is unavailable or unsafe.', 'wp-autoplugin' ) );
 		}
 		return wp_normalize_path( $real );
+	}
+
+	private function has_symlink_component( string $path, string $boundary ): bool {
+		$path     = wp_normalize_path( $path );
+		$boundary = untrailingslashit( wp_normalize_path( $boundary ) );
+		if ( '' === $boundary || ! str_starts_with( $path, trailingslashit( $boundary ) ) ) {
+			return true;
+		}
+		$current = $boundary;
+		foreach ( explode( '/', ltrim( substr( $path, strlen( $boundary ) ), '/' ) ) as $component ) {
+			if ( '' === $component ) {
+				continue;
+			}
+			$current .= '/' . $component;
+			if ( is_link( $current ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private function copy_target( string $source, string $destination ) {

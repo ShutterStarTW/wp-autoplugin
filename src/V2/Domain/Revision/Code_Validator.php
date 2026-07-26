@@ -404,6 +404,9 @@ final class Code_Validator {
 			if ( 'plugin' === $kind && $main_file === $file['path'] && 'delete' === $file['operation'] ) {
 				return new \WP_Error( 'code_change_main_file_delete', __( 'A staged change set cannot delete the target plugin main file.', 'wp-autoplugin' ) );
 			}
+			if ( 'theme' === $kind && 'style.css' === $file['path'] && 'delete' === $file['operation'] ) {
+				return new \WP_Error( 'code_change_theme_stylesheet_delete', __( 'A staged change set cannot delete the target theme stylesheet.', 'wp-autoplugin' ) );
+			}
 		}
 
 		$result = [
@@ -420,7 +423,7 @@ final class Code_Validator {
 			$result['target_fingerprint'] = $fingerprint;
 		}
 		$complete_fingerprint = (string) ( $manifest['complete_target_fingerprint'] ?? '' );
-		if ( 'plugin' === $kind && preg_match( '/^[a-f0-9]{64}$/', $complete_fingerprint ) ) {
+		if ( preg_match( '/^[a-f0-9]{64}$/', $complete_fingerprint ) ) {
 			$result['complete_target_fingerprint'] = $complete_fingerprint;
 		}
 		$base_hashes = [];

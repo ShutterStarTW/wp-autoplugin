@@ -297,10 +297,11 @@ final class Review_Orchestrator {
 	private function target_is_stale( array $workspace, array $revision ) {
 		$manifest = (array) ( $revision['project_manifest'] ?? [] );
 		$complete = (string) ( $manifest['complete_target_fingerprint'] ?? '' );
-		if ( 'changes' === ( $manifest['scope'] ?? '' ) && 'plugin' === ( $manifest['artifact_kind'] ?? '' ) && '' !== $complete ) {
-			$current_complete = ( new Package_Builder() )->fingerprint_target( (string) $workspace['target_ref'], false );
+		$kind     = (string) ( $manifest['artifact_kind'] ?? '' );
+		if ( 'changes' === ( $manifest['scope'] ?? '' ) && in_array( $kind, [ 'plugin', 'theme' ], true ) && '' !== $complete ) {
+			$current_complete = ( new Package_Builder() )->fingerprint_target( (string) $workspace['target_ref'], 'theme' === $kind, $kind );
 			if ( is_wp_error( $current_complete ) || ! hash_equals( $complete, (string) ( $current_complete['fingerprint'] ?? '' ) ) ) {
-				return is_wp_error( $current_complete ) ? $current_complete : new \WP_Error( 'review_complete_target_changed', __( 'The complete installed plugin changed after Code was staged. Regenerate Code before Review.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+				return is_wp_error( $current_complete ) ? $current_complete : new \WP_Error( 'review_complete_target_changed', __( 'The complete installed target changed after Code was staged. Regenerate Code before Review.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 		}
 		$expected = 'changes' === ( $manifest['scope'] ?? '' ) ? (string) ( $manifest['target_fingerprint'] ?? '' ) : (string) ( $manifest['integration_target_fingerprint'] ?? '' );
