@@ -18,6 +18,7 @@ use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Review_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Release_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
 use WP_Autoplugin\V2\Domain\AI\Prompt_Image_Validator;
 use WP_Autoplugin\V2\Release\Release_Matrix;
 use WP_Autoplugin\V2\Release\Theme_Promotion_Service;
@@ -113,6 +114,12 @@ final class Routes {
 		register_rest_route( self::NAMESPACE, '/workspaces/(?P<id>\d+)/jobs', [
 			'methods'             => \WP_REST_Server::READABLE,
 			'callback'            => [ $this, 'workspace_jobs' ],
+			'permission_callback' => $permission,
+			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
+		] );
+		register_rest_route( self::NAMESPACE, '/workspaces/(?P<id>\d+)/usage', [
+			'methods'             => \WP_REST_Server::READABLE,
+			'callback'            => [ $this, 'workspace_usage' ],
 			'permission_callback' => $permission,
 			'args'                => [ 'id' => [ 'type' => 'integer', 'minimum' => 1 ] ],
 		] );
@@ -561,6 +568,20 @@ final class Routes {
 		$jobs = new Job_Repository();
 		$items = array_map( fn( array $job ): array => $this->with_latest_event( $job, $jobs ), $jobs->list_for_workspace( $workspace_id ) );
 		return rest_ensure_response( [ 'items' => $items ] );
+	}
+
+	/**
+	 * Return project-wide token totals, grouped models, and executed AI jobs.
+	 *
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function workspace_usage( \WP_REST_Request $request ) {
+		$workspace = $this->workspace_for_current_user( (int) $request['id'] );
+		if ( ! $workspace ) {
+			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+
+		return rest_ensure_response( ( new Usage_Repository() )->summary_for_project( (int) $workspace['project_id'] ) );
 	}
 
 	/** @return \WP_REST_Response|\WP_Error */

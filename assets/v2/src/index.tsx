@@ -336,6 +336,39 @@ function revisionVisibleFiles(
 
 type CodeIssue = { path: string; line: number; code: string; message: string };
 
+type TokenUsageModel = {
+	provider: string;
+	model: string;
+	input_tokens: number;
+	output_tokens: number;
+};
+
+type TokenUsageSummary = {
+	project_id: number;
+	total: {
+		input_tokens: number;
+		output_tokens: number;
+	};
+	models: Array<
+		TokenUsageModel & {
+			job_count: number;
+		}
+	>;
+	executed_jobs: Array< {
+		id: number;
+		task: string;
+		stage: string;
+		mode: string;
+		status: string;
+		input_tokens: number;
+		output_tokens: number;
+		models: TokenUsageModel[];
+		created_at: string;
+		started_at: string;
+		finished_at: string;
+	} >;
+};
+
 type JobEvent = {
 	id: number;
 	sequence: number;
@@ -1904,6 +1937,431 @@ function StageModelControl( {
 	);
 }
 
+function formatTokenCount( count: number ): string {
+	return new Intl.NumberFormat().format( count );
+}
+
+function tokenUsageJobLabel(
+	job: TokenUsageSummary[ 'executed_jobs' ][ number ]
+): string {
+	if ( job.task === 'conversation' ) {
+		return sprintf(
+			/* translators: %s: Plan, Code, or Review stage name. */
+			__( '%s follow-up', 'wp-autoplugin' ),
+			getTabLabel( job.stage )
+		);
+	}
+	if ( job.task === 'plan_structure' ) {
+		return __( 'Plan structure update', 'wp-autoplugin' );
+	}
+	if ( job.task === 'review_fix' ) {
+		return __( 'Review fix', 'wp-autoplugin' );
+	}
+	if ( job.task === 'code' && job.mode === 'regenerate' ) {
+		return __( 'Code regeneration', 'wp-autoplugin' );
+	}
+	if ( job.task === 'code' ) {
+		return __( 'Code generation', 'wp-autoplugin' );
+	}
+	return getTabLabel( job.stage || job.task );
+}
+
+function TokenUsageControl( {
+	workspaceId,
+	jobs,
+}: {
+	workspaceId: number;
+	jobs: Job[];
+} ) {
+	const [ summary, setSummary ] = useState< TokenUsageSummary | null >(
+		null
+	);
+	const [ loading, setLoading ] = useState( true );
+	const [ error, setError ] = useState( '' );
+	const [ open, setOpen ] = useState( false );
+	const requestSequence = useRef( 0 );
+	const refreshKey = jobs
+		.map(
+			( job ) =>
+				`${ job.id }:${ job.status }:${ job.progress }:${
+					job.latest_event?.sequence ?? ''
+				}:${ job.code_progress?.input_tokens ?? '' }:${
+					job.code_progress?.output_tokens ?? ''
+				}`
+		)
+		.join( '|' );
+
+	const load = useCallback( async () => {
+		const requestNumber = ++requestSequence.current;
+		setLoading( true );
+		setError( '' );
+		try {
+			const response = await apiFetch< TokenUsageSummary >( {
+				path: `${ rest }/workspaces/${ workspaceId }/usage`,
+			} );
+			if ( requestNumber === requestSequence.current ) {
+				setSummary( response );
+			}
+		} catch ( reason: any ) {
+			if ( requestNumber === requestSequence.current ) {
+				setError(
+					reason?.message ||
+						__(
+							'Token usage could not be loaded.',
+							'wp-autoplugin'
+						)
+				);
+			}
+		} finally {
+			if ( requestNumber === requestSequence.current ) {
+				setLoading( false );
+			}
+		}
+	}, [ workspaceId ] );
+
+	useEffect( () => {
+		setSummary( null );
+		setError( '' );
+	}, [ workspaceId ] );
+
+	useEffect( () => {
+		void load();
+	}, [ load, refreshKey ] );
+
+	const inputTokens = summary?.total.input_tokens ?? 0;
+	const outputTokens = summary?.total.output_tokens ?? 0;
+	const buttonLabel =
+		loading && ! summary
+			? __( 'Loading token usage', 'wp-autoplugin' )
+			: sprintf(
+					/* translators: 1: Total input tokens, 2: Total output tokens. */
+					__(
+						'%1$s input tokens, %2$s output tokens. Click for token usage breakdown.',
+						'wp-autoplugin'
+					),
+					formatTokenCount( inputTokens ),
+					formatTokenCount( outputTokens )
+			  );
+
+	return (
+		<>
+			<Button
+				className="token-usage-control"
+				variant="secondary"
+				aria-label={ buttonLabel }
+				title={ buttonLabel }
+				onClick={ () => {
+					setOpen( true );
+					void load();
+				} }
+			>
+				<span aria-hidden="true">⬆️</span>
+				<span>
+					{ loading && ! summary
+						? '…'
+						: formatTokenCount( inputTokens ) }
+				</span>
+				<span className="token-usage-control__separator">|</span>
+				<span aria-hidden="true">⬇️</span>
+				<span>
+					{ loading && ! summary
+						? '…'
+						: formatTokenCount( outputTokens ) }
+				</span>
+			</Button>
+			{ open && (
+				<Modal
+					className="token-usage-modal"
+					title={ __( 'Project token usage', 'wp-autoplugin' ) }
+					size="large"
+					onRequestClose={ () => setOpen( false ) }
+				>
+					<p className="token-usage-modal__intro">
+						{ __(
+							'Totals include every recorded model request in this project, including retries and provider calls made by failed or cancelled jobs.',
+							'wp-autoplugin'
+						) }
+					</p>
+					{ error && (
+						<Notice status="error" isDismissible={ false }>
+							<p>{ error }</p>
+							<Button
+								variant="secondary"
+								isBusy={ loading }
+								onClick={ () => void load() }
+							>
+								{ __( 'Retry', 'wp-autoplugin' ) }
+							</Button>
+						</Notice>
+					) }
+					{ loading && ! summary && (
+						<div
+							className="token-usage-modal__loading"
+							role="status"
+						>
+							<Spinner />
+							{ __( 'Loading token usage…', 'wp-autoplugin' ) }
+						</div>
+					) }
+					{ summary && (
+						<>
+							<div className="token-usage-totals">
+								<div>
+									<span aria-hidden="true">⬆️</span>
+									<p>
+										{ __(
+											'Input tokens',
+											'wp-autoplugin'
+										) }
+									</p>
+									<strong>
+										{ formatTokenCount(
+											summary.total.input_tokens
+										) }
+									</strong>
+								</div>
+								<div>
+									<span aria-hidden="true">⬇️</span>
+									<p>
+										{ __(
+											'Output tokens',
+											'wp-autoplugin'
+										) }
+									</p>
+									<strong>
+										{ formatTokenCount(
+											summary.total.output_tokens
+										) }
+									</strong>
+								</div>
+							</div>
+							{ summary.models.length === 0 ? (
+								<p className="token-usage-modal__empty">
+									{ __(
+										'No token usage data available yet.',
+										'wp-autoplugin'
+									) }
+								</p>
+							) : (
+								<>
+									<section className="token-usage-section">
+										<h3>
+											{ __(
+												'Usage by model',
+												'wp-autoplugin'
+											) }
+										</h3>
+										<div className="token-usage-table-wrap">
+											<table>
+												<thead>
+													<tr>
+														<th>
+															{ __(
+																'Model',
+																'wp-autoplugin'
+															) }
+														</th>
+														<th>
+															{ __(
+																'Jobs',
+																'wp-autoplugin'
+															) }
+														</th>
+														<th>
+															{ __(
+																'Input',
+																'wp-autoplugin'
+															) }
+														</th>
+														<th>
+															{ __(
+																'Output',
+																'wp-autoplugin'
+															) }
+														</th>
+													</tr>
+												</thead>
+												<tbody>
+													{ summary.models.map(
+														( model ) => (
+															<tr
+																key={ `${ model.provider }:${ model.model }` }
+															>
+																<td>
+																	<strong>
+																		{
+																			model.model
+																		}
+																	</strong>
+																	<small>
+																		{
+																			model.provider
+																		}
+																	</small>
+																</td>
+																<td>
+																	{
+																		model.job_count
+																	}
+																</td>
+																<td>
+																	{ formatTokenCount(
+																		model.input_tokens
+																	) }
+																</td>
+																<td>
+																	{ formatTokenCount(
+																		model.output_tokens
+																	) }
+																</td>
+															</tr>
+														)
+													) }
+												</tbody>
+											</table>
+										</div>
+									</section>
+									<section className="token-usage-section">
+										<div className="token-usage-section__heading">
+											<h3>
+												{ __(
+													'Executed AI jobs',
+													'wp-autoplugin'
+												) }
+											</h3>
+											<span>
+												{ sprintf(
+													/* translators: %d: Number of executed AI jobs. */
+													_n(
+														'%d job',
+														'%d jobs',
+														summary.executed_jobs
+															.length,
+														'wp-autoplugin'
+													),
+													summary.executed_jobs.length
+												) }
+											</span>
+										</div>
+										<div className="token-usage-table-wrap">
+											<table>
+												<thead>
+													<tr>
+														<th>
+															{ __(
+																'Job',
+																'wp-autoplugin'
+															) }
+														</th>
+														<th>
+															{ __(
+																'Status',
+																'wp-autoplugin'
+															) }
+														</th>
+														<th>
+															{ __(
+																'Model',
+																'wp-autoplugin'
+															) }
+														</th>
+														<th>
+															{ __(
+																'Input',
+																'wp-autoplugin'
+															) }
+														</th>
+														<th>
+															{ __(
+																'Output',
+																'wp-autoplugin'
+															) }
+														</th>
+													</tr>
+												</thead>
+												<tbody>
+													{ summary.executed_jobs.map(
+														( job ) => (
+															<tr key={ job.id }>
+																<td>
+																	<strong>
+																		{ tokenUsageJobLabel(
+																			job
+																		) }
+																	</strong>
+																	<small>
+																		{ sprintf(
+																			/* translators: 1: Job ID, 2: Date and time. */
+																			__(
+																				'#%1$d · %2$s',
+																				'wp-autoplugin'
+																			),
+																			job.id,
+																			formatWorkspaceDate(
+																				job.created_at
+																			)
+																		) }
+																	</small>
+																</td>
+																<td>
+																	<span
+																		className={ `token-usage-job-status status--${ job.status }` }
+																	>
+																		{
+																			job.status
+																		}
+																	</span>
+																</td>
+																<td>
+																	{ job.models.map(
+																		(
+																			model
+																		) => (
+																			<span
+																				className="token-usage-job-model"
+																				key={ `${ job.id }:${ model.provider }:${ model.model }` }
+																			>
+																				<strong>
+																					{
+																						model.model
+																					}
+																				</strong>
+																				<small>
+																					{
+																						model.provider
+																					}
+																				</small>
+																			</span>
+																		)
+																	) }
+																</td>
+																<td>
+																	{ formatTokenCount(
+																		job.input_tokens
+																	) }
+																</td>
+																<td>
+																	{ formatTokenCount(
+																		job.output_tokens
+																	) }
+																</td>
+															</tr>
+														)
+													) }
+												</tbody>
+											</table>
+										</div>
+									</section>
+								</>
+							) }
+						</>
+					) }
+				</Modal>
+			) }
+		</>
+	);
+}
+
 function WorkspaceTabBar( {
 	workspaces,
 	activeWorkspaceId,
@@ -2752,6 +3210,13 @@ function WorkspaceView( {
 							context={ activeModelContext }
 							settings={ modelSettings }
 							onUpdate={ onUpdateModel }
+						/>
+					) }
+					{ activeModelRole && (
+						<TokenUsageControl
+							key={ workspace.id }
+							workspaceId={ workspace.id }
+							jobs={ jobs }
 						/>
 					) }
 				</div>
@@ -8387,9 +8852,9 @@ function slugify( value: string ): string {
 function reviewStatusLabel( status: string ): string {
 	switch ( status ) {
 		case 'all_clear':
-			return __( 'No actionable issues found', 'wp-autoplugin' );
+			return __( 'No issues', 'wp-autoplugin' );
 		case 'cleared_with_dismissals':
-			return __( 'Cleared with dismissals', 'wp-autoplugin' );
+			return __( 'Dismissed issues', 'wp-autoplugin' );
 		case 'action_required':
 			return __( 'Action required', 'wp-autoplugin' );
 		case 'stale':
