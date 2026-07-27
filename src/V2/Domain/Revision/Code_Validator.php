@@ -8,8 +8,8 @@ final class Code_Validator {
 	public const MAX_FILE_BYTES        = 65536;
 	public const MAX_PROJECT_BYTES     = 262144;
 	public const MAX_MANUAL_FILE_BYTES = 262144;
-	public const GENERATED_TYPES       = [ 'php', 'js', 'css', 'json', 'html', 'md', 'txt' ];
-	private const SUPPORTED_TYPES      = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'md', 'txt', 'xml', 'html' ];
+	public const GENERATED_TYPES       = [ 'php', 'js', 'css', 'json', 'html', 'svg', 'xml', 'md', 'txt' ];
+	private const SUPPORTED_TYPES      = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'html', 'svg', 'xml', 'md', 'txt' ];
 
 	/**
 	 * Normalize and validate structured Plan metadata before billable work.

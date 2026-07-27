@@ -219,6 +219,26 @@ final class SourceToolsTest extends WP_UnitTestCase {
 		$this->assertWPError( $this->tools->revision_file( '../wp-config.php' ) );
 	}
 
+	public function test_svg_and_xml_are_available_as_bounded_source_files(): void {
+		$svg_path = $this->root . '/icon.svg';
+		$xml_path = $this->root . '/integration.xml';
+		file_put_contents( $svg_path, "<svg xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 0h1v1z\"/></svg>\n" );
+		file_put_contents( $xml_path, "<?xml version=\"1.0\"?><integration/>\n" );
+
+		try {
+			$tree  = $this->tools->revision_tree();
+			$types = array_column( $tree['files'], 'type', 'path' );
+
+			$this->assertSame( 'svg', $types['icon.svg'] );
+			$this->assertSame( 'xml', $types['integration.xml'] );
+			$this->assertSame( 'svg', $this->tools->revision_file( 'icon.svg' )['type'] );
+			$this->assertSame( 'xml', $this->tools->revision_file( 'integration.xml' )['type'] );
+		} finally {
+			unlink( $svg_path );
+			unlink( $xml_path );
+		}
+	}
+
 	public function test_code_follow_up_tree_is_bounded_and_excludes_source_bodies(): void {
 		$tree = $this->tools->code_follow_up_tree();
 

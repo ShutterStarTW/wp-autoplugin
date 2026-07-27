@@ -97,25 +97,29 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 			'outcome'             => 'changes',
 			'content'             => 'Add project documentation.',
 			'resolved_request'    => 'Add the requested project documentation files.',
-			'acceptance_criteria' => [ 'The project includes metadata, a template, a README, and release notes.' ],
+			'acceptance_criteria' => [ 'The project includes the requested metadata, template, SVG, XML, README, and release notes.' ],
 			'manifest'            => $this->base,
 			'changes'             => [
 				[ 'path' => 'block.json', 'instruction' => 'Define the block metadata.' ],
 				[ 'path' => 'templates/notice.html', 'instruction' => 'Create the notice fragment.' ],
+				[ 'path' => 'assets/icon.svg', 'instruction' => 'Create the requested icon.' ],
+				[ 'path' => 'config/integration.xml', 'instruction' => 'Create the requested integration metadata.' ],
 				[ 'path' => 'README.md', 'instruction' => 'Document installation and usage.' ],
 				[ 'path' => 'notes.txt', 'instruction' => 'Add the release notes.' ],
 			],
 		];
 		$response['manifest']['files'][] = [ 'path' => 'block.json', 'type' => 'json', 'description' => 'Block metadata.' ];
 		$response['manifest']['files'][] = [ 'path' => 'templates/notice.html', 'type' => 'html', 'description' => 'Notice fragment.' ];
+		$response['manifest']['files'][] = [ 'path' => 'assets/icon.svg', 'type' => 'svg', 'description' => 'Requested icon.' ];
+		$response['manifest']['files'][] = [ 'path' => 'config/integration.xml', 'type' => 'xml', 'description' => 'Integration metadata.' ];
 		$response['manifest']['files'][] = [ 'path' => 'README.md', 'type' => 'md', 'description' => 'Usage documentation.' ];
 		$response['manifest']['files'][] = [ 'path' => 'notes.txt', 'type' => 'txt', 'description' => 'Release notes.' ];
 
 		$result = ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base );
 
 		$this->assertFalse( is_wp_error( $result ) );
-		$this->assertSame( [ 'block.json', 'templates/notice.html', 'README.md', 'notes.txt' ], $result['change_set']['added_paths'] );
-		$this->assertSame( [ 'json', 'html', 'md', 'txt' ], array_column( $result['files'], 'type' ) );
+		$this->assertSame( [ 'block.json', 'templates/notice.html', 'assets/icon.svg', 'config/integration.xml', 'README.md', 'notes.txt' ], $result['change_set']['added_paths'] );
+		$this->assertSame( [ 'json', 'html', 'svg', 'xml', 'md', 'txt' ], array_column( $result['files'], 'type' ) );
 	}
 
 	public function test_main_file_role_change_requires_both_retained_php_files(): void {
@@ -245,6 +249,8 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 					[ 'path' => 'notes.txt', 'type' => 'txt', 'description' => 'Release notes.', 'operation' => 'add' ],
 					[ 'path' => 'block.json', 'type' => 'json', 'description' => 'Block metadata.', 'operation' => 'add' ],
 					[ 'path' => 'templates/notice.html', 'type' => 'html', 'description' => 'Notice fragment.', 'operation' => 'add' ],
+					[ 'path' => 'assets/icon.svg', 'type' => 'svg', 'description' => 'Requested icon.', 'operation' => 'add' ],
+					[ 'path' => 'config/integration.xml', 'type' => 'xml', 'description' => 'Integration metadata.', 'operation' => 'add' ],
 				],
 			],
 			'changes'             => [
@@ -252,12 +258,14 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 				[ 'path' => 'notes.txt', 'instruction' => 'Summarize the release.' ],
 				[ 'path' => 'block.json', 'instruction' => 'Define the block metadata.' ],
 				[ 'path' => 'templates/notice.html', 'instruction' => 'Create the notice fragment.' ],
+				[ 'path' => 'assets/icon.svg', 'instruction' => 'Create the requested icon.' ],
+				[ 'path' => 'config/integration.xml', 'instruction' => 'Create the requested integration metadata.' ],
 			],
 		];
 
 		$result = ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $base );
 
 		$this->assertFalse( is_wp_error( $result ) );
-		$this->assertSame( [ 'md', 'txt', 'json', 'html' ], array_column( $result['files'], 'type' ) );
+		$this->assertSame( [ 'md', 'txt', 'json', 'html', 'svg', 'xml' ], array_column( $result['files'], 'type' ) );
 	}
 }

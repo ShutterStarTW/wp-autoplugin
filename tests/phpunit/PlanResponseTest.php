@@ -103,6 +103,8 @@ final class PlanResponseTest extends WP_UnitTestCase {
 							[ 'path' => 'documented-plugin.php', 'type' => 'php', 'description' => 'Bootstrap the plugin.', 'action' => 'add' ],
 							[ 'path' => 'block.json', 'type' => 'json', 'description' => 'Define block metadata.', 'action' => 'add' ],
 							[ 'path' => 'templates/notice.html', 'type' => 'html', 'description' => 'Render a notice fragment.', 'action' => 'add' ],
+							[ 'path' => 'assets/icon.svg', 'type' => 'svg', 'description' => 'Provide the requested icon.', 'action' => 'add' ],
+							[ 'path' => 'config/integration.xml', 'type' => 'xml', 'description' => 'Provide integration metadata.', 'action' => 'add' ],
 							[ 'path' => 'README.md', 'type' => 'md', 'description' => 'Document installation and usage.', 'action' => 'add' ],
 							[ 'path' => 'docs/license-notice.txt', 'type' => 'txt', 'description' => 'Describe bundled notices.', 'action' => 'add' ],
 						],
@@ -114,7 +116,7 @@ final class PlanResponseTest extends WP_UnitTestCase {
 		$result = ( new Plan_Response() )->parse( (string) $response, false, 0, 'create' );
 
 		$this->assertFalse( is_wp_error( $result ) );
-		$this->assertSame( [ 'php', 'json', 'html', 'md', 'txt' ], array_column( $result['structured']['project_structure']['files'], 'type' ) );
+		$this->assertSame( [ 'php', 'json', 'html', 'svg', 'xml', 'md', 'txt' ], array_column( $result['structured']['project_structure']['files'], 'type' ) );
 	}
 
 	public function test_rejects_new_plugin_plan_that_updates_a_file(): void {

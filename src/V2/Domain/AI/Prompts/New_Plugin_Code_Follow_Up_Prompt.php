@@ -5,7 +5,7 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Versioned prompts for questions and topology-aware Code follow-ups. */
 final class New_Plugin_Code_Follow_Up_Prompt {
 	public const SLUG    = 'new-plugin-code-follow-up';
-	public const VERSION = 6;
+	public const VERSION = 7;
 
 	public function analysis_instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
@@ -26,7 +26,7 @@ For a question return:
 For a change request return:
 {"outcome":"changes","content":"A concise Markdown change summary.","resolved_request":"One concrete statement of the newest requested result, with contextual references resolved.","acceptance_criteria":["Observable requirement the generated revision must satisfy."],"manifest":{"plugin_name":"...","main_file":"root-file.php","files":[{"path":"relative/path.php","type":"php","description":"Purpose."}]},"changes":[{"path":"relative/path.php","instruction":"Specific bounded implementation instruction that directly satisfies the resolved request."}]}
 
-For a change, provide one resolved_request and one to eight concrete, testable acceptance_criteria derived from the newest message and its clear conversational antecedent. The manifest is the complete desired live project after the change. Omitting an existing path deletes it. A renamed or moved file is a deletion plus a new file. Every new file must have one change instruction. Include retained files in changes only when their complete contents must be regenerated. Retained unlisted files are copied unchanged. Use only safe relative PHP, JavaScript, CSS, JSON, HTML, Markdown, and plain-text paths. Keep 1-20 files, exactly one root-level PHP main_file, and one Plugin Name header in that main file only. Do not propose build artifacts, dependencies, binaries, or filesystem operations. A change request must materially alter content or topology.
+For a change, provide one resolved_request and one to eight concrete, testable acceptance_criteria derived from the newest message and its clear conversational antecedent. The manifest is the complete desired live project after the change. Omitting an existing path deletes it. A renamed or moved file is a deletion plus a new file. Every new file must have one change instruction. Include retained files in changes only when their complete contents must be regenerated. Retained unlisted files are copied unchanged. Use only safe relative PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, and plain-text paths. Keep 1-20 files, exactly one root-level PHP main_file, and one Plugin Name header in that main file only. Do not propose build artifacts, dependencies, binaries, or filesystem operations. A change request must materially alter content or topology.
 PROMPT;
 	}
 
@@ -55,7 +55,7 @@ PROMPT;
 		$priority            = Code_Follow_Up_Priority::generation_instructions();
 
 		return <<<PROMPT
-Generate one complete file for a staged WordPress plugin change. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","content":"complete file contents"}. Do not wrap the JSON response in a Markdown fence; Markdown file content may contain fenced examples encoded inside the JSON string. The path must match exactly. Preserve established project conventions and implement the supplied instruction. The output must be a complete non-empty PHP, JavaScript, CSS, JSON, HTML, Markdown, or plain-text file under 64 KiB. PHP must parse without execution, JSON must be syntactically valid, and HTML may be a complete document or fragment. The desired main file must contain exactly one Plugin Name header and the exact header `Author: WP-Autoplugin`; supporting PHP files must contain none.
+Generate one complete file for a staged WordPress plugin change. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","content":"complete file contents"}. Do not wrap the JSON response in a Markdown fence; Markdown file content may contain fenced examples encoded inside the JSON string. The path must match exactly. Preserve established project conventions and implement the supplied instruction. The output must be a complete non-empty PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text file under 64 KiB. PHP must parse without execution, JSON must be syntactically valid, SVG and XML must be well-formed XML, and HTML may be a complete document or fragment. The desired main file must contain exactly one Plugin Name header and the exact header `Author: WP-Autoplugin`; supporting PHP files must contain none.
 
 $priority
 

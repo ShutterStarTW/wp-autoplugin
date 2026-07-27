@@ -85,7 +85,7 @@ final class Code_Follow_Up_Response {
 				return $this->error( 'code_follow_up_instruction', __( 'Every change instruction must be bounded, unique, and identify a desired file.', 'wp-autoplugin' ) );
 			}
 			if ( ! in_array( $target_paths[ $path ]['type'], Code_Validator::GENERATED_TYPES, true ) ) {
-				return $this->error( 'code_follow_up_target_type', __( 'AI Code follow-ups can generate only PHP, JavaScript, CSS, JSON, HTML, Markdown, and plain-text files.', 'wp-autoplugin' ) );
+				return $this->error( 'code_follow_up_target_type', __( 'AI Code follow-ups can generate only PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, and plain-text files.', 'wp-autoplugin' ) );
 			}
 			$total_bytes += strlen( $instruction );
 			$instructions[ $path ] = $instruction;

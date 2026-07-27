@@ -5448,11 +5448,11 @@ function CodeGenerationPanel( {
 				<Notice status="warning" isDismissible={ false }>
 					{ requiresMainFile
 						? __(
-								'This Plan needs a valid main plugin file and 1–20 added PHP, JavaScript, CSS, JSON, HTML, Markdown, or plain-text files. Regenerate the Plan structure before generating Code.',
+								'This Plan needs a valid main plugin file and 1–20 added PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text files. Regenerate the Plan structure before generating Code.',
 								'wp-autoplugin'
 						  )
 						: __(
-								'This Plan needs 1–20 valid Add, Update, or Delete actions for PHP, JavaScript, CSS, JSON, HTML, Markdown, or plain-text files. Regenerate the Plan structure before generating Code.',
+								'This Plan needs 1–20 valid Add, Update, or Delete actions for PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text files. Regenerate the Plan structure before generating Code.',
 								'wp-autoplugin'
 						  ) }
 				</Notice>

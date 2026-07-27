@@ -36,6 +36,7 @@ final class Assets {
 			'scss' => $css_editor,
 			'json' => $json_editor,
 			'html' => $html_editor,
+			'svg'  => $xml_editor,
 			'xml'  => $xml_editor,
 			'md'   => $text_editor,
 			'txt'  => $text_editor,

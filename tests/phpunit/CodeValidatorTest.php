@@ -21,6 +21,8 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 						[ 'path' => 'assets/style.css', 'type' => 'css', 'action' => 'add', 'description' => 'Styles.' ],
 						[ 'path' => 'block.json', 'type' => 'json', 'action' => 'add', 'description' => 'Block metadata.' ],
 						[ 'path' => 'templates/notice.html', 'type' => 'html', 'action' => 'add', 'description' => 'Notice template.' ],
+						[ 'path' => 'assets/icon.svg', 'type' => 'svg', 'action' => 'add', 'description' => 'Requested icon.' ],
+						[ 'path' => 'config/integration.xml', 'type' => 'xml', 'action' => 'add', 'description' => 'Integration metadata.' ],
 						[ 'path' => 'README.md', 'type' => 'md', 'action' => 'add', 'description' => 'Usage documentation.' ],
 						[ 'path' => 'notes.txt', 'type' => 'txt', 'action' => 'add', 'description' => 'Release notes.' ],
 					],
@@ -30,7 +32,7 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 
 		$this->assertFalse( is_wp_error( $plan ) );
 		$this->assertSame( 'example.php', $plan['main_file'] );
-		$this->assertSame( [ 'assets/style.css', 'block.json', 'templates/notice.html', 'README.md', 'notes.txt', 'example.php' ], array_column( $plan['files'], 'path' ) );
+		$this->assertSame( [ 'assets/style.css', 'block.json', 'templates/notice.html', 'assets/icon.svg', 'config/integration.xml', 'README.md', 'notes.txt', 'example.php' ], array_column( $plan['files'], 'path' ) );
 	}
 
 	public function test_legacy_plan_with_ambiguous_root_php_files_requires_regeneration(): void {
@@ -86,18 +88,22 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$this->assertSame( $text, $text_result['content'] );
 	}
 
-	public function test_generates_valid_json_and_html_and_rejects_invalid_json(): void {
+	public function test_generates_valid_json_html_svg_and_xml_and_rejects_invalid_json(): void {
 		$manifest = [
 			'plugin_name' => 'Block Plugin',
 			'main_file'   => 'block-plugin.php',
 			'files'       => [
 				[ 'path' => 'block.json', 'type' => 'json', 'description' => 'Block metadata.' ],
 				[ 'path' => 'templates/notice.html', 'type' => 'html', 'description' => 'Notice fragment.' ],
+				[ 'path' => 'assets/icon.svg', 'type' => 'svg', 'description' => 'Requested icon.' ],
+				[ 'path' => 'config/integration.xml', 'type' => 'xml', 'description' => 'Integration metadata.' ],
 				[ 'path' => 'block-plugin.php', 'type' => 'php', 'description' => 'Bootstrap.' ],
 			],
 		];
 		$json = "{\n\t\"apiVersion\": 3,\n\t\"name\": \"example/block\"\n}\n";
 		$html = "<section class=\"notice\"><strong>Ready</strong></section>\n";
+		$svg  = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\"><path d=\"M4 12h16\"/></svg>\n";
+		$xml  = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<integration><name>Example</name></integration>\n";
 
 		$json_result = $this->validator->response(
 			(string) wp_json_encode( [ 'path' => 'block.json', 'content' => $json ] ),
@@ -107,6 +113,16 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$html_result = $this->validator->response(
 			(string) wp_json_encode( [ 'path' => 'templates/notice.html', 'content' => $html ] ),
 			[ 'path' => 'templates/notice.html', 'type' => 'html', 'operation' => 'add' ],
+			$manifest
+		);
+		$svg_result = $this->validator->response(
+			(string) wp_json_encode( [ 'path' => 'assets/icon.svg', 'content' => $svg ] ),
+			[ 'path' => 'assets/icon.svg', 'type' => 'svg', 'operation' => 'add' ],
+			$manifest
+		);
+		$xml_result = $this->validator->response(
+			(string) wp_json_encode( [ 'path' => 'config/integration.xml', 'content' => $xml ] ),
+			[ 'path' => 'config/integration.xml', 'type' => 'xml', 'operation' => 'add' ],
 			$manifest
 		);
 		$invalid_json = $this->validator->response(
@@ -119,6 +135,10 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$this->assertSame( $json, $json_result['content'] );
 		$this->assertFalse( is_wp_error( $html_result ) );
 		$this->assertSame( $html, $html_result['content'] );
+		$this->assertFalse( is_wp_error( $svg_result ) );
+		$this->assertSame( $svg, $svg_result['content'] );
+		$this->assertFalse( is_wp_error( $xml_result ) );
+		$this->assertSame( $xml, $xml_result['content'] );
 		$this->assertWPError( $invalid_json );
 		$this->assertSame( 'json_syntax', $invalid_json->get_error_data()['issues'][0]['code'] );
 	}

@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Domain\Target;
  * Discovers local plugin/theme targets and calculates bounded source statistics.
  */
 final class Target_Scanner {
-	private const SUPPORTED_EXTENSIONS = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'md', 'txt', 'xml', 'html' ];
+	private const SUPPORTED_EXTENSIONS = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'html', 'svg', 'xml', 'md', 'txt' ];
 	private const SKIPPED_DIRECTORIES  = [ '.git', 'node_modules', 'vendor', 'tests' ];
 
 	/**

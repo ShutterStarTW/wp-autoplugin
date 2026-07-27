@@ -25,6 +25,11 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'vendor SDKs', $constraints );
 		$this->assertStringContainsString( 'WordPress HTTP API', $constraints );
 		$this->assertStringContainsString( 'CLI-only', $constraints );
+		$this->assertStringContainsString( 'SVG', $constraints );
+		$this->assertStringContainsString( 'XML', $constraints );
+		$this->assertStringContainsString( 'Keep every file map minimal', $constraints );
+		$this->assertStringContainsString( 'include a supporting file only when the administrator explicitly requests it or the required implementation genuinely needs it', $constraints );
+		$this->assertStringContainsString( 'never add optional files by default', $constraints );
 	}
 
 	public function test_versioned_plan_and_code_prompts_include_runtime_constraints(): void {
@@ -84,6 +89,8 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		foreach ( $prompts as $prompt ) {
 			$this->assertStringContainsString( 'JSON', $prompt );
 			$this->assertStringContainsString( 'HTML', $prompt );
+			$this->assertStringContainsString( 'SVG', $prompt );
+			$this->assertStringContainsString( 'XML', $prompt );
 			$this->assertStringContainsString( 'Markdown', $prompt );
 			$this->assertStringContainsString( 'plain', $prompt );
 		}

@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Domain\Target;
  * Bounded, read-only target source access for agents and revision editing.
  */
 final class Source_Tools {
-	private const EXTENSIONS       = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'md', 'txt', 'xml', 'html' ];
+	private const EXTENSIONS       = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'html', 'svg', 'xml', 'md', 'txt' ];
 	private const SKIPPED          = [ '.git', 'node_modules', 'vendor', 'tests' ];
 	private const MAX_FILE_BYTES   = 262144;
 	private const MAX_RESULT_BYTES = 65536;
