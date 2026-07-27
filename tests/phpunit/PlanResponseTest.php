@@ -54,6 +54,10 @@ final class PlanResponseTest extends WP_UnitTestCase {
 		);
 
 		$this->assertWPError( ( new Plan_Response() )->parse( (string) $response ) );
+
+		$reserved = json_decode( (string) $response, true );
+		$reserved['structured']['project_structure']['files'][0]['path'] = 'parent_theme:functions.php';
+		$this->assertWPError( ( new Plan_Response() )->parse( (string) wp_json_encode( $reserved ) ) );
 	}
 
 	public function test_initial_plan_cannot_finish_as_answer(): void {

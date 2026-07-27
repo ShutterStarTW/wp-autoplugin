@@ -1,11 +1,15 @@
 <?php
 
 use WP_Autoplugin\V2\Domain\Target\Source_Tools;
+use WP_Autoplugin\V2\Domain\Target\Target_Scanner;
 
 /** Focused WordPress test-suite coverage for bounded agent source tools. */
 final class SourceToolsTest extends WP_UnitTestCase {
 	private string $root;
 	private Source_Tools $tools;
+	private ?string $parent_root = null;
+	/** @var array<int, string> */
+	private array $theme_directories = [];
 
 	protected function setUp(): void {
 		parent::setUp();
@@ -23,7 +27,26 @@ final class SourceToolsTest extends WP_UnitTestCase {
 	}
 
 	protected function tearDown(): void {
-		foreach ( [ $this->root . '/linked.php', $this->root . '/AGENTS.md', $this->root . '/includes/AGENTS.md' ] as $path ) {
+		foreach ( array_reverse( $this->theme_directories ) as $directory ) {
+			$this->remove_tree( $directory );
+		}
+		if ( $this->theme_directories ) {
+			wp_clean_themes_cache( true );
+		}
+		if ( null !== $this->parent_root ) {
+			foreach ( [ $this->parent_root . '/inc/parent-hooks.php', $this->parent_root . '/functions.php', $this->parent_root . '/style.css' ] as $path ) {
+				if ( is_file( $path ) ) {
+					unlink( $path );
+				}
+			}
+			if ( is_dir( $this->parent_root . '/inc' ) ) {
+				rmdir( $this->parent_root . '/inc' );
+			}
+			if ( is_dir( $this->parent_root ) ) {
+				rmdir( $this->parent_root );
+			}
+		}
+		foreach ( [ $this->root . '/linked.php', $this->root . '/functions.php', $this->root . '/AGENTS.md', $this->root . '/includes/AGENTS.md' ] as $path ) {
 			if ( is_file( $path ) || is_link( $path ) ) {
 				unlink( $path );
 			}
@@ -204,5 +227,175 @@ final class SourceToolsTest extends WP_UnitTestCase {
 		$this->assertSame( [ 'includes/class-fixture.php', 'plugin.php' ], array_column( $tree['files'], 'path' ) );
 		$this->assertArrayNotHasKey( 'content', $tree['files'][0] );
 		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $tree['tree_fingerprint'] );
+	}
+
+	public function test_child_theme_can_inspect_parent_without_adding_parent_files_to_editable_tree(): void {
+		$this->configure_parent_theme();
+
+		$metadata = json_decode( $this->tools->execute( 'get_target_metadata', [] )['content'], true );
+		$this->assertTrue( $metadata['is_child'] );
+		$this->assertSame( 'Parent Fixture', $metadata['parent_theme']['name'] );
+		$this->assertSame( 'parent-fixture', $metadata['parent_theme']['ref'] );
+
+		$list = $this->tools->execute( 'list_files', [ 'source' => 'parent_theme' ] );
+		$decoded = json_decode( $list['content'], true );
+		$this->assertFalse( $list['error'] );
+		$this->assertSame( 'parent_theme', $decoded['source'] );
+		$this->assertSame( [ 'functions.php', 'inc/parent-hooks.php', 'style.css' ], array_column( $decoded['files'], 'path' ) );
+
+		$read = $this->tools->execute( 'read_file', [ 'source' => 'parent_theme', 'path' => 'functions.php' ] );
+		$this->assertStringContainsString( 'parent_theme:functions.php', $read['content'] );
+		$this->assertStringContainsString( 'parent-hooks.php', $read['content'] );
+		$this->assertArrayHasKey( 'parent_theme:functions.php', $read['inspected'] );
+		$this->assertSame( 'parent_theme', $read['audit']['source'] );
+
+		$child_read = $this->tools->execute( 'read_file', [ 'path' => 'functions.php' ] );
+		$this->assertStringContainsString( 'Child source with the same relative path', $child_read['content'] );
+		$this->assertStringNotContainsString( 'parent-hooks.php', $child_read['content'] );
+		$this->assertArrayHasKey( 'functions.php', $child_read['inspected'] );
+
+		$search = $this->tools->execute( 'search_code', [ 'source' => 'parent_theme', 'query' => 'parent_fixture_ready' ] );
+		$decoded = json_decode( $search['content'], true );
+		$this->assertSame( 'parent_theme', $decoded['hits'][0]['source'] );
+		$this->assertSame( 'inc/parent-hooks.php', $decoded['hits'][0]['path'] );
+
+		$hooks = $this->tools->execute( 'list_hooks', [ 'source' => 'parent_theme' ] );
+		$decoded = json_decode( $hooks['content'], true );
+		$this->assertSame( 'parent_theme', $decoded['hooks'][0]['source'] );
+		$this->assertSame( 'parent_fixture_ready', $decoded['hooks'][0]['name'] );
+
+		$editable = $this->tools->revision_tree();
+		$this->assertSame( [ 'functions.php', 'includes/class-fixture.php', 'plugin.php' ], array_column( $editable['files'], 'path' ) );
+
+		$bootstrap = $this->tools->bootstrap();
+		$this->assertStringContainsString( 'Read-only parent theme source structure', $bootstrap['content'] );
+		$this->assertStringContainsString( '"parent_theme"', $bootstrap['content'] );
+		$this->assertStringContainsString( 'Parent Fixture', $bootstrap['content'] );
+		$this->assertSame( 'functions.php', $bootstrap['audit']['parent_theme']['main_file'] );
+	}
+
+	public function test_parent_source_participates_only_in_inspection_consistency(): void {
+		$this->configure_parent_theme();
+
+		$target_fingerprint     = $this->tools->tree_fingerprint();
+		$inspection_fingerprint = $this->tools->inspection_fingerprint();
+		$parent_read            = $this->tools->execute( 'read_file', [ 'source' => 'parent_theme', 'path' => 'functions.php' ] );
+
+		file_put_contents( $this->parent_root . '/functions.php', "<?php\n// Parent changed.\n" );
+
+		$this->assertSame( $target_fingerprint, $this->tools->tree_fingerprint() );
+		$this->assertNotSame( $inspection_fingerprint, $this->tools->inspection_fingerprint() );
+		$this->assertFalse( $this->tools->inspected_unchanged( $parent_read['inspected'] ) );
+	}
+
+	public function test_parent_source_scope_is_rejected_for_non_child_targets(): void {
+		$result = $this->tools->execute( 'read_file', [ 'source' => 'parent_theme', 'path' => 'plugin.php' ] );
+
+		$this->assertTrue( $result['error'] );
+		$this->assertSame( [], $result['inspected'] );
+		$this->assertStringContainsString( 'does not have an available parent theme', $result['content'] );
+	}
+
+	public function test_scanner_and_source_tools_expose_installed_parent_theme_metadata_and_source(): void {
+		if ( ! is_writable( get_theme_root() ) ) {
+			$this->markTestSkipped( 'The WordPress theme root is not writable in this test environment.' );
+		}
+		$parent_slug = 'wp-autoplugin-parent-' . strtolower( wp_generate_password( 8, false, false ) );
+		$child_slug  = 'wp-autoplugin-child-' . strtolower( wp_generate_password( 8, false, false ) );
+		$parent_root = $this->install_theme(
+			$parent_slug,
+			"/*\nTheme Name: Parent Scanner Fixture\nVersion: 3.2.1\n*/\n",
+			[ 'functions.php' => "<?php\ndo_action( 'scanner_parent_hook' );\n" ]
+		);
+		$this->install_theme(
+			$child_slug,
+			"/*\nTheme Name: Child Scanner Fixture\nTemplate: {$parent_slug}\n*/\n",
+			[ 'functions.php' => "<?php\n// Child source.\n" ]
+		);
+
+		$target = ( new Target_Scanner() )->find( 'theme', $child_slug );
+		$this->assertIsArray( $target );
+		$this->assertTrue( $target['is_child'] );
+		$this->assertSame( $parent_slug, $target['parent_theme']['ref'] );
+		$this->assertSame( 'Parent Scanner Fixture', $target['parent_theme']['name'] );
+		$this->assertSame( '3.2.1', $target['parent_theme']['version'] );
+		$this->assertGreaterThanOrEqual( 2, $target['parent_theme']['source_files'] );
+
+		$tools = new Source_Tools( $target );
+		$this->assertTrue( $tools->has_parent_theme() );
+		$read = $tools->execute( 'read_file', [ 'source' => 'parent_theme', 'path' => 'functions.php' ] );
+		$this->assertFalse( $read['error'] );
+		$this->assertStringContainsString( 'scanner_parent_hook', $read['content'] );
+		$this->assertStringNotContainsString( $parent_root, $read['content'] );
+	}
+
+	private function configure_parent_theme(): void {
+		$this->parent_root = sys_get_temp_dir() . '/wp-autoplugin-parent-' . wp_generate_password( 8, false );
+		mkdir( $this->parent_root . '/inc', 0777, true );
+		file_put_contents( $this->parent_root . '/style.css', "/*\nTheme Name: Parent Fixture\n*/\n" );
+		file_put_contents( $this->parent_root . '/functions.php', "<?php\nrequire __DIR__ . '/inc/parent-hooks.php';\n" );
+		file_put_contents( $this->parent_root . '/inc/parent-hooks.php', "<?php\ndo_action( 'parent_fixture_ready' );\n" );
+		file_put_contents( $this->root . '/functions.php', "<?php\n// Child source with the same relative path.\n" );
+
+		$target = [
+			'kind'             => 'theme',
+			'ref'              => 'child-fixture',
+			'name'             => 'Child Fixture',
+			'stylesheet'       => 'child-fixture',
+			'template'         => 'parent-fixture',
+			'is_child'         => true,
+			'parent_ref'       => 'parent-fixture',
+			'parent_available' => true,
+			'parent_theme'     => [
+				'kind'         => 'theme',
+				'ref'          => 'parent-fixture',
+				'name'         => 'Parent Fixture',
+				'version'      => '2.0.0',
+				'source_files' => 3,
+				'lines'        => 8,
+				'tokens'       => 30,
+				'hooks'        => 1,
+			],
+		];
+		$reflection = new ReflectionClass( Source_Tools::class );
+		foreach (
+			[
+				'target'           => $target,
+				'parent_target'    => $target['parent_theme'],
+				'parent_root'      => $this->parent_root,
+				'parent_main_file' => 'functions.php',
+			] as $property => $value
+		) {
+			$field = $reflection->getProperty( $property );
+			$field->setValue( $this->tools, $value );
+		}
+	}
+
+	/** @param array<string, string> $files */
+	private function install_theme( string $slug, string $stylesheet, array $files ): string {
+		$root = wp_normalize_path( trailingslashit( get_theme_root() ) . $slug );
+		$this->assertDirectoryDoesNotExist( $root );
+		$this->assertTrue( wp_mkdir_p( $root ) );
+		$this->theme_directories[] = $root;
+		file_put_contents( $root . '/style.css', $stylesheet );
+		file_put_contents( $root . '/index.php', "<?php\n" );
+		foreach ( $files as $relative => $content ) {
+			$path = $root . '/' . $relative;
+			$this->assertTrue( wp_mkdir_p( dirname( $path ) ) );
+			file_put_contents( $path, $content );
+		}
+		wp_clean_themes_cache( true );
+		return $root;
+	}
+
+	private function remove_tree( string $directory ): void {
+		if ( ! is_dir( $directory ) ) {
+			return;
+		}
+		$iterator = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $directory, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST );
+		foreach ( $iterator as $item ) {
+			$item->isDir() ? rmdir( $item->getPathname() ) : unlink( $item->getPathname() );
+		}
+		rmdir( $directory );
 	}
 }

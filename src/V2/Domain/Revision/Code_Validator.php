@@ -541,7 +541,7 @@ final class Code_Validator {
 	private function path( string $path ): string {
 		$path     = str_replace( '\\', '/', trim( $path ) );
 		$segments = explode( '/', $path );
-		if ( '' === $path || str_starts_with( $path, '/' ) || preg_match( '/^[A-Za-z]:/', $path ) || preg_match( '/[\x00-\x1F]/', $path ) || array_intersect( [ '', '.', '..' ], $segments ) ) {
+		if ( '' === $path || str_starts_with( $path, '/' ) || str_starts_with( strtolower( $path ), 'parent_theme:' ) || preg_match( '/^[A-Za-z]:/', $path ) || preg_match( '/[\x00-\x1F]/', $path ) || array_intersect( [ '', '.', '..' ], $segments ) ) {
 			return '';
 		}
 		return trim( $path, '/' );

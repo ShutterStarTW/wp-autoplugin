@@ -1010,7 +1010,7 @@ function WorkspaceLoader() {
 						</p>
 						<p className="wp-autoplugin-v2-loading__copy">
 							{ __(
-								'Restoring your projects, tabs, and recent work…',
+								'Restoring your projects and recent work…',
 								'wp-autoplugin'
 							) }
 						</p>

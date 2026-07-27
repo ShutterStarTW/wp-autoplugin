@@ -69,13 +69,20 @@ final class Source_Agent {
 			try {
 				$bootstrap = $tools->bootstrap();
 				if ( 'hook_extension' === (string) $workspace['operation'] ) {
-					$hooks = $tools->execute( 'list_hooks', [ 'offset' => 0, 'limit' => 25 ] );
-					if ( ! empty( $hooks['error'] ) ) {
-						throw new \RuntimeException( __( 'The target hooks could not be inspected.', 'wp-autoplugin' ) );
+					$hook_sources = [ 'target' ];
+					if ( $tools->has_parent_theme() ) {
+						$hook_sources[] = 'parent_theme';
 					}
-					$bootstrap['content'] .= "\n\nDiscovered target hook contexts (first bounded page):\n" . $hooks['content'];
-					$bootstrap['inspected'] = array_merge( $bootstrap['inspected'], $hooks['inspected'] );
-					$bootstrap['audit']['hooks'] = $hooks['audit'];
+					foreach ( $hook_sources as $hook_source ) {
+						$hooks = $tools->execute( 'list_hooks', [ 'offset' => 0, 'limit' => 25, 'source' => $hook_source ] );
+						if ( ! empty( $hooks['error'] ) ) {
+							throw new \RuntimeException( __( 'The target hooks could not be inspected.', 'wp-autoplugin' ) );
+						}
+						$label = 'parent_theme' === $hook_source ? 'read-only parent theme' : 'editable target';
+						$bootstrap['content'] .= "\n\nDiscovered {$label} hook contexts (first bounded page):\n" . $hooks['content'];
+						$bootstrap['inspected'] = array_merge( $bootstrap['inspected'], $hooks['inspected'] );
+						$bootstrap['audit']['hooks'][ $hook_source ] = $hooks['audit'];
+					}
 				}
 				$run = $runs->create(
 					(int) $job['id'],
@@ -91,8 +98,8 @@ final class Source_Agent {
 					(int) $job['id'],
 					'agent_bootstrap',
 					'hook_extension' === (string) $workspace['operation']
-						? __( 'Provided target metadata, source structure, main entry file, any root AGENTS.md instructions, and discovered hook contexts to the model.', 'wp-autoplugin' )
-						: __( 'Provided target metadata, the source structure, the main entry file, and any root AGENTS.md instructions to the model.', 'wp-autoplugin' ),
+						? __( 'Provided target and available parent-theme metadata, source structures, main entry files, any root AGENTS.md instructions, and discovered hook contexts to the model.', 'wp-autoplugin' )
+						: __( 'Provided target and available parent-theme metadata, source structures, main entry files, and any root AGENTS.md instructions to the model.', 'wp-autoplugin' ),
 					(array) $bootstrap['audit']
 				);
 			} catch ( \Throwable $error ) {
@@ -115,7 +122,7 @@ final class Source_Agent {
 			if ( self::MAX_TOOL_CALLS <= (int) $run['tool_calls'] || self::MAX_SOURCE_BYTES <= (int) $run['source_bytes'] ) {
 				throw new \RuntimeException( sprintf( /* translators: %s: workspace stage. */ __( '%s stopped after reaching its source-inspection limit.', 'wp-autoplugin' ), $this->label( $stage ) ) );
 			}
-			if ( $run['tree_fingerprint'] !== $tools->tree_fingerprint() || ! $tools->inspected_unchanged( (array) $run['inspected_files'] ) ) {
+			if ( $run['tree_fingerprint'] !== $tools->inspection_fingerprint() || ! $tools->inspected_unchanged( (array) $run['inspected_files'] ) ) {
 				throw new \RuntimeException( sprintf( /* translators: %s: workspace stage. */ __( 'The target changed during inspection. Start %s again to inspect a consistent version.', 'wp-autoplugin' ), $this->label( $stage ) ) );
 			}
 
@@ -279,6 +286,7 @@ final class Source_Agent {
 			$remaining_calls,
 			$remaining_bytes
 		);
+		$budget .= ' When the target metadata identifies a child theme and the tools expose source="parent_theme", inspect that source as needed to understand inherited templates, functions, hooks, and APIs. Parent-theme source is strictly read-only context: every proposed modify/fix path must remain relative to the editable child-theme target, and citations must distinguish parent_theme:path from target paths.';
 		if ( 'explain' === $stage ) {
 			return 'You are a read-only WordPress source-code explanation agent. Inspect only what is needed to answer confidently. Use the provided tools to examine relevant files; never claim to write, execute, install, activate, or modify code. Prefer searches and targeted line-range reads. Cite relative file paths and line numbers when they support the answer. When sufficient evidence is available, return a clear Markdown answer instead of requesting more tools. ' . $budget;
 		}

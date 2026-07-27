@@ -34,7 +34,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<div class="wp-autoplugin-v2-loading__status">
 						<div class="wp-autoplugin-v2-loading__mark" aria-hidden="true">&lt;/&gt;</div>
 						<p class="wp-autoplugin-v2-loading__title"><?php esc_html_e( 'Preparing your workspace', 'wp-autoplugin' ); ?></p>
-						<p class="wp-autoplugin-v2-loading__copy"><?php esc_html_e( 'Restoring your projects, tabs, and recent work…', 'wp-autoplugin' ); ?></p>
+						<p class="wp-autoplugin-v2-loading__copy"><?php esc_html_e( 'Restoring your projects and recent work…', 'wp-autoplugin' ); ?></p>
 						<div class="wp-autoplugin-v2-loading__progress" aria-hidden="true"><span></span></div>
 					</div>
 				</div>

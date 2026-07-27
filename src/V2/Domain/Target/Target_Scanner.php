@@ -54,7 +54,10 @@ final class Target_Scanner {
 				'ref'  => $ref,
 				'name' => (string) $theme->get( 'Name' ),
 			],
-			$this->theme_identity( $theme )
+			$this->theme_identity(
+				$theme,
+				is_array( $metadata['parent_theme'] ?? null ) ? (array) $metadata['parent_theme'] : null
+			)
 		);
 	}
 
@@ -108,7 +111,7 @@ final class Target_Scanner {
 	}
 
 	/** @return array<string, mixed> */
-	private function theme_identity( \WP_Theme $theme ): array {
+	private function theme_identity( \WP_Theme $theme, ?array $persisted_parent = null ): array {
 		$stylesheet    = (string) $theme->get_stylesheet();
 		$template      = (string) $theme->get_template();
 		$is_child      = '' !== $template && $template !== $stylesheet;
@@ -116,6 +119,7 @@ final class Target_Scanner {
 		$parent_valid  = $is_child && $parent instanceof \WP_Theme && $parent->exists() && ! $parent->errors();
 		$active_child  = get_stylesheet() === $stylesheet;
 		$active_parent = get_template() === $stylesheet;
+		$parent_theme  = $parent_valid ? $this->describe_parent_theme( $parent, $persisted_parent ) : null;
 		return [
 			'version'              => (string) $theme->get( 'Version' ),
 			'author'               => wp_strip_all_tags( (string) $theme->get( 'Author' ) ),
@@ -129,10 +133,43 @@ final class Target_Scanner {
 			'parent_available'     => $parent_valid,
 			'parent_name'          => $parent instanceof \WP_Theme ? (string) $parent->get( 'Name' ) : '',
 			'parent_version'       => $parent instanceof \WP_Theme ? (string) $parent->get( 'Version' ) : '',
+			'parent_theme'         => $parent_theme,
 			'active_as_stylesheet' => $active_child,
 			'active_as_template'   => $active_parent,
 			'in_use'               => $active_child || $active_parent,
 		];
+	}
+
+	/** @return array<string, mixed> */
+	private function describe_parent_theme( \WP_Theme $theme, ?array $persisted = null ): array {
+		$stylesheet = (string) $theme->get_stylesheet();
+		$template   = (string) $theme->get_template();
+		$stats      = is_array( $persisted ) && $stylesheet === ( $persisted['ref'] ?? '' )
+			? array_intersect_key( $persisted, array_flip( [ 'source_files', 'lines', 'tokens', 'hooks' ] ) )
+			: [];
+		if ( count( $stats ) < 4 ) {
+			$stats = $this->source_stats( wp_normalize_path( $theme->get_stylesheet_directory() ) );
+		}
+
+		return array_merge(
+			[
+				'kind'                 => 'theme',
+				'ref'                  => $stylesheet,
+				'name'                 => (string) $theme->get( 'Name' ),
+				'version'              => (string) $theme->get( 'Version' ),
+				'author'               => wp_strip_all_tags( (string) $theme->get( 'Author' ) ),
+				'description'          => wp_strip_all_tags( (string) $theme->get( 'Description' ) ),
+				'active'               => get_template() === $stylesheet,
+				'stylesheet'           => $stylesheet,
+				'template'             => $template,
+				'is_child'             => '' !== $template && $template !== $stylesheet,
+				'is_block_theme'       => $theme->is_block_theme(),
+				'active_as_stylesheet' => get_stylesheet() === $stylesheet,
+				'active_as_template'   => get_template() === $stylesheet,
+				'in_use'               => get_stylesheet() === $stylesheet || get_template() === $stylesheet,
+			],
+			$stats
+		);
 	}
 
 	/**

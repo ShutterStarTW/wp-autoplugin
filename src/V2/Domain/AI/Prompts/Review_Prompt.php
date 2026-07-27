@@ -7,7 +7,7 @@ use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
 /** Versioned, structured static Review of one immutable staged revision. */
 final class Review_Prompt {
 	public const SLUG    = 'staged-revision-review';
-	public const VERSION = 2;
+	public const VERSION = 3;
 
 	public function instructions( bool $allow_answer, bool $same_revision ): string {
 		$answer = $allow_answer

@@ -774,8 +774,11 @@ final class Code_Follow_Up_Orchestrator {
 
 	/** @return array<string,mixed>|\WP_Error */
 	private function target_metadata( array $workspace, array $manifest ) {
-		$target = array_intersect_key( (array) ( $workspace['target_metadata'] ?? [] ), array_flip( [ 'kind', 'ref', 'name', 'version', 'author', 'description', 'active', 'source_files', 'lines', 'tokens', 'hooks' ] ) );
-		if ( 'plugin' !== ( $workspace['target_kind'] ?? '' ) ) {
+		$target = array_intersect_key(
+			(array) ( $workspace['target_metadata'] ?? [] ),
+			array_flip( [ 'kind', 'ref', 'name', 'version', 'author', 'description', 'active', 'source_files', 'lines', 'tokens', 'hooks', 'stylesheet', 'template', 'is_child', 'is_block_theme', 'parent_ref', 'parent_available', 'parent_name', 'parent_version', 'parent_theme', 'active_as_stylesheet', 'active_as_template', 'in_use' ] )
+		);
+		if ( ! in_array( (string) ( $workspace['target_kind'] ?? '' ), [ 'plugin', 'theme' ], true ) ) {
 			return $target;
 		}
 		try {
@@ -783,12 +786,13 @@ final class Code_Follow_Up_Orchestrator {
 			$expected = 'changes' === ( $manifest['scope'] ?? '' )
 				? (string) ( $manifest['target_fingerprint'] ?? '' )
 				: (string) ( $manifest['integration_target_fingerprint'] ?? '' );
-			if ( '' !== $expected && ! hash_equals( $expected, $tools->tree_fingerprint() ) ) {
+			$current  = 'changes' === ( $manifest['scope'] ?? '' ) ? $tools->tree_fingerprint() : $tools->inspection_fingerprint();
+			if ( '' !== $expected && ! hash_equals( $expected, $current ) ) {
 				return $this->target_changed();
 			}
-			$instructions = $tools->plugin_instructions();
+			$instructions = 'plugin' === ( $workspace['target_kind'] ?? '' ) ? $tools->plugin_instructions() : null;
 		} catch ( \Throwable $error ) {
-			return new \WP_Error( 'code_plugin_instructions_unavailable', $error->getMessage(), [ 'retryable' => false, 'ambiguous' => false ] );
+			return new \WP_Error( 'code_target_context_unavailable', $error->getMessage(), [ 'retryable' => false, 'ambiguous' => false ] );
 		}
 		if ( $instructions ) {
 			$target['root_plugin_instructions'] = [ 'path' => $instructions['path'], 'content' => $instructions['content'] ];

@@ -7,7 +7,7 @@ use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
 /** Versioned Code follow-ups for a staged extension plugin. */
 final class Extension_Plugin_Code_Follow_Up_Prompt {
 	public const SLUG    = 'extension-plugin-code-follow-up';
-	public const VERSION = 6;
+	public const VERSION = 7;
 
 	public function analysis_instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
@@ -31,7 +31,7 @@ For a question return:
 For a change request return:
 {"outcome":"changes","content":"A concise Markdown change summary.","resolved_request":"One concrete statement of the newest requested result, with contextual references resolved.","acceptance_criteria":["Observable requirement the generated revision must satisfy."],"manifest":{"plugin_name":"...","main_file":"root-file.php","files":[{"path":"relative/path.php","type":"php","description":"Purpose."}]},"changes":[{"path":"relative/path.php","instruction":"Specific bounded implementation instruction that directly satisfies the resolved request."}]}
 
-For a change, provide one resolved_request and one to eight concrete, testable acceptance_criteria derived from the newest message and its clear conversational antecedent. The manifest is the complete desired extension plugin after the change. Omitting an existing extension path deletes it. A renamed or moved extension file is a deletion plus a new file. Every new file must have one change instruction. Include retained files in changes only when their complete contents must be regenerated. Retained unlisted files are copied unchanged. Use only safe relative PHP, JavaScript, CSS, JSON, HTML, Markdown, and plain-text paths. Keep 1-20 files, exactly one root-level PHP main_file, and one Plugin Name header in that main file only. The extension must remain a separate plugin: never propose, copy, edit, replace, rename, or delete a file in the inspected target. Do not propose build artifacts, dependencies, binaries, or filesystem operations. A change request must materially alter extension content or topology.
+For a change, provide one resolved_request and one to eight concrete, testable acceptance_criteria derived from the newest message and its clear conversational antecedent. The manifest is the complete desired extension plugin after the change. Omitting an existing extension path deletes it. A renamed or moved extension file is a deletion plus a new file. Every new file must have one change instruction. Include retained files in changes only when their complete contents must be regenerated. Retained unlisted files are copied unchanged. Use only safe relative PHP, JavaScript, CSS, JSON, HTML, Markdown, and plain-text paths. Keep 1-20 files, exactly one root-level PHP main_file, and one Plugin Name header in that main file only. The extension must remain a separate plugin: never propose, copy, edit, replace, rename, or delete a file in the inspected target or its read-only parent_theme. Do not propose build artifacts, dependencies, binaries, or filesystem operations. A change request must materially alter extension content or topology.
 PROMPT;
 	}
 

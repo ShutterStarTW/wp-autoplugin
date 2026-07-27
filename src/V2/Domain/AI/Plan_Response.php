@@ -200,7 +200,7 @@ final class Plan_Response {
 
 	private function relative_path( string $path, bool $directory = false ): string {
 		$path = wp_normalize_path( trim( $path ) );
-		if ( '' === $path || str_starts_with( $path, '/' ) || str_contains( $path, "\0" ) || preg_match( '#(^|/)\.\.(/|$)#', $path ) || preg_match( '#^[A-Za-z]:/#', $path ) ) {
+		if ( '' === $path || str_starts_with( $path, '/' ) || str_starts_with( strtolower( $path ), 'parent_theme:' ) || str_contains( $path, "\0" ) || preg_match( '#(^|/)\.\.(/|$)#', $path ) || preg_match( '#^[A-Za-z]:/#', $path ) ) {
 			return '';
 		}
 		$path = trim( $path, '/' );

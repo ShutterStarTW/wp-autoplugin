@@ -85,7 +85,7 @@ final class Code_Orchestrator {
 					$integration = new Source_Tools( (array) $workspace['target_metadata'] );
 					$manifest['integration_target_kind']        = (string) $workspace['target_kind'];
 					$manifest['integration_target_ref']         = (string) $workspace['target_ref'];
-					$manifest['integration_target_fingerprint'] = $integration->tree_fingerprint();
+					$manifest['integration_target_fingerprint'] = $integration->inspection_fingerprint();
 					$manifest = $validator->manifest( $manifest );
 				} catch ( \Throwable $error ) {
 					return new \WP_Error( 'code_integration_target_unavailable', __( 'The extension integration target is unavailable.', 'wp-autoplugin' ) );
@@ -320,7 +320,10 @@ final class Code_Orchestrator {
 	private function prompt_input( object $prompt, array $workspace, array $plan, array $manifest, array $current, array $source, array $generated, array $feedback ) {
 		$request = (string) $workspace['request'];
 		$content = $this->plan_content( $plan );
-		$target  = array_intersect_key( (array) $workspace['target_metadata'], array_flip( [ 'kind', 'ref', 'name', 'version', 'author', 'description', 'active', 'source_files', 'lines', 'tokens', 'hooks' ] ) );
+		$target  = array_intersect_key(
+			(array) $workspace['target_metadata'],
+			array_flip( [ 'kind', 'ref', 'name', 'version', 'author', 'description', 'active', 'source_files', 'lines', 'tokens', 'hooks', 'stylesheet', 'template', 'is_child', 'is_block_theme', 'parent_ref', 'parent_available', 'parent_name', 'parent_version', 'parent_theme', 'active_as_stylesheet', 'active_as_template', 'in_use' ] )
+		);
 		$instructions = $this->plugin_instructions( $workspace, $manifest );
 		if ( is_wp_error( $instructions ) ) {
 			return $instructions;
@@ -340,7 +343,7 @@ final class Code_Orchestrator {
 
 	/** @return array{path:string,content:string,bytes:int,content_hash:string}|null|\WP_Error */
 	private function plugin_instructions( array $workspace, array $manifest ) {
-		if ( 'plugin' !== ( $workspace['target_kind'] ?? '' ) ) {
+		if ( ! in_array( (string) ( $workspace['target_kind'] ?? '' ), [ 'plugin', 'theme' ], true ) ) {
 			return null;
 		}
 		try {
@@ -348,12 +351,13 @@ final class Code_Orchestrator {
 			$expected = 'changes' === ( $manifest['scope'] ?? '' )
 				? (string) ( $manifest['target_fingerprint'] ?? '' )
 				: (string) ( $manifest['integration_target_fingerprint'] ?? '' );
-			if ( '' !== $expected && ! hash_equals( $expected, $tools->tree_fingerprint() ) ) {
-				return new \WP_Error( 'code_target_changed', __( 'The installed plugin changed after Code generation started. No revision was staged; regenerate the Plan before trying again.', 'wp-autoplugin' ) );
+			$current  = 'changes' === ( $manifest['scope'] ?? '' ) ? $tools->tree_fingerprint() : $tools->inspection_fingerprint();
+			if ( '' !== $expected && ! hash_equals( $expected, $current ) ) {
+				return new \WP_Error( 'code_target_changed', __( 'The installed target or its inspected parent theme changed after Code generation started. No revision was staged; regenerate the Plan before trying again.', 'wp-autoplugin' ) );
 			}
-			return $tools->plugin_instructions();
+			return 'plugin' === ( $workspace['target_kind'] ?? '' ) ? $tools->plugin_instructions() : null;
 		} catch ( \Throwable $error ) {
-			return new \WP_Error( 'code_plugin_instructions_unavailable', $error->getMessage() );
+			return new \WP_Error( 'code_target_context_unavailable', $error->getMessage() );
 		}
 	}
 

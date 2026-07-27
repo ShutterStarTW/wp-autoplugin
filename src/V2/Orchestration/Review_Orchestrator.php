@@ -255,7 +255,18 @@ final class Review_Orchestrator {
 			}
 		}
 		return [
-			'workspace' => [ 'id' => (int) $workspace['id'], 'request' => (string) $workspace['request'], 'operation' => (string) $workspace['operation'], 'target_kind' => (string) $workspace['target_kind'], 'target_ref' => (string) $workspace['target_ref'], 'target_name' => (string) ( $workspace['target_metadata']['name'] ?? $workspace['project_name'] ?? '' ) ],
+			'workspace' => [
+				'id'              => (int) $workspace['id'],
+				'request'         => (string) $workspace['request'],
+				'operation'       => (string) $workspace['operation'],
+				'target_kind'     => (string) $workspace['target_kind'],
+				'target_ref'      => (string) $workspace['target_ref'],
+				'target_name'     => (string) ( $workspace['target_metadata']['name'] ?? $workspace['project_name'] ?? '' ),
+				'target_metadata' => array_intersect_key(
+					(array) $workspace['target_metadata'],
+					array_flip( [ 'kind', 'ref', 'name', 'version', 'author', 'description', 'active', 'source_files', 'lines', 'tokens', 'hooks', 'stylesheet', 'template', 'is_child', 'is_block_theme', 'parent_ref', 'parent_available', 'parent_name', 'parent_version', 'parent_theme', 'active_as_stylesheet', 'active_as_template', 'in_use' ] )
+				),
+			],
 			'root_plugin_instructions' => $root_plugin_instructions,
 			'plan' => [ 'job_id' => (int) ( $plan['id'] ?? 0 ), 'content' => (string) ( $plan['result']['artifact']['content'] ?? $plan['result']['content'] ?? '' ), 'structured' => (array) ( $plan['result']['structured'] ?? [] ) ],
 			'revision' => [ 'id' => (int) $revision['id'], 'number' => (int) $revision['revision_number'], 'parent_revision_id' => $revision['parent_revision_id'], 'manifest' => $revision['project_manifest'], 'files' => $files, 'parent_changes' => $this->parent_changes( $parent_revision, $revision ), 'target_tree' => $target_tree ],
@@ -309,7 +320,8 @@ final class Review_Orchestrator {
 			return true;
 		}
 		try {
-			$current = ( new Source_Tools( (array) $workspace['target_metadata'] ) )->tree_fingerprint();
+			$tools   = new Source_Tools( (array) $workspace['target_metadata'] );
+			$current = 'changes' === ( $manifest['scope'] ?? '' ) ? $tools->tree_fingerprint() : $tools->inspection_fingerprint();
 		} catch ( \Throwable $error ) {
 			return new \WP_Error( 'review_target_unavailable', __( 'The inspected integration target is no longer available.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}

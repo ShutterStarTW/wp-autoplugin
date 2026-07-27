@@ -328,6 +328,26 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$this->assertSame( '', $plan['main_file'] );
 	}
 
+	public function test_existing_theme_plan_rejects_parent_source_namespace_as_an_edit_path(): void {
+		$plan = $this->validator->plan(
+			[
+				'project_structure' => [
+					'files' => [
+						[ 'path' => 'parent_theme:functions.php', 'type' => 'php', 'action' => 'update', 'description' => 'Invalid parent edit.' ],
+					],
+				],
+			],
+			[
+				'operation'       => 'modify',
+				'target_kind'     => 'theme',
+				'target_ref'      => 'fixture-child',
+				'target_metadata' => [ 'kind' => 'theme', 'ref' => 'fixture-child', 'name' => 'Fixture Child', 'is_child' => true ],
+			]
+		);
+
+		$this->assertWPError( $plan );
+	}
+
 	public function test_change_set_validates_update_and_delete_without_plugin_headers_for_theme(): void {
 		$manifest = [
 			'scope'         => 'changes',
