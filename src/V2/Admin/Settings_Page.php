@@ -94,7 +94,7 @@ final class Settings_Page {
 						<td>
 							<textarea name="<?php echo esc_attr( Global_Instructions::OPTION_NAME ); ?>" id="<?php echo esc_attr( Global_Instructions::OPTION_NAME ); ?>" rows="12" class="large-text code"><?php echo esc_textarea( (string) get_option( Global_Instructions::OPTION_NAME, '' ) ); ?></textarea>
 							<p class="description">
-								<?php esc_html_e( 'Applied to Plan, Explain, Code, Review, follow-up, and Review-fix jobs queued after you save. Running jobs and automatic retries keep their original snapshot. A plugin-root AGENTS.md and the current request take precedence.', 'wp-autoplugin' ); ?>
+								<?php esc_html_e( 'Applied to Plan, Explain, Code, Review, follow-up, and Review-fix jobs queued after you save. Running jobs and automatic retries keep their original snapshot. These instructions override built-in implementation defaults, while safety and response contracts, the current request, and a plugin-root AGENTS.md take precedence.', 'wp-autoplugin' ); ?>
 							</p>
 							<p class="description">
 								<?php esc_html_e( 'Instructions are stored with each job and sent to the selected AI provider. Do not include passwords, API keys, or other secrets. Maximum size: 64 KiB.', 'wp-autoplugin' ); ?>

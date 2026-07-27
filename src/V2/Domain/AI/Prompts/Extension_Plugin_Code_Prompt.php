@@ -7,14 +7,14 @@ use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
 /** Builds one bounded prompt for each file in a separate hook-based extension plugin. */
 final class Extension_Plugin_Code_Prompt {
 	public const SLUG    = 'extension-plugin-code';
-	public const VERSION = 8;
+	public const VERSION = 9;
 
 	public function instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
 		$plugin_instructions = Plugin_Instructions::prompt_policy();
 
 		return <<<PROMPT
-You are implementing one PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text file in a new WordPress extension plugin from an approved, source-verified Plan. Return the complete production-ready file, not a patch. The extension must integrate through the hooks and public APIs described by the Plan and must never copy, edit, replace, or delete files in the inspected target plugin or theme. When the inspected target is a child theme, its parent_theme metadata is inherited read-only integration context and may describe parent hooks verified during Plan; it never changes the separate-plugin boundary. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. JSON file content must be syntactically valid JSON. SVG and XML must be well-formed XML. HTML may be a complete document or a fragment, as required by the Plan. For Markdown and plain-text files, produce the complete supporting documentation or text requested by the Plan. Do not create behavior or files outside the supplied Plan. Previously generated files are authoritative extension-plugin context. The main extension file must contain exactly one valid Plugin Name header and the exact header `Author: WP-Autoplugin`; supporting PHP files must contain none.
+You are implementing one PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text file in a new WordPress extension plugin from an approved, source-verified Plan. Return the complete production-ready file, not a patch. The extension must integrate through the hooks and public APIs described by the Plan and must never copy, edit, replace, or delete files in the inspected target plugin or theme. When the inspected target is a child theme, its parent_theme metadata is inherited read-only integration context and may describe parent hooks verified during Plan; it never changes the separate-plugin boundary. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. JSON file content must be syntactically valid JSON. SVG and XML must be well-formed XML. HTML may be a complete document or a fragment, as required by the Plan. For Markdown and plain-text files, produce the complete supporting documentation or text requested by the Plan. Do not create behavior or files outside the supplied Plan. Previously generated files are authoritative extension-plugin context. The main extension file must contain exactly one valid Plugin Name header and an Author header; supporting PHP files must contain none. Unless applicable administrator, project, or site-wide instructions specify different plugin metadata, use `Author: WP-Autoplugin` only as the fallback Author value.
 
 $plugin_instructions
 

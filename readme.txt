@@ -65,7 +65,7 @@ Yes. Settings provides a Default model plus optional Planner, Coder, and Reviewe
 
 WP-Autoplugin sends task instructions, relevant source context, and optional images only to providers configured by an administrator.
 
-Site-wide Custom instructions saved by an administrator are included with every future AI job. They remain in private durable job history, are not intended for secrets, and are sent to the selected provider with the rest of the job context.
+Site-wide Custom instructions saved by an administrator are included with every future AI job. They override built-in implementation defaults but not safety, response contracts, the current request, or a more-specific root AGENTS.md. They remain in private durable job history, are not intended for secrets, and are sent to the selected provider with the rest of the job context.
 
 **OpenAI**
 

@@ -40,9 +40,12 @@ final class GlobalInstructionsTest extends WP_UnitTestCase {
 		$wrapped = Global_Instructions::apply( $base, $snapshot );
 		$this->assertStringStartsWith( $base, $wrapped );
 		$this->assertStringContainsString( $content, $wrapped );
-		$this->assertStringContainsString( 'current administrator request has priority', $wrapped );
+		$this->assertStringContainsString( 'current administrator request', $wrapped );
 		$this->assertStringContainsString( 'root_plugin_instructions', $wrapped );
-		$this->assertStringContainsString( 'hard constraints', $wrapped );
+		$this->assertStringContainsString( 'administrator-authored requirements', $wrapped );
+		$this->assertStringContainsString( 'override conflicting built-in implementation defaults', $wrapped );
+		$this->assertStringContainsString( 'exact transport response syntax/schema', $wrapped );
+		$this->assertStringContainsString( 'verify the result against every applicable custom instruction', $wrapped );
 	}
 
 	public function test_ai_jobs_snapshot_instructions_privately_while_non_ai_jobs_do_not(): void {

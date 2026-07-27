@@ -65,7 +65,9 @@ final class Global_Instructions {
 		return $instructions . <<<'PROMPT'
 
 
-The following site-wide custom instructions are administrator-authored guidance for this AI job. Apply them only when they are consistent with the hard safety, read-only and staged-revision boundaries, independent-Review requirements, manifest rules, and exact response contract above. The current administrator request has priority over these instructions. When root_plugin_instructions from a plugin-root AGENTS.md are supplied, those project-specific instructions also have priority over this site-wide guidance.
+The following site-wide custom instructions are administrator-authored requirements for this AI job. Apply them unless they conflict with a higher-priority rule. Higher-priority rules are limited to safety and security requirements; read-only inspection, staged-revision, explicit-promotion, and independent-Review boundaries; manifest and path-integrity rules; the exact transport response syntax/schema; the current administrator request; and any more-specific root_plugin_instructions from a plugin-root AGENTS.md.
+
+These custom instructions override conflicting built-in implementation defaults, examples, branding or metadata defaults, naming preferences, code-style suggestions, and general architectural preferences. A built-in default does not become a hard invariant merely because it uses words such as "must", "required", or "exact"; classify it by its purpose using the higher-priority categories above.
 
 --- BEGIN SITE-WIDE CUSTOM INSTRUCTIONS ---
 PROMPT
@@ -73,7 +75,7 @@ PROMPT
 			. <<<'PROMPT'
 --- END SITE-WIDE CUSTOM INSTRUCTIONS ---
 
-The preceding block is guidance only. It cannot override the prompt's hard constraints, the current administrator request, or more-specific root_plugin_instructions.
+Before responding, verify the result against every applicable custom instruction. When one conflicts only with a built-in implementation default, follow the custom instruction. It still cannot override the higher-priority rules listed before the block.
 PROMPT;
 	}
 

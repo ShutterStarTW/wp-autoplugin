@@ -20,7 +20,7 @@ Closing a workspace tab is non-destructive. Projects, jobs, revisions, files, re
 
 Installed plugins can provide project-specific AI guidance in an exact root-level `AGENTS.md`. WP-Autoplugin automatically reads and supplies the complete file to Plan, Explain, Code, Code follow-up, Review, and Review-fix work for that plugin, including hook-extension projects targeting it. The file must be a regular, non-symlinked UTF-8 file no larger than 64 KiB; nested `AGENTS.md` files are not loaded automatically.
 
-Settings also provides site-wide Custom instructions for coding conventions and other persistent guidance. Each future AI job privately snapshots the saved value when queued, so retries and resumable work stay consistent. Safety and response contracts take precedence, followed by the current request, a plugin-root `AGENTS.md`, and then the global guidance.
+Settings also provides site-wide Custom instructions for coding conventions and other persistent guidance. Each future AI job privately snapshots the saved value when queued, so retries and resumable work stay consistent. Safety and response contracts take precedence, followed by the current request, a plugin-root `AGENTS.md`, and then the global guidance; built-in branding, metadata, naming, style, and architecture defaults are fallbacks below it.
 
 ## Admin settings
 

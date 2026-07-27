@@ -62,7 +62,7 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		}
 	}
 
-	public function test_complete_plugin_code_prompts_require_wp_autoplugin_author(): void {
+	public function test_complete_plugin_code_prompts_make_wp_autoplugin_author_an_overridable_fallback(): void {
 		$prompts = [
 			( new New_Plugin_Code_Prompt() )->instructions(),
 			( new Extension_Plugin_Code_Prompt() )->instructions(),
@@ -72,6 +72,9 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 
 		foreach ( $prompts as $prompt ) {
 			$this->assertStringContainsString( 'Author: WP-Autoplugin', $prompt );
+			$this->assertStringContainsString( 'fallback Author value', $prompt );
+			$this->assertStringContainsString( 'site-wide instructions specify different plugin metadata', $prompt );
+			$this->assertStringNotContainsString( 'exact header `Author: WP-Autoplugin`', $prompt );
 		}
 	}
 

@@ -5,7 +5,7 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Versioned prompts for questions and topology-aware Code follow-ups. */
 final class New_Plugin_Code_Follow_Up_Prompt {
 	public const SLUG    = 'new-plugin-code-follow-up';
-	public const VERSION = 7;
+	public const VERSION = 8;
 
 	public function analysis_instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
@@ -55,7 +55,7 @@ PROMPT;
 		$priority            = Code_Follow_Up_Priority::generation_instructions();
 
 		return <<<PROMPT
-Generate one complete file for a staged WordPress plugin change. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","content":"complete file contents"}. Do not wrap the JSON response in a Markdown fence; Markdown file content may contain fenced examples encoded inside the JSON string. The path must match exactly. Preserve established project conventions and implement the supplied instruction. The output must be a complete non-empty PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text file under 64 KiB. PHP must parse without execution, JSON must be syntactically valid, SVG and XML must be well-formed XML, and HTML may be a complete document or fragment. The desired main file must contain exactly one Plugin Name header and the exact header `Author: WP-Autoplugin`; supporting PHP files must contain none.
+Generate one complete file for a staged WordPress plugin change. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","content":"complete file contents"}. Do not wrap the JSON response in a Markdown fence; Markdown file content may contain fenced examples encoded inside the JSON string. The path must match exactly. Preserve established project conventions and implement the supplied instruction. The output must be a complete non-empty PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text file under 64 KiB. PHP must parse without execution, JSON must be syntactically valid, SVG and XML must be well-formed XML, and HTML may be a complete document or fragment. The desired main file must contain exactly one Plugin Name header and an Author header; supporting PHP files must contain none. Unless applicable administrator, project, or site-wide instructions specify different plugin metadata, use `Author: WP-Autoplugin` only as the fallback Author value.
 
 $priority
 
