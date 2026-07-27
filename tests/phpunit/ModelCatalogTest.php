@@ -1,6 +1,7 @@
 <?php
 
 use WP_Autoplugin\V2\Domain\AI\Model_Catalog;
+use WP_Autoplugin\V2\Domain\AI\Model_Registry;
 use WP_Autoplugin\V2\Infrastructure\AI\Agent_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
 use WP_Autoplugin\V2\Rest\Routes;
@@ -52,6 +53,20 @@ final class ModelCatalogTest extends WP_UnitTestCase {
 			}
 		}
 		parent::tear_down();
+	}
+
+	public function test_registry_contains_the_latest_requested_provider_models(): void {
+		$models = Model_Registry::all();
+
+		$this->assertSame( 'GPT-5.6 Sol', $models['OpenAI']['gpt-5.6-sol'] );
+		$this->assertSame( 'GPT-5.6 Terra', $models['OpenAI']['gpt-5.6-terra'] );
+		$this->assertSame( 'GPT-5.6 Luna', $models['OpenAI']['gpt-5.6-luna'] );
+		$this->assertSame( 'Claude Sonnet 5', $models['Anthropic']['claude-sonnet-5'] );
+		$this->assertSame( 'Claude Opus 5', $models['Anthropic']['claude-opus-5'] );
+		$this->assertSame( 'Claude Fable 5', $models['Anthropic']['claude-fable-5'] );
+		$this->assertSame( 'Gemini 3.6 Flash', $models['Google']['gemini-3.6-flash'] );
+		$this->assertSame( 'Gemini 3.5 Flash-Lite', $models['Google']['gemini-3.5-flash-lite'] );
+		$this->assertSame( 'Grok 4.5', $models['xAI']['grok-4.5'] );
 	}
 
 	public function test_role_selection_inherits_default_and_can_be_detached_or_restored(): void {

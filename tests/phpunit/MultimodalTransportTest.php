@@ -105,6 +105,21 @@ final class MultimodalTransportTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_latest_gemini_models_omit_deprecated_sampling_parameters(): void {
+		foreach ( [ 'gemini-3.6-flash', 'gemini-3.5-flash-lite' ] as $model ) {
+			$result = ( new Google_Direct_Transport( 'key', $model ) )->complete( 'Instructions', 'Request' );
+			$this->assertFalse( is_wp_error( $result ) );
+
+			$url = 'https://generativelanguage.googleapis.com/v1beta/models/' . $model . ':generateContent?key=key';
+			$this->assertArrayNotHasKey( 'temperature', $this->requests[ $url ]['generationConfig'] );
+		}
+
+		$result = ( new Google_Direct_Transport( 'key', 'gemini-2.5-pro' ) )->complete( 'Instructions', 'Request' );
+		$this->assertFalse( is_wp_error( $result ) );
+		$url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=key';
+		$this->assertSame( 0.2, $this->requests[ $url ]['generationConfig']['temperature'] );
+	}
+
 	public function test_provider_errors_cannot_echo_private_image_content(): void {
 		$this->echo_request_errors = true;
 		$options = [ 'prompt_images' => [ [ 'mime_type' => 'image/png', 'content' => 'private-image-bytes' ] ] ];

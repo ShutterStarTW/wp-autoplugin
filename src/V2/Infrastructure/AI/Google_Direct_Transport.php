@@ -24,6 +24,13 @@ final class Google_Direct_Transport implements Direct_Transport {
 		if ( '' !== $input ) {
 			$parts[] = [ 'text' => $input ];
 		}
+		$generation_config = [
+			'maxOutputTokens'  => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 8192 ) ) ),
+			'responseMimeType' => 'application/json',
+		];
+		if ( ! in_array( $this->selected_model, [ 'gemini-3.6-flash', 'gemini-3.5-flash-lite' ], true ) ) {
+			$generation_config['temperature'] = 0.2;
+		}
 		$response = wp_remote_post(
 			$url,
 			[
@@ -33,7 +40,7 @@ final class Google_Direct_Transport implements Direct_Transport {
 					[
 						'systemInstruction' => [ 'parts' => [ [ 'text' => $instructions ] ] ],
 						'contents'          => [ [ 'role' => 'user', 'parts' => $parts ] ],
-						'generationConfig'  => [ 'temperature' => 0.2, 'maxOutputTokens' => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 8192 ) ) ), 'responseMimeType' => 'application/json' ],
+						'generationConfig'  => $generation_config,
 						'safetySettings'    => [ [ 'category' => 'HARM_CATEGORY_DANGEROUS_CONTENT', 'threshold' => 'BLOCK_ONLY_HIGH' ] ],
 					]
 				),

@@ -23,10 +23,15 @@ final class Model_Effort {
 	 */
 	public static function capabilities(): array {
 		$openai_standard = [ 'none', 'low', 'medium', 'high', 'xhigh' ];
+		$openai_gpt_5_6  = [ 'none', 'low', 'medium', 'high', 'xhigh', 'max' ];
 		$openai_gpt_5    = [ 'minimal', 'low', 'medium', 'high' ];
 		$anthropic       = [ 'low', 'medium', 'high', 'max' ];
+		$anthropic_5     = [ 'low', 'medium', 'high', 'xhigh', 'max' ];
 
 		$capabilities = [
+			'gpt-5.6-sol'                 => [ 'provider' => 'openai', 'levels' => $openai_gpt_5_6, 'default' => 'medium' ],
+			'gpt-5.6-terra'               => [ 'provider' => 'openai', 'levels' => $openai_gpt_5_6, 'default' => 'medium' ],
+			'gpt-5.6-luna'                => [ 'provider' => 'openai', 'levels' => $openai_gpt_5_6, 'default' => 'medium' ],
 			'gpt-5.5'                     => [ 'provider' => 'openai', 'levels' => $openai_standard, 'default' => 'medium' ],
 			'gpt-5.5-pro'                 => [ 'provider' => 'openai', 'levels' => [ 'medium', 'high', 'xhigh' ], 'default' => 'high' ],
 			'gpt-5.4'                     => [ 'provider' => 'openai', 'levels' => $openai_standard, 'default' => 'none' ],
@@ -37,6 +42,9 @@ final class Model_Effort {
 			'gpt-5-mini'                  => [ 'provider' => 'openai', 'levels' => $openai_gpt_5, 'default' => 'medium' ],
 			'gpt-5-nano'                  => [ 'provider' => 'openai', 'levels' => $openai_gpt_5, 'default' => 'medium' ],
 			'o3'                          => [ 'provider' => 'openai', 'levels' => [ 'low', 'medium', 'high' ], 'default' => 'medium' ],
+			'claude-fable-5'              => [ 'provider' => 'anthropic', 'levels' => $anthropic_5, 'default' => 'high' ],
+			'claude-opus-5'               => [ 'provider' => 'anthropic', 'levels' => $anthropic_5, 'default' => 'high' ],
+			'claude-sonnet-5'             => [ 'provider' => 'anthropic', 'levels' => $anthropic_5, 'default' => 'high' ],
 			'claude-opus-4-8'             => [ 'provider' => 'anthropic', 'levels' => [ 'low', 'medium', 'high', 'xhigh', 'max' ], 'default' => 'high' ],
 			'claude-opus-4-7'             => [ 'provider' => 'anthropic', 'levels' => [ 'low', 'medium', 'high', 'xhigh', 'max' ], 'default' => 'high' ],
 			'claude-opus-4-6'             => [ 'provider' => 'anthropic', 'levels' => $anthropic, 'default' => 'high' ],
