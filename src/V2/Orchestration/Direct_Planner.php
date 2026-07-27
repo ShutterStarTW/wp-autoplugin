@@ -2,6 +2,7 @@
 
 namespace WP_Autoplugin\V2\Orchestration;
 
+use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Domain\AI\Plan_Response;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Plan_Prompt;
 use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
@@ -64,12 +65,13 @@ final class Direct_Planner {
 			return $prepared;
 		}
 
-		$input   = $prepared['input'];
-		$images  = ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true );
-		$parsed  = null;
-		$usage   = [ 'input_tokens' => 0, 'output_tokens' => 0 ];
+		$instructions = Global_Instructions::apply( $prepared['instructions'], $jobs->global_instructions( (int) $job['id'] ) );
+		$input        = $prepared['input'];
+		$images       = ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true );
+		$parsed       = null;
+		$usage        = [ 'input_tokens' => 0, 'output_tokens' => 0 ];
 		for ( $attempt = 1; $attempt <= 3; $attempt++ ) {
-			$response = $transport->complete( $prepared['instructions'], $input, [ 'prompt_images' => $images ] );
+			$response = $transport->complete( $instructions, $input, [ 'prompt_images' => $images ] );
 			if ( is_wp_error( $response ) ) {
 				return $response;
 			}

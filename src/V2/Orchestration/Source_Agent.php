@@ -3,6 +3,7 @@
 namespace WP_Autoplugin\V2\Orchestration;
 
 use WP_Autoplugin\V2\Domain\AI\Agent_Task;
+use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Domain\AI\Plan_Response;
 use WP_Autoplugin\V2\Domain\AI\Prompts\WordPress_Runtime_Constraints;
 use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
@@ -133,12 +134,15 @@ final class Source_Agent {
 				$transcript[0]['prompt_images'] = $images;
 			}
 			$response = $transport->send(
-				$this->instructions(
-					$run,
-					$stage,
-					'conversation' === $job['task'],
-					(string) $workspace['operation'],
-					'plan_structure' === $job['task']
+				Global_Instructions::apply(
+					$this->instructions(
+						$run,
+						$stage,
+						'conversation' === $job['task'],
+						(string) $workspace['operation'],
+						'plan_structure' === $job['task']
+					),
+					$jobs->global_instructions( (int) $job['id'] )
 				),
 				$transcript,
 				$tools->definitions()

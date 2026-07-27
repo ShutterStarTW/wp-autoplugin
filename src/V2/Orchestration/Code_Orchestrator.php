@@ -2,6 +2,7 @@
 
 namespace WP_Autoplugin\V2\Orchestration;
 
+use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Existing_Target_Code_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Extension_Plugin_Code_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Code_Prompt;
@@ -185,7 +186,7 @@ final class Code_Orchestrator {
 			return $input;
 		}
 		$response = $transport->complete(
-			$prompt['instructions'],
+			Global_Instructions::apply( $prompt['instructions'], $jobs->global_instructions( (int) $job['id'] ) ),
 			$input,
 			[ 'max_output_tokens' => 16384, 'json' => true ]
 		);

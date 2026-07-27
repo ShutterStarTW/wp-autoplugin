@@ -4,6 +4,7 @@ namespace WP_Autoplugin\V2\Orchestration;
 
 use WP_Autoplugin\V2\Domain\AI\Code_Follow_Up_Compliance_Response;
 use WP_Autoplugin\V2\Domain\AI\Code_Follow_Up_Response;
+use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Code_Follow_Up_Compliance_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Existing_Target_Code_Follow_Up_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Extension_Plugin_Code_Follow_Up_Prompt;
@@ -128,7 +129,7 @@ final class Code_Follow_Up_Orchestrator {
 		}
 		$jobs->event( (int) $job['id'], 'code_follow_up_analysis_started', __( 'Analyzing whether the message is a question or a Code change.', 'wp-autoplugin' ), [ 'phase' => 'analysis', 'revision_id' => (int) $base['id'] ] );
 		$response = $transport->complete(
-			$prompt['instructions'],
+			Global_Instructions::apply( $prompt['instructions'], $jobs->global_instructions( (int) $job['id'] ) ),
 			$prompt['input'],
 			[ 'max_output_tokens' => 8192, 'json' => true, 'prompt_images' => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ) ]
 		);
@@ -245,7 +246,7 @@ final class Code_Follow_Up_Orchestrator {
 			return $transport;
 		}
 		$response = $transport->complete(
-			$prompt['instructions'],
+			Global_Instructions::apply( $prompt['instructions'], $jobs->global_instructions( (int) $job['id'] ) ),
 			$prompt['input'],
 			[ 'max_output_tokens' => 16384, 'json' => true, 'prompt_images' => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ) ]
 		);
@@ -329,7 +330,7 @@ final class Code_Follow_Up_Orchestrator {
 
 		$jobs->event( (int) $job['id'], 'code_follow_up_compliance_started', __( 'Verifying that the generated Code satisfies the latest administrator request.', 'wp-autoplugin' ), [ 'phase' => 'compliance' ] );
 		$response = $transport->complete(
-			$prompt->instructions(),
+			Global_Instructions::apply( $prompt->instructions(), $jobs->global_instructions( (int) $job['id'] ) ),
 			$prompt->input(
 				(string) $job['payload']['message'],
 				$this->history( (int) $job['workspace_id'], (int) $job['id'] ),

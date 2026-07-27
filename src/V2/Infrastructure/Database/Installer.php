@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
  * Creates and upgrades v2 operational tables.
  */
 final class Installer {
-	public const SCHEMA_VERSION = '12';
+	public const SCHEMA_VERSION = '13';
 	private const OPTION_NAME   = 'wp_autoplugin_v2_schema_version';
 
 	/**
@@ -164,6 +164,8 @@ final class Installer {
 			cancel_requested tinyint(1) unsigned NOT NULL DEFAULT 0,
 			runner varchar(30) NULL,
 			payload longtext NULL,
+			global_instructions longtext NULL,
+			global_instructions_hash char(64) NULL,
 			result longtext NULL,
 			error_message text NULL,
 			created_by bigint(20) unsigned NOT NULL,
@@ -543,6 +545,18 @@ final class Installer {
 			array_keys( $revision_file_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $revision_files, $column )
 		);
+		$jobs        = self::table( 'jobs' );
+		$job_columns = [
+			'global_instructions'      => "ALTER TABLE $jobs ADD global_instructions longtext NULL AFTER payload",
+			'global_instructions_hash' => "ALTER TABLE $jobs ADD global_instructions_hash char(64) NULL AFTER global_instructions",
+		];
+		foreach ( $job_columns as $column => $alter ) {
+			maybe_add_column( $jobs, $column, $alter );
+		}
+		$job_ready  = ! array_filter(
+			array_keys( $job_columns ),
+			static fn( string $column ): bool => ! self::column_exists( $jobs, $column )
+		);
 		$code_runs = self::table( 'code_runs' );
 		maybe_add_column(
 			$code_runs,
@@ -615,7 +629,7 @@ final class Installer {
 			static fn( string $table ): bool => ! self::table_exists( self::table( $table ) )
 		);
 		$prompt_attachment_ready = self::table_exists( self::table( 'prompt_attachments' ) ) && self::table_exists( self::table( 'job_prompt_attachments' ) );
-		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && $revision_file_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) && $review_release_ready && $release_package_ready && $promotion_ready && $prompt_attachment_ready ) {
+		if ( self::column_exists( $agent_runs, 'effort' ) && $revision_ready && $revision_file_ready && $job_ready && self::table_exists( $code_runs ) && self::column_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'revision_id' ) && self::index_exists( $code_runs, 'mode_status' ) && $code_run_ready && self::table_exists( $code_run_files ) && self::column_exists( $code_run_files, 'operation' ) && $review_release_ready && $release_package_ready && $promotion_ready && $prompt_attachment_ready ) {
 			update_option( self::OPTION_NAME, self::SCHEMA_VERSION, false );
 		}
 	}
@@ -655,17 +669,21 @@ final class Installer {
 	 * Add privacy-conscious defaults without overwriting existing choices.
 	 */
 	private static function add_defaults(): void {
+		if ( false === get_option( 'wp_autoplugin_custom_instructions', false ) ) {
+			add_option( 'wp_autoplugin_custom_instructions', '', '', false );
+		}
 		if ( false === get_option( 'wp_autoplugin_v2_log_mode', false ) ) {
 			add_option( 'wp_autoplugin_v2_log_mode', 'metadata', '', false );
 		}
 
 		wp_set_option_autoload_values(
 			[
-				'wp_autoplugin_openai_api_key'    => false,
-				'wp_autoplugin_anthropic_api_key' => false,
-				'wp_autoplugin_google_api_key'    => false,
-				'wp_autoplugin_xai_api_key'       => false,
-				'wp_autoplugin_custom_models'      => false,
+				'wp_autoplugin_openai_api_key'       => false,
+				'wp_autoplugin_anthropic_api_key'    => false,
+				'wp_autoplugin_google_api_key'       => false,
+				'wp_autoplugin_xai_api_key'          => false,
+				'wp_autoplugin_custom_models'         => false,
+				'wp_autoplugin_custom_instructions'   => false,
 				'wp_autoplugin_default_model_effort'  => false,
 				'wp_autoplugin_planner_model_effort'  => false,
 				'wp_autoplugin_coder_model_effort'    => false,

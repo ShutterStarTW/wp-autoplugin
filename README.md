@@ -20,6 +20,8 @@ Closing a workspace tab is non-destructive. Projects, jobs, revisions, files, re
 
 Installed plugins can provide project-specific AI guidance in an exact root-level `AGENTS.md`. WP-Autoplugin automatically reads and supplies the complete file to Plan, Explain, Code, Code follow-up, Review, and Review-fix work for that plugin, including hook-extension projects targeting it. The file must be a regular, non-symlinked UTF-8 file no larger than 64 KiB; nested `AGENTS.md` files are not loaded automatically.
 
+Settings also provides site-wide Custom instructions for coding conventions and other persistent guidance. Each future AI job privately snapshots the saved value when queued, so retries and resumable work stay consistent. Safety and response contracts take precedence, followed by the current request, a plugin-root `AGENTS.md`, and then the global guidance.
+
 ## Admin settings
 
 The native v2 settings screen keeps the existing upgrade-compatible option names for:
@@ -27,6 +29,7 @@ The native v2 settings screen keeps the existing upgrade-compatible option names
 - OpenAI, Anthropic, Google Gemini, and xAI API keys
 - Default, Planner, Coder, and Reviewer model selection
 - per-role reasoning effort
+- site-wide Custom instructions for future AI jobs
 - custom OpenAI-compatible endpoints
 - the experimental ChatGPT Subscription connection
 
@@ -45,6 +48,7 @@ API usage may be billed by the selected provider.
 - All v2 REST resources require `manage_options`.
 - Source inspection is bounded, read-only, and constrained to the selected target root.
 - Root plugin `AGENTS.md` instructions cannot override v2 safety, staging, manifest, or independent-Review invariants.
+- Site-wide Custom instructions cannot override the current administrator request or a more-specific plugin-root `AGENTS.md`.
 - API secrets never belong in jobs, events, revisions, usage, diagnostics, or browser bootstrap data.
 - Generated files are deterministic staged revisions, not direct AI writes.
 - Plugin package, install, activation, modification, and rollback actions require explicit approval and the relevant WordPress capabilities.
@@ -91,7 +95,7 @@ Do not hand-edit generated bundles.
 
 ## Privacy
 
-WP-Autoplugin does not require a WP-Autoplugin account. Source and credentials remain on the WordPress site except for the task content sent to the configured AI provider. See `readme.txt` for the external-service disclosures.
+WP-Autoplugin does not require a WP-Autoplugin account. Source, credentials, and durable job snapshots remain on the WordPress site except for task content, relevant source, images, and any saved Custom instructions sent to the configured AI provider. Custom instructions are not a secret store. See `readme.txt` for the external-service disclosures.
 
 ## License
 

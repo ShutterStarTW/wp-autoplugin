@@ -2,6 +2,7 @@
 
 namespace WP_Autoplugin\V2\Orchestration;
 
+use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Review_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Review_Response;
 use WP_Autoplugin\V2\Domain\Target\Source_Tools;
@@ -112,7 +113,10 @@ final class Review_Orchestrator {
 		}
 		$same_revision = $parent && (int) $parent['revision_id'] === $revision_id;
 		$prompt        = new Review_Prompt();
-		$instructions  = $prompt->instructions( $is_conversation, (bool) $same_revision );
+		$instructions  = Global_Instructions::apply(
+			$prompt->instructions( $is_conversation, (bool) $same_revision ),
+			$jobs->global_instructions( (int) $job['id'] )
+		);
 		$input         = $prompt->input(
 			$context,
 			$previous,

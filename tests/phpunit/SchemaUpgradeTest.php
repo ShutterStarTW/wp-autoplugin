@@ -255,4 +255,39 @@ final class SchemaUpgradeTest extends WP_UnitTestCase {
 		$wpdb->delete( $packages, [ 'id' => $package_id ] );
 		$wpdb->delete( $promotions, [ 'id' => $promotion_id ] );
 	}
+
+	public function test_version_twelve_upgrade_preserves_jobs_and_adds_private_instruction_snapshots(): void {
+		global $wpdb;
+
+		Installer::activate();
+		$jobs = Installer::table( 'jobs' );
+		$now  = current_time( 'mysql', true );
+		$wpdb->insert(
+			$jobs,
+			[
+				'workspace_id' => 987659,
+				'task'         => 'plan',
+				'status'       => 'completed',
+				'progress'     => 100,
+				'payload'      => wp_json_encode( [ 'fixture' => true ] ),
+				'created_by'   => 1,
+				'created_at'   => $now,
+				'updated_at'   => $now,
+			]
+		);
+		$job_id = (int) $wpdb->insert_id;
+		$wpdb->query( "ALTER TABLE $jobs DROP COLUMN global_instructions_hash, DROP COLUMN global_instructions" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		update_option( 'wp_autoplugin_v2_schema_version', '12', false );
+
+		Installer::maybe_upgrade();
+
+		$this->assertSame( Installer::SCHEMA_VERSION, get_option( 'wp_autoplugin_v2_schema_version' ) );
+		$this->assertSame( 'plan', $wpdb->get_var( $wpdb->prepare( "SELECT task FROM $jobs WHERE id = %d", $job_id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		foreach ( [ 'global_instructions', 'global_instructions_hash' ] as $column ) {
+			$this->assertSame( $column, $wpdb->get_var( "SHOW COLUMNS FROM $jobs LIKE '$column'" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+			$this->assertNull( $wpdb->get_var( $wpdb->prepare( "SELECT $column FROM $jobs WHERE id = %d", $job_id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal test table.
+		}
+
+		$wpdb->delete( $jobs, [ 'id' => $job_id ] );
+	}
 }

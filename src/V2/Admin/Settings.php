@@ -2,6 +2,7 @@
 
 namespace WP_Autoplugin\V2\Admin;
 
+use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 use WP_Autoplugin\V2\Domain\AI\Model_Registry;
 use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Config;
@@ -30,6 +31,19 @@ final class Settings {
 
 	public function register_settings(): void {
 		$this->migrate_chatgpt_overrides();
+		if ( false === get_option( Global_Instructions::OPTION_NAME, false ) ) {
+			add_option( Global_Instructions::OPTION_NAME, '', '', false );
+		}
+
+		register_setting(
+			self::GROUP,
+			Global_Instructions::OPTION_NAME,
+			[
+				'type'              => 'string',
+				'sanitize_callback' => [ $this, 'sanitize_custom_instructions' ],
+				'default'           => '',
+			]
+		);
 
 		register_setting(
 			self::GROUP,
@@ -91,6 +105,25 @@ final class Settings {
 	public function sanitize_secret( $value ): string {
 		$value = preg_replace( '/[\x00-\x1F\x7F]/', '', trim( (string) $value ) );
 		return is_string( $value ) ? $value : '';
+	}
+
+	/**
+	 * Preserve administrator-authored Markdown and code while enforcing bounds.
+	 *
+	 * @param mixed $value Submitted setting value.
+	 */
+	public function sanitize_custom_instructions( $value ): string {
+		$value = str_replace( [ "\r\n", "\r" ], "\n", (string) $value );
+		if ( '' === trim( $value ) ) {
+			return '';
+		}
+
+		try {
+			return Global_Instructions::validate( $value );
+		} catch ( \RuntimeException $error ) {
+			$this->settings_error( $error->getMessage() );
+			return (string) get_option( Global_Instructions::OPTION_NAME, '' );
+		}
 	}
 
 	public function sanitize_default_model( $value ): string {

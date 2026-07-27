@@ -2,6 +2,7 @@
 
 namespace WP_Autoplugin\V2\Infrastructure\Database;
 
+use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Domain\AI\Json_Response;
 
 /**
@@ -15,6 +16,9 @@ final class Job_Repository extends Repository {
 	public function create( int $workspace_id, string $task, array $payload, int $user_id ): array {
 		$now           = $this->now();
 		$artifact_lock = self::is_artifact_work( [ 'task' => $task, 'payload' => $payload ] );
+		$instructions  = self::is_ai_work( [ 'task' => $task, 'payload' => $payload ] )
+			? Global_Instructions::snapshot()
+			: null;
 		if ( $artifact_lock ) {
 			$this->wpdb->query( 'START TRANSACTION' );
 		}
@@ -30,16 +34,18 @@ final class Job_Repository extends Repository {
 			$this->wpdb->insert(
 				Installer::table( 'jobs' ),
 				[
-					'workspace_id' => $workspace_id,
-					'task'         => $task,
-					'status'       => 'queued',
-					'progress'     => 0,
-					'payload'      => $this->json( $payload ),
-					'created_by'   => $user_id,
-					'created_at'   => $now,
-					'updated_at'   => $now,
+					'workspace_id'             => $workspace_id,
+					'task'                     => $task,
+					'status'                   => 'queued',
+					'progress'                 => 0,
+					'payload'                  => $this->json( $payload ),
+					'global_instructions'      => $instructions['content'] ?? null,
+					'global_instructions_hash' => $instructions['content_hash'] ?? null,
+					'created_by'               => $user_id,
+					'created_at'               => $now,
+					'updated_at'               => $now,
 				],
-				[ '%d', '%s', '%s', '%d', '%s', '%d', '%s', '%s' ]
+				[ '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%d', '%s', '%s' ]
 			);
 
 			$id = (int) $this->wpdb->insert_id;
@@ -170,6 +176,40 @@ final class Job_Repository extends Repository {
 	public static function is_code_work( array $job ): bool {
 		return in_array( (string) ( $job['task'] ?? '' ), [ 'code', 'review_fix' ], true )
 			|| ( 'conversation' === ( $job['task'] ?? '' ) && 'code' === ( $job['payload']['stage'] ?? '' ) );
+	}
+
+	/** Whether a durable job sends one or more requests to an AI provider. */
+	public static function is_ai_work( array $job ): bool {
+		return in_array(
+			(string) ( $job['task'] ?? '' ),
+			[ 'plan', 'plan_structure', 'code', 'review', 'review_fix', 'explain', 'conversation' ],
+			true
+		);
+	}
+
+	/**
+	 * Return the private immutable site-wide instruction snapshot for one job.
+	 *
+	 * @return array{content:string,content_hash:string}|null
+	 */
+	public function global_instructions( int $job_id ): ?array {
+		$row = $this->wpdb->get_row(
+			$this->wpdb->prepare(
+				'SELECT global_instructions, global_instructions_hash FROM ' . Installer::table( 'jobs' ) . ' WHERE id = %d',
+				$job_id
+			),
+			ARRAY_A
+		);
+		if ( ! $row || null === $row['global_instructions'] || '' === (string) $row['global_instructions'] ) {
+			return null;
+		}
+
+		$snapshot = [
+			'content'      => (string) $row['global_instructions'],
+			'content_hash' => (string) $row['global_instructions_hash'],
+		];
+
+		return Global_Instructions::validate_snapshot( $snapshot );
 	}
 
 	/** Whether a job participates in the workspace artifact lock. */
@@ -389,6 +429,7 @@ final class Job_Repository extends Repository {
 		}
 		$row['payload'] = $this->decode( $row['payload'] );
 		$row['result']  = $this->decode( $row['result'] );
+		unset( $row['global_instructions'], $row['global_instructions_hash'] );
 		$row['prompt_attachments'] = ( new Prompt_Attachment_Repository( $this->wpdb ) )->for_job( (int) $row['id'] );
 
 		return $row;

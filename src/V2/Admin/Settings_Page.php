@@ -2,6 +2,7 @@
 
 namespace WP_Autoplugin\V2\Admin;
 
+use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Domain\AI\Model_Catalog;
 use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 use WP_Autoplugin\V2\Domain\AI\Model_Registry;
@@ -84,6 +85,23 @@ final class Settings_Page {
 						?>
 					</table>
 				</div>
+
+				<h2><?php esc_html_e( 'Custom instructions', 'wp-autoplugin' ); ?></h2>
+				<p><?php esc_html_e( 'Set site-wide guidance for coding conventions, architecture preferences, and other instructions that should apply to future AI jobs.', 'wp-autoplugin' ); ?></p>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="<?php echo esc_attr( Global_Instructions::OPTION_NAME ); ?>"><?php esc_html_e( 'Custom instructions', 'wp-autoplugin' ); ?></label></th>
+						<td>
+							<textarea name="<?php echo esc_attr( Global_Instructions::OPTION_NAME ); ?>" id="<?php echo esc_attr( Global_Instructions::OPTION_NAME ); ?>" rows="12" class="large-text code"><?php echo esc_textarea( (string) get_option( Global_Instructions::OPTION_NAME, '' ) ); ?></textarea>
+							<p class="description">
+								<?php esc_html_e( 'Applied to Plan, Explain, Code, Review, follow-up, and Review-fix jobs queued after you save. Running jobs and automatic retries keep their original snapshot. A plugin-root AGENTS.md and the current request take precedence.', 'wp-autoplugin' ); ?>
+							</p>
+							<p class="description">
+								<?php esc_html_e( 'Instructions are stored with each job and sent to the selected AI provider. Do not include passwords, API keys, or other secrets. Maximum size: 64 KiB.', 'wp-autoplugin' ); ?>
+							</p>
+						</td>
+					</tr>
+				</table>
 
 				<h2><?php esc_html_e( 'Custom Models', 'wp-autoplugin' ); ?></h2>
 				<p><?php esc_html_e( 'Add OpenAI-compatible endpoints. Custom model changes are persisted when you save this settings form.', 'wp-autoplugin' ); ?></p>
