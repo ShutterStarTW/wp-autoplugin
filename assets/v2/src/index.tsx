@@ -3124,6 +3124,12 @@ function WorkspaceLauncher( {
 		target?.kind === 'new_plugin' ? directPlanCapability : planCapability;
 	const imageCapability =
 		operation === 'explain' ? explainCapability : effectivePlanCapability;
+	const submitDisabled =
+		busy ||
+		( ! request.trim() && ! images.length ) ||
+		( images.length > 0 && ! imageCapability?.images ) ||
+		( operation === 'explain' && ! explainCapability?.available ) ||
+		( requiresPlan && ! effectivePlanCapability?.available );
 	const submit = async () => {
 		if ( await onStart( images ) ) {
 			setImages( [] );
@@ -3185,6 +3191,18 @@ function WorkspaceLauncher( {
 							onFilesChange={ setImages }
 							imageEnabled={ !! imageCapability?.images }
 							disabled={ busy }
+							onKeyDown={ ( event ) => {
+								if (
+									'Enter' === event.key &&
+									! event.shiftKey &&
+									! event.nativeEvent.isComposing &&
+									!! request.trim() &&
+									! submitDisabled
+								) {
+									event.preventDefault();
+									submit();
+								}
+							} }
 							help={
 								target?.kind === 'new_plugin'
 									? __(
@@ -3219,16 +3237,7 @@ function WorkspaceLauncher( {
 							) }
 						<Button
 							variant="primary"
-							disabled={
-								busy ||
-								( ! request.trim() && ! images.length ) ||
-								( images.length > 0 &&
-									! imageCapability?.images ) ||
-								( operation === 'explain' &&
-									! explainCapability?.available ) ||
-								( requiresPlan &&
-									! effectivePlanCapability?.available )
-							}
+							disabled={ submitDisabled }
 							isBusy={ busy }
 							onClick={ submit }
 						>
