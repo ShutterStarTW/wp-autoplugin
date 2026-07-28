@@ -49,7 +49,7 @@ API usage may be billed by the selected provider.
 - Source inspection is bounded, read-only, and constrained to the selected target root.
 - Root plugin `AGENTS.md` instructions cannot override v2 safety, staging, manifest, or independent-Review invariants.
 - Site-wide Custom instructions cannot override the current administrator request or a more-specific plugin-root `AGENTS.md`.
-- API secrets never belong in jobs, events, revisions, usage, diagnostics, or browser bootstrap data.
+- API secrets never belong in jobs, events, revisions, usage, or browser bootstrap data.
 - Generated files are deterministic staged revisions, not direct AI writes.
 - Plugin package, install, activation, modification, and rollback actions require explicit approval and the relevant WordPress capabilities.
 - `DISALLOW_FILE_MODS` and multisite mutation restrictions are respected.

@@ -306,7 +306,6 @@ final class Routes {
 			'version'   => WP_AUTOPLUGIN_VERSION,
 			'schema'    => Installer::SCHEMA_VERSION,
 			'queue'     => ( new Queue() )->status(),
-			'log_mode'  => get_option( 'wp_autoplugin_v2_log_mode', 'metadata' ),
 			'explain_agent' => ( new Agent_Transport_Factory() )->capability( 'explain' ),
 			'plan_agent'    => ( new Agent_Transport_Factory() )->capability( 'plan' ),
 			'direct_plan'   => ( new Direct_Transport_Factory() )->capability( 'plan' ),

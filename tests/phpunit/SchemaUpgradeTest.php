@@ -3,7 +3,7 @@
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Release_Repository;
 
-/** Verifies additive Code-slice schema upgrades. */
+/** Verifies additive v2 schema upgrades. */
 final class SchemaUpgradeTest extends WP_UnitTestCase {
 	public function test_version_five_upgrade_preserves_revision_and_adds_code_schema(): void {
 		global $wpdb;
@@ -289,5 +289,23 @@ final class SchemaUpgradeTest extends WP_UnitTestCase {
 		}
 
 		$wpdb->delete( $jobs, [ 'id' => $job_id ] );
+	}
+
+	public function test_version_thirteen_upgrade_does_not_provision_retired_scaffolding(): void {
+		global $wpdb;
+
+		$diagnostic_logs  = $wpdb->prefix . 'wp_autoplugin_diagnostic_logs';
+		$prompt_templates = $wpdb->prefix . 'wp_autoplugin_prompt_templates';
+		$wpdb->query( "DROP TABLE IF EXISTS $diagnostic_logs" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Exact internal test table.
+		$wpdb->query( "DROP TABLE IF EXISTS $prompt_templates" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Exact internal test table.
+		delete_option( 'wp_autoplugin_v2_log_mode' );
+		update_option( 'wp_autoplugin_v2_schema_version', '13', false );
+
+		Installer::maybe_upgrade();
+
+		$this->assertSame( Installer::SCHEMA_VERSION, get_option( 'wp_autoplugin_v2_schema_version' ) );
+		$this->assertNull( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $diagnostic_logs ) ) );
+		$this->assertNull( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $prompt_templates ) ) );
+		$this->assertFalse( get_option( 'wp_autoplugin_v2_log_mode', false ) );
 	}
 }

@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
  * Creates and upgrades v2 operational tables.
  */
 final class Installer {
-	public const SCHEMA_VERSION = '13';
+	public const SCHEMA_VERSION = '14';
 	private const OPTION_NAME   = 'wp_autoplugin_v2_schema_version';
 
 	/**
@@ -44,8 +44,6 @@ final class Installer {
 			'jobs',
 			'job_events',
 			'usage',
-			'diagnostic_logs',
-			'prompt_templates',
 			'agent_runs',
 			'agent_steps',
 			'code_runs',
@@ -229,34 +227,6 @@ final class Installer {
 			created_at datetime NOT NULL,
 			PRIMARY KEY  (id),
 			KEY job_id (job_id)
-		) $charset;";
-
-		$sql[] = 'CREATE TABLE ' . self::table( 'diagnostic_logs' ) . " (
-			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-			job_id bigint(20) unsigned NULL,
-			level varchar(20) NOT NULL,
-			code varchar(100) NOT NULL,
-			message text NOT NULL,
-			metadata longtext NULL,
-			created_at datetime NOT NULL,
-			PRIMARY KEY  (id),
-			KEY job_id (job_id),
-			KEY code (code)
-		) $charset;";
-
-		$sql[] = 'CREATE TABLE ' . self::table( 'prompt_templates' ) . " (
-			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-			slug varchar(100) NOT NULL,
-			version int(10) unsigned NOT NULL,
-			task varchar(30) NOT NULL,
-			template longtext NOT NULL,
-			input_schema longtext NULL,
-			output_schema longtext NULL,
-			is_active tinyint(1) unsigned NOT NULL DEFAULT 1,
-			created_at datetime NOT NULL,
-			PRIMARY KEY  (id),
-			UNIQUE KEY slug_version (slug,version),
-			KEY task_active (task,is_active)
 		) $charset;";
 
 		$sql[] = 'CREATE TABLE ' . self::table( 'agent_runs' ) . " (
@@ -671,9 +641,6 @@ final class Installer {
 	private static function add_defaults(): void {
 		if ( false === get_option( 'wp_autoplugin_custom_instructions', false ) ) {
 			add_option( 'wp_autoplugin_custom_instructions', '', '', false );
-		}
-		if ( false === get_option( 'wp_autoplugin_v2_log_mode', false ) ) {
-			add_option( 'wp_autoplugin_v2_log_mode', 'metadata', '', false );
 		}
 
 		wp_set_option_autoload_values(
