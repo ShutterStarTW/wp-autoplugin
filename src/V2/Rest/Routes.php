@@ -88,11 +88,6 @@ final class Routes {
 				],
 			],
 		] );
-		register_rest_route( self::NAMESPACE, '/workspaces/recent', [
-			'methods'             => \WP_REST_Server::READABLE,
-			'callback'            => [ $this, 'recent_workspaces' ],
-			'permission_callback' => $permission,
-		] );
 		register_rest_route( self::NAMESPACE, '/workspaces/(?P<id>\d+)', [
 			'methods'             => \WP_REST_Server::READABLE,
 			'callback'            => [ $this, 'workspace' ],
@@ -361,10 +356,6 @@ final class Routes {
 
 	public function workspaces(): \WP_REST_Response {
 		return rest_ensure_response( [ 'items' => ( new Workspace_Repository() )->list_open( get_current_user_id() ) ] );
-	}
-
-	public function recent_workspaces(): \WP_REST_Response {
-		return rest_ensure_response( [ 'items' => ( new Workspace_Repository() )->list_recently_closed( get_current_user_id(), 10 ) ] );
 	}
 
 	/**

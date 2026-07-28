@@ -54,8 +54,17 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 
 	public function test_response_rejects_wrong_path_and_markdown_fence(): void {
 		$expected = [ 'path' => 'example.php', 'type' => 'php' ];
-		$this->assertWPError( $this->validator->response( '{"path":"other.php","content":"<?php"}', $expected, 'example.php' ) );
-		$this->assertWPError( $this->validator->response( '```json {"path":"example.php","content":"<?php"} ```', $expected, 'example.php' ) );
+		$manifest = [
+			'scope'         => 'project',
+			'artifact_kind' => 'plugin',
+			'plugin_name'   => 'Example',
+			'main_file'     => 'example.php',
+			'files'         => [
+				[ 'path' => 'example.php', 'type' => 'php', 'description' => 'Bootstrap.', 'operation' => 'add' ],
+			],
+		];
+		$this->assertWPError( $this->validator->response( '{"path":"other.php","content":"<?php"}', $expected, $manifest ) );
+		$this->assertWPError( $this->validator->response( '```json {"path":"example.php","content":"<?php"} ```', $expected, $manifest ) );
 	}
 
 	public function test_generates_markdown_and_text_files_with_literal_fenced_examples(): void {

@@ -7,20 +7,6 @@ use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 
 /** Persists and reads immutable validated staged revisions. */
 final class Revision_Repository extends Repository {
-	/**
-	 * Backward-compatible staging entry point.
-	 *
-	 * @param array<int, array<string, mixed>> $files Staged files.
-	 * @return array<string, mixed>
-	 */
-	public function stage( int $workspace_id, array $files, string $summary, int $user_id ): array {
-		$result = $this->create_complete( $workspace_id, $files, $summary, $user_id, [ 'origin' => 'ai' ], null, false );
-		if ( is_wp_error( $result ) ) {
-			throw new \RuntimeException( $result->get_error_message() );
-		}
-		return $this->find( (int) $result['id'] );
-	}
-
 	/** Atomically stage a completed Code run and scrub its temporary source. */
 	public function stage_code_run( array $run, array $manifest, int $workspace_id, int $user_id, ?int $expected_latest_revision_id, array $source_files = [] ) {
 		$run_files = ( new Code_Run_Repository( $this->wpdb ) )->files( (int) $run['id'] );

@@ -2,7 +2,6 @@
 
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Review_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 
 /** Integration coverage for immutable reports and administrator finding history. */
 final class ReviewRepositoryTest extends WP_UnitTestCase {
@@ -25,13 +24,7 @@ final class ReviewRepositoryTest extends WP_UnitTestCase {
 			[ 'project_id' => $project_id, 'operation' => 'create', 'status' => 'staged', 'request' => 'Create a fixture.', 'created_by' => 1, 'created_at' => $now, 'updated_at' => $now ]
 		);
 		$this->workspace_id = (int) $wpdb->insert_id;
-		$revision = ( new Revision_Repository() )->stage(
-			$this->workspace_id,
-			[ [ 'path' => 'fixture.php', 'change_type' => 'add', 'content' => "<?php\n/* Plugin Name: Fixture */\n" ] ],
-			'Fixture revision',
-			1
-		);
-		$this->revision_id = (int) $revision['id'];
+		$this->revision_id = $this->create_revision_fixture( $now );
 	}
 
 	public function test_report_verdict_is_immutable_while_dismiss_reopen_and_successors_update_projection(): void {
@@ -90,6 +83,41 @@ final class ReviewRepositoryTest extends WP_UnitTestCase {
 	/** @return array<string, mixed> */
 	private function model(): array {
 		return [ 'provider' => 'openai', 'model' => 'fixture', 'effort' => '', 'prompt_slug' => 'staged-revision-review', 'prompt_version' => 1 ];
+	}
+
+	private function create_revision_fixture( string $now ): int {
+		global $wpdb;
+
+		$content  = "<?php\n/* Plugin Name: Fixture */\n";
+		$inserted = $wpdb->insert(
+			Installer::table( 'revisions' ),
+			[
+				'workspace_id'    => $this->workspace_id,
+				'revision_number' => 1,
+				'status'          => 'staged',
+				'summary'         => 'Fixture revision',
+				'origin'          => 'ai',
+				'created_by'      => 1,
+				'created_at'      => $now,
+			]
+		);
+		$this->assertNotFalse( $inserted );
+		$revision_id = (int) $wpdb->insert_id;
+		$this->assertGreaterThan( 0, $revision_id );
+
+		$inserted = $wpdb->insert(
+			Installer::table( 'revision_files' ),
+			[
+				'revision_id'  => $revision_id,
+				'path'         => 'fixture.php',
+				'change_type'  => 'add',
+				'content'      => $content,
+				'content_hash' => hash( 'sha256', $content ),
+			]
+		);
+		$this->assertNotFalse( $inserted );
+
+		return $revision_id;
 	}
 
 	/** @return array<string, mixed> */

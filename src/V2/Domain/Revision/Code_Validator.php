@@ -152,11 +152,12 @@ final class Code_Validator {
 	/**
 	 * Parse and validate one provider response against its expected manifest row.
 	 *
-	 * @param array<string, mixed>        $expected Expected file.
-	 * @param string|array<string, mixed> $policy   Legacy main path or normalized manifest.
+	 * @param string               $response Provider response.
+	 * @param array<string, mixed> $expected Expected file.
+	 * @param array<string, mixed> $manifest Normalized manifest.
 	 * @return array<string, string>|\WP_Error
 	 */
-	public function response( string $response, array $expected, $policy ) {
+	public function response( string $response, array $expected, array $manifest ) {
 		$decoded = json_decode( trim( $response ), true );
 		if ( ! is_array( $decoded ) && str_contains( $response, '```' ) ) {
 			return $this->error( $expected['path'], 0, 'markdown_fence', __( 'The response must be JSON without Markdown code fences.', 'wp-autoplugin' ) );
@@ -168,9 +169,6 @@ final class Code_Validator {
 			return $this->error( $expected['path'], 0, 'wrong_path', __( 'The provider returned a different file path than requested.', 'wp-autoplugin' ) );
 		}
 
-		$manifest = is_array( $policy )
-			? $policy
-			: [ 'scope' => 'project', 'artifact_kind' => 'plugin', 'main_file' => (string) $policy ];
 		$issues = $this->file_issues(
 			[
 				'path'        => $decoded['path'],
