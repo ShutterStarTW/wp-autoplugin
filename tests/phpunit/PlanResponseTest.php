@@ -37,6 +37,29 @@ final class PlanResponseTest extends WP_UnitTestCase {
 		$this->assertSame( [ 'content' => 'The current Plan already covers that.', 'outcome' => 'answer' ], $result );
 	}
 
+	public function test_links_follow_up_artifact_to_parent_plan(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => '# Updated Plan',
+				'structured' => [
+					'project_structure' => [
+						'directories' => [],
+						'files'       => [
+							[ 'path' => 'plugin.php', 'type' => 'php', 'description' => 'Update the plugin.', 'action' => 'update' ],
+						],
+					],
+				],
+			]
+		);
+
+		$result = ( new Plan_Response() )->parse( (string) $response, true, 42 );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( 42, $result['artifact']['parent_plan_id'] );
+		$this->assertArrayNotHasKey( 'parent_job_id', $result['artifact'] );
+	}
+
 	public function test_rejects_unsafe_or_duplicate_file_paths(): void {
 		$response = wp_json_encode(
 			[

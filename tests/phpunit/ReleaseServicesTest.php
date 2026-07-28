@@ -396,7 +396,7 @@ final class ReleaseServicesTest extends WP_UnitTestCase {
 		Installer::activate();
 		$repository = new Release_Repository();
 		$promotion  = $repository->create_promotion(
-			[ 'id' => wp_rand( 900000, 999999 ), 'workspace_id' => 987660, 'created_by' => $user_id, 'payload' => [] ],
+			[ 'id' => wp_rand( 900000, 999999 ), 'project_id' => 987660, 'created_by' => $user_id, 'payload' => [] ],
 			$revision,
 			'modify_theme_original',
 			$slug,
@@ -457,7 +457,7 @@ final class ReleaseServicesTest extends WP_UnitTestCase {
 		$job_id     = wp_rand( 800000, 899998 );
 		$revision   = [ 'id' => 654321 ];
 		$first      = $repository->create_promotion(
-			[ 'id' => $job_id, 'workspace_id' => 987659, 'created_by' => 1, 'payload' => [] ],
+			[ 'id' => $job_id, 'project_id' => 987659, 'created_by' => 1, 'payload' => [] ],
 			$revision,
 			'modify_theme_original',
 			'fixture-theme',
@@ -468,7 +468,7 @@ final class ReleaseServicesTest extends WP_UnitTestCase {
 		);
 		$repository->update_promotion( (int) $first['id'], [ 'status' => 'completed' ] );
 		$second = $repository->create_promotion(
-			[ 'id' => $job_id + 1, 'workspace_id' => 987659, 'created_by' => 1, 'payload' => [] ],
+			[ 'id' => $job_id + 1, 'project_id' => 987659, 'created_by' => 1, 'payload' => [] ],
 			$revision,
 			'modify_theme_original',
 			'fixture-theme',

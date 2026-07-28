@@ -3,25 +3,21 @@
 use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 
 /** Coverage for private per-job custom-instruction snapshots and prompt precedence. */
 final class GlobalInstructionsTest extends WP_UnitTestCase {
-	private int $workspace_id = 0;
-	private int $project_id   = 0;
+	private int $project_id = 0;
 
 	public function tear_down(): void {
 		global $wpdb;
 
-		if ( $this->workspace_id ) {
-			$job_ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'jobs' ) . ' WHERE workspace_id = %d', $this->workspace_id ) ) );
+		if ( $this->project_id ) {
+			$job_ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'jobs' ) . ' WHERE project_id = %d', $this->project_id ) ) );
 			foreach ( $job_ids as $job_id ) {
 				$wpdb->delete( Installer::table( 'job_events' ), [ 'job_id' => $job_id ] );
 			}
-			$wpdb->delete( Installer::table( 'jobs' ), [ 'workspace_id' => $this->workspace_id ] );
-			$wpdb->delete( Installer::table( 'workspaces' ), [ 'id' => $this->workspace_id ] );
-		}
-		if ( $this->project_id ) {
+			$wpdb->delete( Installer::table( 'jobs' ), [ 'project_id' => $this->project_id ] );
 			$wpdb->delete( Installer::table( 'projects' ), [ 'id' => $this->project_id ] );
 		}
 		delete_option( Global_Instructions::OPTION_NAME );
@@ -53,7 +49,7 @@ final class GlobalInstructionsTest extends WP_UnitTestCase {
 
 		Installer::activate();
 		$user_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
-		$created = ( new Workspace_Repository() )->create(
+		$created = ( new Project_Repository() )->create(
 			[
 				'kind' => 'new_plugin',
 				'ref'  => 'global-instructions-' . wp_generate_uuid4(),
@@ -63,13 +59,12 @@ final class GlobalInstructionsTest extends WP_UnitTestCase {
 			'Create a test plugin.',
 			$user_id
 		);
-		$this->workspace_id = (int) $created['workspace_id'];
-		$this->project_id   = (int) $created['project_id'];
+		$this->project_id = (int) $created['id'];
 
 		$first = "# First snapshot\n\nUse tabs.";
 		update_option( Global_Instructions::OPTION_NAME, $first, false );
 		$jobs = new Job_Repository();
-		$plan = $jobs->create( $this->workspace_id, 'plan', [], $user_id );
+		$plan = $jobs->create( $this->project_id, 'plan', [], $user_id );
 
 		update_option( Global_Instructions::OPTION_NAME, 'A later setting.', false );
 		$this->assertSame(
@@ -89,7 +84,7 @@ final class GlobalInstructionsTest extends WP_UnitTestCase {
 		$this->assertSame( $first, $raw['global_instructions'] );
 		$this->assertSame( hash( 'sha256', $first ), $raw['global_instructions_hash'] );
 
-		$package = $jobs->create( $this->workspace_id, 'package', [], $user_id );
+		$package = $jobs->create( $this->project_id, 'package', [], $user_id );
 		$this->assertNull( $jobs->global_instructions( (int) $package['id'] ) );
 	}
 

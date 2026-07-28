@@ -5,7 +5,7 @@ namespace WP_Autoplugin\V2\Orchestration;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Release_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Release\Promotion_Service;
 use WP_Autoplugin\V2\Release\Release_Matrix;
 use WP_Autoplugin\V2\Release\Theme_Promotion_Service;
@@ -24,7 +24,7 @@ final class Promotion_Orchestrator {
 		if ( in_array( $action, [ 'activate', 'rollback' ], true ) ) {
 			$release   = new Release_Repository();
 			$promotion = $release->promotion( absint( $job['payload']['promotion_id'] ?? 0 ) );
-			if ( ! $promotion || (int) $promotion['workspace_id'] !== (int) $job['workspace_id'] ) {
+			if ( ! $promotion || (int) $promotion['project_id'] !== (int) $job['project_id'] ) {
 				return new \WP_Error( 'promotion_action_missing', __( 'The promotion for this action is unavailable.', 'wp-autoplugin' ) );
 			}
 			$jobs = new Job_Repository();
@@ -68,15 +68,15 @@ final class Promotion_Orchestrator {
 					'promotion_id'  => (int) $promotion['id'],
 					'action'        => $action,
 					'artifact_kind' => $kind,
-					'target_ref'    => $operation['target_ref'] ?? $operation['plugin_file'] ?? $promotion['destination_target_ref'] ?? null,
+					'target_ref'    => $operation['target_ref'] ?? $promotion['destination_target_ref'] ?? null,
 				],
 				$operation
 			);
 		}
 		$revisions = new Revision_Repository();
-		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
+		$workspace = ( new Project_Repository() )->find( (int) $job['project_id'] );
 		$revision  = $revisions->find( absint( $job['payload']['revision_id'] ?? 0 ) );
-		if ( ! $workspace || ! $revision || (int) $revision['workspace_id'] !== (int) $workspace['id'] || (int) $revision['id'] !== $revisions->latest_id( (int) $workspace['id'] ) ) {
+		if ( ! $workspace || ! $revision || (int) $revision['project_id'] !== (int) $workspace['id'] || (int) $revision['id'] !== $revisions->latest_id( (int) $workspace['id'] ) ) {
 			return new \WP_Error( 'promotion_revision_conflict', __( 'Only the latest staged revision can be promoted.', 'wp-autoplugin' ) );
 		}
 		$mode = sanitize_key( (string) ( $job['payload']['mode'] ?? '' ) );
@@ -147,7 +147,7 @@ final class Promotion_Orchestrator {
 			return $operation;
 		}
 		$operation['artifact_kind'] = $kind;
-		$operation['target_ref']    = $operation['target_ref'] ?? $operation['plugin_file'] ?? $destination;
+		$operation['target_ref']    = $operation['target_ref'] ?? $destination;
 		$jobs->event(
 			(int) $job['id'],
 			'promotion_completed',
@@ -155,7 +155,7 @@ final class Promotion_Orchestrator {
 			[
 				'promotion_id'  => (int) $promotion['id'],
 				'status'        => $operation['status'],
-				'target_ref'    => $operation['target_ref'] ?? $operation['plugin_file'] ?? '',
+				'target_ref'    => $operation['target_ref'] ?? '',
 				'artifact_kind' => $kind,
 			]
 		);

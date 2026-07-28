@@ -11,7 +11,7 @@ final class Release_Repository extends Repository {
 			Installer::table( 'release_packages' ),
 			[
 				'job_id'           => (int) $job['id'],
-				'workspace_id'     => (int) $job['workspace_id'],
+				'project_id'       => (int) $job['project_id'],
 				'revision_id'      => (int) $revision['id'],
 				'review_report_id' => absint( $job['payload']['review_report_id'] ?? 0 ) ?: null,
 				'mode'             => $mode,
@@ -19,7 +19,6 @@ final class Release_Repository extends Repository {
 				'artifact_kind'    => $artifact_kind,
 				'target_ref'       => $target_ref,
 				'slug'             => $slug,
-				'plugin_file'      => 'plugin' === $artifact_kind ? $target_ref : null,
 				'review_override'  => $override ? 1 : 0,
 				'created_by'       => (int) $job['created_by'],
 				'created_at'       => $now,
@@ -41,9 +40,8 @@ final class Release_Repository extends Repository {
 				'sha256'               => $hash,
 				'size'                 => $size,
 				'artifact_kind'        => (string) ( $metadata['artifact_kind'] ?? 'plugin' ),
-				'target_ref'           => (string) ( $metadata['target_ref'] ?? $metadata['plugin_file'] ?? '' ),
+				'target_ref'           => (string) ( $metadata['target_ref'] ?? '' ),
 				'slug'                 => (string) ( $metadata['slug'] ?? '' ),
-				'plugin_file'          => isset( $metadata['plugin_file'] ) ? (string) $metadata['plugin_file'] : null,
 				'source_fingerprint'   => $metadata['source_tree_fingerprint'] ?? null,
 				'artifact_fingerprint' => $metadata['tree_fingerprint'] ?? null,
 				'header_transforms'    => $this->json( (array) ( $metadata['header_transforms'] ?? [] ) ),
@@ -119,7 +117,7 @@ final class Release_Repository extends Repository {
 			Installer::table( 'promotions' ),
 			[
 				'job_id'                  => (int) $job['id'],
-				'workspace_id'            => (int) $job['workspace_id'],
+				'project_id'             => (int) $job['project_id'],
 				'revision_id'             => (int) $revision['id'],
 				'review_report_id'        => absint( $job['payload']['review_report_id'] ?? 0 ) ?: null,
 				'mode'                    => $mode,
@@ -127,8 +125,6 @@ final class Release_Repository extends Repository {
 				'artifact_kind'           => $artifact_kind,
 				'source_target_ref'       => $source_ref,
 				'destination_target_ref'  => $destination_ref,
-				'source_plugin_file'      => 'plugin' === $artifact_kind ? $source_ref : null,
-				'destination_plugin_file' => 'plugin' === $artifact_kind ? $destination_ref : null,
 				'destination_slug'        => $slug,
 				'review_override'         => $override ? 1 : 0,
 				'created_by'              => (int) $job['created_by'],
@@ -144,7 +140,7 @@ final class Release_Repository extends Repository {
 
 	/** @param array<string,mixed> $fields */
 	public function update_promotion( int $id, array $fields ): bool {
-		$allowed = [ 'status', 'artifact_kind', 'source_target_ref', 'destination_target_ref', 'destination_plugin_file', 'destination_slug', 'target_fingerprint', 'header_transforms', 'created_directories', 'active_before', 'active_after', 'error_message', 'finished_at' ];
+		$allowed = [ 'status', 'artifact_kind', 'source_target_ref', 'destination_target_ref', 'destination_slug', 'target_fingerprint', 'header_transforms', 'created_directories', 'active_before', 'active_after', 'error_message', 'finished_at' ];
 		$data    = [ 'updated_at' => $this->now() ];
 		foreach ( $fields as $field => $value ) {
 			if ( in_array( $field, $allowed, true ) ) {
@@ -160,14 +156,12 @@ final class Release_Repository extends Repository {
 		if ( ! $row ) {
 			return null;
 		}
-		foreach ( [ 'id', 'job_id', 'workspace_id', 'revision_id', 'review_report_id', 'active_before', 'active_after', 'review_override', 'created_by' ] as $field ) {
+		foreach ( [ 'id', 'job_id', 'project_id', 'revision_id', 'review_report_id', 'active_before', 'active_after', 'review_override', 'created_by' ] as $field ) {
 			$row[ $field ] = null === $row[ $field ] ? null : (int) $row[ $field ];
 		}
 		$row['header_transforms']      = $this->decode( $row['header_transforms'] );
 		$row['created_directories']    = $this->decode( $row['created_directories'] );
 		$row['artifact_kind']          = (string) ( ( $row['artifact_kind'] ?? '' ) ?: 'plugin' );
-		$row['source_target_ref']      = ( $row['source_target_ref'] ?? null ) ?: ( $row['source_plugin_file'] ?? null );
-		$row['destination_target_ref'] = ( $row['destination_target_ref'] ?? null ) ?: ( $row['destination_plugin_file'] ?? null );
 		return $row;
 	}
 
@@ -226,7 +220,7 @@ final class Release_Repository extends Repository {
 		$modes = 'theme' === $artifact_kind ? [ 'modify_theme_original' ] : [ 'modify_original' ];
 		$id    = $this->wpdb->get_var(
 			$this->wpdb->prepare(
-				'SELECT id FROM ' . Installer::table( 'promotions' ) . ' WHERE mode = %s AND artifact_kind = %s AND COALESCE(destination_target_ref,destination_plugin_file) = %s AND status IN (%s,%s) ORDER BY id DESC LIMIT 1',
+				'SELECT id FROM ' . Installer::table( 'promotions' ) . ' WHERE mode = %s AND artifact_kind = %s AND destination_target_ref = %s AND status IN (%s,%s) ORDER BY id DESC LIMIT 1',
 				$modes[0],
 				$artifact_kind,
 				$destination_ref,
@@ -239,12 +233,11 @@ final class Release_Repository extends Repository {
 
 	/** @return array<string,mixed> */
 	private function hydrate_package( array $row ): array {
-		foreach ( [ 'id', 'job_id', 'workspace_id', 'revision_id', 'review_report_id', 'size', 'review_override', 'created_by' ] as $field ) {
+		foreach ( [ 'id', 'job_id', 'project_id', 'revision_id', 'review_report_id', 'size', 'review_override', 'created_by' ] as $field ) {
 			$row[ $field ] = null === $row[ $field ] ? null : (int) $row[ $field ];
 		}
 		$row['header_transforms'] = $this->decode( $row['header_transforms'] ?? null );
 		$row['artifact_kind']     = (string) ( ( $row['artifact_kind'] ?? '' ) ?: 'plugin' );
-		$row['target_ref']        = ( $row['target_ref'] ?? null ) ?: ( $row['plugin_file'] ?? null );
 		return $row;
 	}
 }

@@ -11,9 +11,10 @@ use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\Database\Code_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Plan_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 use WP_Autoplugin\V2\Release\Package_Builder;
 
@@ -31,12 +32,13 @@ final class Code_Orchestrator {
 		if ( null !== $result || 'code' !== ( $job['task'] ?? '' ) ) {
 			return $result;
 		}
-		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
+		$workspace = ( new Project_Repository() )->find( (int) $job['project_id'] );
 		if ( ! $workspace || ! $this->supports( $workspace ) ) {
 			return new \WP_Error( 'code_workspace_invalid', __( 'Code generation is not available for this workspace operation.', 'wp-autoplugin' ) );
 		}
 
 		$jobs      = new Job_Repository();
+		$plans     = new Plan_Repository();
 		$runs      = new Code_Run_Repository();
 		$validator = new Code_Validator();
 		$run       = $runs->find_by_job( (int) $job['id'] );
@@ -49,12 +51,12 @@ final class Code_Orchestrator {
 			if ( ( new Revision_Repository() )->latest_id( (int) $workspace['id'] ) !== $expected ) {
 				return new \WP_Error( 'revision_conflict', __( 'A newer revision exists. Reload the latest revision before retrying.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
-			$plan_id = (int) ( $job['payload']['plan_artifact_job_id'] ?? 0 );
-			$plan    = $plan_id ? $jobs->find( $plan_id ) : null;
-			if ( ! $plan || (int) $plan['workspace_id'] !== (int) $workspace['id'] || ! $jobs->is_plan_artifact( $plan ) ) {
+			$plan_id = (int) ( $job['payload']['plan_id'] ?? 0 );
+			$plan    = $plan_id ? $plans->find( $plan_id ) : null;
+			if ( ! $plan || (int) $plan['project_id'] !== (int) $workspace['id'] || ! $plans->is_ready( $plan ) ) {
 				return new \WP_Error( 'code_plan_missing', __( 'A completed Plan artifact from this workspace is required.', 'wp-autoplugin' ) );
 			}
-			$manifest = $validator->plan( (array) ( $plan['result']['structured'] ?? [] ), $workspace );
+			$manifest = $validator->plan( (array) ( $plan['structured'] ?? [] ), $workspace );
 			if ( is_wp_error( $manifest ) ) {
 				return $manifest;
 			}
@@ -132,7 +134,7 @@ final class Code_Orchestrator {
 				]
 			);
 		} else {
-			$plan     = $jobs->find( (int) $run['plan_job_id'] );
+			$plan     = $plans->find( (int) $run['plan_id'] );
 			$manifest = is_array( $run['target_manifest'] ?? null ) ? $validator->manifest( $run['target_manifest'] ) : null;
 			if ( ! $plan || is_wp_error( $manifest ) || ! is_array( $manifest ) ) {
 				return is_wp_error( $manifest ) ? $manifest : new \WP_Error( 'code_plan_missing', __( 'The Code run Plan artifact or manifest is unavailable.', 'wp-autoplugin' ) );
@@ -302,7 +304,7 @@ final class Code_Orchestrator {
 		if ( is_wp_error( $source ) ) {
 			return $source;
 		}
-		$revision = ( new Revision_Repository() )->stage_code_run( $run, $manifest, (int) $job['workspace_id'], (int) $job['created_by'], $expected, (array) ( $source['source_files'] ?? [] ) );
+		$revision = ( new Revision_Repository() )->stage_code_run( $run, $manifest, (int) $job['project_id'], (int) $job['created_by'], $expected, (array) ( $source['source_files'] ?? [] ) );
 		if ( is_wp_error( $revision ) ) {
 			return $revision;
 		}
@@ -316,7 +318,7 @@ final class Code_Orchestrator {
 		}
 		return [
 			'revision_id'          => (int) $run['revision_id'],
-			'plan_artifact_job_id' => (int) $run['plan_job_id'],
+			'plan_id' => (int) $run['plan_id'],
 			'parent_revision_id'   => $run['parent_revision_id'],
 			'files_count'          => $files_count,
 			'provider'             => $run['provider'],
@@ -527,6 +529,6 @@ final class Code_Orchestrator {
 	}
 
 	private function plan_content( array $plan ): string {
-		return (string) ( $plan['result']['artifact']['content'] ?? $plan['result']['content'] ?? '' );
+		return (string) ( $plan['content'] ?? '' );
 	}
 }

@@ -8,7 +8,7 @@ final class Code_Run_Repository extends Repository {
 	 * @param array<int, array<string, mixed>> $files Ordered normalized manifest.
 	 * @return array<string, mixed>
 	 */
-	public function create( int $job_id, int $plan_job_id, ?int $parent_revision_id, string $provider, string $model, string $effort, string $prompt_slug, int $prompt_version, array $files, string $mode = 'generate', ?array $target_manifest = null ): array {
+	public function create( int $job_id, int $plan_id, ?int $parent_revision_id, string $provider, string $model, string $effort, string $prompt_slug, int $prompt_version, array $files, string $mode = 'generate', ?array $target_manifest = null ): array {
 		$now = $this->now();
 		$this->wpdb->query( 'START TRANSACTION' );
 		try {
@@ -16,7 +16,7 @@ final class Code_Run_Repository extends Repository {
 				Installer::table( 'code_runs' ),
 				[
 					'job_id'             => $job_id,
-					'plan_job_id'        => $plan_job_id,
+					'plan_id'        => $plan_id,
 					'parent_revision_id' => $parent_revision_id,
 					'status'             => 'active',
 					'mode'               => sanitize_key( $mode ),
@@ -70,13 +70,13 @@ final class Code_Run_Repository extends Repository {
 	}
 
 	/** Initialize a durable Code follow-up at its analysis phase. */
-	public function create_follow_up( int $job_id, int $plan_job_id, int $parent_revision_id, string $provider, string $model, string $effort, string $prompt_slug, int $prompt_version ): array {
+	public function create_follow_up( int $job_id, int $plan_id, int $parent_revision_id, string $provider, string $model, string $effort, string $prompt_slug, int $prompt_version ): array {
 		$now      = $this->now();
 		$inserted = $this->wpdb->insert(
 			Installer::table( 'code_runs' ),
 			[
 				'job_id'             => $job_id,
-				'plan_job_id'        => $plan_job_id,
+				'plan_id'        => $plan_id,
 				'parent_revision_id' => $parent_revision_id,
 				'status'             => 'active',
 				'mode'               => 'follow_up',
@@ -517,7 +517,7 @@ final class Code_Run_Repository extends Repository {
 
 	/** @param array<string, mixed> $row */
 	private function hydrate( array $row ): array {
-		foreach ( [ 'id', 'job_id', 'plan_job_id', 'revision_id', 'parent_revision_id', 'generation', 'next_file_index', 'prompt_version', 'retry_count', 'input_tokens', 'output_tokens' ] as $field ) {
+		foreach ( [ 'id', 'job_id', 'plan_id', 'revision_id', 'parent_revision_id', 'generation', 'next_file_index', 'prompt_version', 'retry_count', 'input_tokens', 'output_tokens' ] as $field ) {
 			$row[ $field ] = null === $row[ $field ] ? null : (int) $row[ $field ];
 		}
 		$row['target_manifest']     = $this->decode( $row['target_manifest'] ?? null );

@@ -8,10 +8,11 @@ use WP_Autoplugin\V2\Domain\AI\Review_Response;
 use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Plan_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Review_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 use WP_Autoplugin\V2\Release\Package_Builder;
@@ -32,7 +33,7 @@ final class Review_Orchestrator {
 		$verification = null;
 		try {
 			$verification = $jobs->create(
-				(int) $job['workspace_id'],
+				(int) $job['project_id'],
 				'review',
 				[
 					'revision_id'                 => (int) $result['revision_id'],
@@ -43,8 +44,7 @@ final class Review_Orchestrator {
 				],
 				(int) $job['created_by']
 			);
-			$runner       = ( new Queue() )->dispatch( (int) $verification['id'] );
-			$jobs->update( (int) $verification['id'], [ 'runner' => $runner ] );
+			( new Queue() )->dispatch( (int) $verification['id'] );
 			$jobs->event(
 				(int) $job['id'],
 				'review_verification_queued',
@@ -79,14 +79,14 @@ final class Review_Orchestrator {
 		if ( null !== $result || ! $this->supports( $job ) ) {
 			return $result;
 		}
-		$workspaces  = new Workspace_Repository();
+		$workspaces  = new Project_Repository();
 		$revisions   = new Revision_Repository();
 		$reviews     = new Review_Repository();
 		$jobs        = new Job_Repository();
-		$workspace   = $workspaces->find( (int) $job['workspace_id'] );
+		$workspace   = $workspaces->find( (int) $job['project_id'] );
 		$revision_id = absint( $job['payload']['revision_id'] ?? 0 );
 		$revision    = $revision_id ? $revisions->find( $revision_id ) : null;
-		if ( ! $workspace || ! $revision || (int) $revision['workspace_id'] !== (int) $workspace['id'] ) {
+		if ( ! $workspace || ! $revision || (int) $revision['project_id'] !== (int) $workspace['id'] ) {
 			return new \WP_Error( 'review_revision_missing', __( 'The staged revision for this Review is unavailable.', 'wp-autoplugin' ) );
 		}
 		if ( $revision_id !== $revisions->latest_id( (int) $workspace['id'] ) ) {
@@ -99,7 +99,7 @@ final class Review_Orchestrator {
 
 		$parent_id = absint( $job['payload']['parent_report_id'] ?? 0 );
 		$parent    = $parent_id ? $reviews->find( $parent_id ) : null;
-		if ( $parent_id && ( ! $parent || (int) $parent['workspace_id'] !== (int) $workspace['id'] ) ) {
+		if ( $parent_id && ( ! $parent || (int) $parent['project_id'] !== (int) $workspace['id'] ) ) {
 			return new \WP_Error( 'review_parent_missing', __( 'The previous Review report is unavailable in this workspace.', 'wp-autoplugin' ) );
 		}
 		$is_conversation = 'conversation' === ( $job['task'] ?? '' );
@@ -277,7 +277,7 @@ final class Review_Orchestrator {
 
 	/** @return array<string, mixed>|\WP_Error */
 	private function context( array $workspace, array $revision, ?array $parent, Job_Repository $jobs ) {
-		$plan            = $jobs->find( (int) ( $revision['plan_job_id'] ?? 0 ) );
+		$plan            = ( new Plan_Repository() )->find( (int) ( $revision['plan_id'] ?? 0 ) );
 		$files           = [];
 		$parent_files    = [];
 		$parent_revision = null;
@@ -296,7 +296,6 @@ final class Review_Orchestrator {
 				'change_type'  => (string) $file['change_type'],
 				'content'      => (string) $file['content'],
 				'base_content' => $before,
-				'patch'        => (string) ( $file['patch'] ?? '' ),
 			];
 		}
 		$revision['files'] = $files;
@@ -351,11 +350,11 @@ final class Review_Orchestrator {
 				),
 			],
 			'root_plugin_instructions' => $root_plugin_instructions,
-			'plan'                     => [
-				'job_id'     => (int) ( $plan['id'] ?? 0 ),
-				'content'    => (string) ( $plan['result']['artifact']['content'] ?? $plan['result']['content'] ?? '' ),
-				'structured' => (array) ( $plan['result']['structured'] ?? [] ),
-			],
+				'plan'                     => [
+					'plan_id'    => (int) ( $plan['id'] ?? 0 ),
+					'content'    => (string) ( $plan['content'] ?? '' ),
+					'structured' => (array) ( $plan['structured'] ?? [] ),
+				],
 			'revision'                 => [
 				'id'                 => (int) $revision['id'],
 				'number'             => (int) $revision['revision_number'],

@@ -141,7 +141,6 @@ final class Agent_Run_Repository extends Repository {
 				'lease_token' => $token,
 			]
 		);
-		$this->scrub_step_payloads( $run_id, $status );
 	}
 
 	public function terminate_by_job( int $job_id, string $status ): void {
@@ -159,40 +158,6 @@ final class Agent_Run_Repository extends Repository {
 				'updated_at'       => $this->now(),
 			],
 			[ 'id' => $run['id'] ]
-		);
-		$this->scrub_step_payloads( (int) $run['id'], $status );
-	}
-
-	private function scrub_step_payloads( int $run_id, string $status ): void {
-		$preserve_failed_model = 'failed' === $status && defined( 'WP_DEBUG' ) && WP_DEBUG;
-		if ( $preserve_failed_model ) {
-			$query = $this->wpdb->prepare( 'UPDATE ' . Installer::table( 'agent_steps' ) . ' SET payload = NULL WHERE run_id = %d AND kind = %s', $run_id, 'tool' );
-		} else {
-			$query = $this->wpdb->prepare( 'UPDATE ' . Installer::table( 'agent_steps' ) . ' SET payload = NULL WHERE run_id = %d AND kind IN (%s,%s)', $run_id, 'model', 'tool' );
-		}
-		$this->wpdb->query( $query ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared in the branches above.
-	}
-
-	/**
-	 * Append a private step. Tool payloads are always scrubbed at termination.
-	 * Failed model payloads remain private only while WP_DEBUG is enabled.
-	 *
-	 * @param array<string, mixed> $payload Private step payload.
-	 */
-	public function step( int $run_id, string $kind, array $payload, string $tool_name = '', string $path = '' ): void {
-		$table    = Installer::table( 'agent_steps' );
-		$sequence = (int) $this->wpdb->get_var( $this->wpdb->prepare( "SELECT COALESCE(MAX(sequence), 0) + 1 FROM $table WHERE run_id = %d", $run_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
-		$this->wpdb->insert(
-			$table,
-			[
-				'run_id'     => $run_id,
-				'sequence'   => $sequence,
-				'kind'       => sanitize_key( $kind ),
-				'tool_name'  => $tool_name ? sanitize_key( $tool_name ) : null,
-				'path'       => $path ? sanitize_text_field( $path ) : null,
-				'payload'    => $this->json( $payload ),
-				'created_at' => $this->now(),
-			]
 		);
 	}
 

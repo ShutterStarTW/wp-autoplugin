@@ -8,7 +8,8 @@ use WP_Autoplugin\V2\Domain\AI\Agent_Task;
 use WP_Autoplugin\V2\Domain\AI\Model_Catalog;
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Plan_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 use WP_Autoplugin\V2\Infrastructure\AI\Agent_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
@@ -87,52 +88,33 @@ final class Routes {
 			self::NAMESPACE,
 			'/projects',
 			[
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => [ $this, 'projects' ],
-				'permission_callback' => $permission,
-				'args'                => [
-					'search'   => [
-						'type'              => 'string',
-						'default'           => '',
-						'sanitize_callback' => 'sanitize_text_field',
-					],
-					'page'     => [
-						'type'    => 'integer',
-						'default' => 1,
-						'minimum' => 1,
-					],
-					'per_page' => [
-						'type'    => 'integer',
-						'default' => 20,
-						'minimum' => 1,
-						'maximum' => 50,
-					],
-				],
-			]
-		);
-		register_rest_route(
-			self::NAMESPACE,
-			'/projects/(?P<id>\d+)',
-			[
-				'methods'             => \WP_REST_Server::DELETABLE,
-				'callback'            => [ $this, 'delete_project' ],
-				'permission_callback' => $permission,
-				'args'                => [
-					'id' => [
-						'type'    => 'integer',
-						'minimum' => 1,
-					],
-				],
-			]
-		);
-		register_rest_route(
-			self::NAMESPACE,
-			'/workspaces',
-			[
 				[
 					'methods'             => \WP_REST_Server::READABLE,
-					'callback'            => [ $this, 'workspaces' ],
+					'callback'            => [ $this, 'projects' ],
 					'permission_callback' => $permission,
+					'args'                => [
+						'view'     => [
+							'type'    => 'string',
+							'default' => 'open',
+							'enum'    => [ 'open', 'all' ],
+						],
+						'search'   => [
+							'type'              => 'string',
+							'default'           => '',
+							'sanitize_callback' => 'sanitize_text_field',
+						],
+						'page'     => [
+							'type'    => 'integer',
+							'default' => 1,
+							'minimum' => 1,
+						],
+						'per_page' => [
+							'type'    => 'integer',
+							'default' => 20,
+							'minimum' => 1,
+							'maximum' => 50,
+						],
+					],
 				],
 				[
 					'methods'             => \WP_REST_Server::CREATABLE,
@@ -165,22 +147,35 @@ final class Routes {
 		);
 		register_rest_route(
 			self::NAMESPACE,
-			'/workspaces/(?P<id>\d+)',
+			'/projects/(?P<id>\d+)',
 			[
-				'methods'             => \WP_REST_Server::READABLE,
-				'callback'            => [ $this, 'workspace' ],
-				'permission_callback' => $permission,
-				'args'                => [
-					'id' => [
-						'type'    => 'integer',
-						'minimum' => 1,
+				[
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => [ $this, 'workspace' ],
+					'permission_callback' => $permission,
+					'args'                => [
+						'id' => [
+							'type'    => 'integer',
+							'minimum' => 1,
+						],
+					],
+				],
+				[
+					'methods'             => \WP_REST_Server::DELETABLE,
+					'callback'            => [ $this, 'delete_project' ],
+					'permission_callback' => $permission,
+					'args'                => [
+						'id' => [
+							'type'    => 'integer',
+							'minimum' => 1,
+						],
 					],
 				],
 			]
 		);
 		register_rest_route(
 			self::NAMESPACE,
-			'/workspaces/(?P<id>\d+)/close',
+			'/projects/(?P<id>\d+)/close',
 			[
 				'methods'             => \WP_REST_Server::CREATABLE,
 				'callback'            => [ $this, 'close_workspace' ],
@@ -195,7 +190,7 @@ final class Routes {
 		);
 		register_rest_route(
 			self::NAMESPACE,
-			'/workspaces/(?P<id>\d+)/reopen',
+			'/projects/(?P<id>\d+)/reopen',
 			[
 				'methods'             => \WP_REST_Server::CREATABLE,
 				'callback'            => [ $this, 'reopen_workspace' ],
@@ -210,7 +205,7 @@ final class Routes {
 		);
 		register_rest_route(
 			self::NAMESPACE,
-			'/workspaces/(?P<id>\d+)/jobs',
+			'/projects/(?P<id>\d+)/jobs',
 			[
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => [ $this, 'workspace_jobs' ],
@@ -225,7 +220,7 @@ final class Routes {
 		);
 		register_rest_route(
 			self::NAMESPACE,
-			'/workspaces/(?P<id>\d+)/usage',
+			'/projects/(?P<id>\d+)/usage',
 			[
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => [ $this, 'workspace_usage' ],
@@ -240,7 +235,7 @@ final class Routes {
 		);
 		register_rest_route(
 			self::NAMESPACE,
-			'/workspaces/(?P<id>\d+)/revisions',
+			'/projects/(?P<id>\d+)/revisions',
 			[
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => [ $this, 'workspace_revisions' ],
@@ -255,7 +250,7 @@ final class Routes {
 		);
 		register_rest_route(
 			self::NAMESPACE,
-			'/workspaces/(?P<id>\d+)/review-reports',
+			'/projects/(?P<id>\d+)/review-reports',
 			[
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => [ $this, 'workspace_review_reports' ],
@@ -323,7 +318,7 @@ final class Routes {
 				'callback'            => [ $this, 'create_job' ],
 				'permission_callback' => $permission,
 				'args'                => [
-					'workspace_id'          => [
+					'project_id'          => [
 						'required' => true,
 						'type'     => 'integer',
 						'minimum'  => 1,
@@ -405,7 +400,7 @@ final class Routes {
 		);
 		register_rest_route(
 			self::NAMESPACE,
-			'/jobs/(?P<id>\d+)/plan',
+			'/plans/(?P<id>\d+)',
 			[
 				'methods'             => \WP_REST_Server::CREATABLE,
 				'callback'            => [ $this, 'update_plan' ],
@@ -719,8 +714,13 @@ final class Routes {
 	}
 
 	public function projects( \WP_REST_Request $request ): \WP_REST_Response {
+		$repository = new Project_Repository();
+		if ( 'open' === (string) $request['view'] ) {
+			return rest_ensure_response( [ 'items' => $repository->list_open( get_current_user_id() ) ] );
+		}
+
 		return rest_ensure_response(
-			( new Workspace_Repository() )->list_projects(
+			$repository->list_projects(
 				get_current_user_id(),
 				(string) $request['search'],
 				(int) $request['page'],
@@ -736,17 +736,13 @@ final class Routes {
 	 */
 	public function delete_project( \WP_REST_Request $request ) {
 		try {
-			$deleted = ( new Workspace_Repository() )->delete_project( (int) $request['id'], get_current_user_id() );
+			$deleted = ( new Project_Repository() )->delete_project( (int) $request['id'], get_current_user_id() );
 			return is_wp_error( $deleted )
 				? $deleted
 				: rest_ensure_response( $deleted );
 		} catch ( \Throwable $error ) {
 			return new \WP_Error( 'wp_autoplugin_project_delete_error', __( 'The project could not be deleted.', 'wp-autoplugin' ), [ 'status' => 500 ] );
 		}
-	}
-
-	public function workspaces(): \WP_REST_Response {
-		return rest_ensure_response( [ 'items' => ( new Workspace_Repository() )->list_open( get_current_user_id() ) ] );
 	}
 
 	/**
@@ -769,19 +765,17 @@ final class Routes {
 		}
 
 		try {
-			$repository = new Workspace_Repository();
+			$repository = new Project_Repository();
 			$created    = $repository->create(
 				$target,
 				$operation,
 				(string) $request['request'],
 				get_current_user_id()
 			);
-			$workspace  = $repository->find( (int) $created['workspace_id'] );
+			$workspace  = $repository->find( (int) $created['id'] );
 			if ( ! $workspace ) {
 				throw new \RuntimeException( __( 'The workspace was created but could not be loaded.', 'wp-autoplugin' ) );
 			}
-			$workspace['workspace_id'] = (int) $created['workspace_id'];
-
 			return new \WP_REST_Response( $workspace, 201 );
 		} catch ( \Throwable $error ) {
 			return new \WP_Error( 'wp_autoplugin_workspace_error', $error->getMessage(), [ 'status' => 500 ] );
@@ -804,7 +798,7 @@ final class Routes {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function close_workspace( \WP_REST_Request $request ) {
-		$closed = ( new Workspace_Repository() )->close( (int) $request['id'], get_current_user_id() );
+		$closed = ( new Project_Repository() )->close( (int) $request['id'], get_current_user_id() );
 		return $closed
 			? rest_ensure_response(
 				[
@@ -821,7 +815,7 @@ final class Routes {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function reopen_workspace( \WP_REST_Request $request ) {
-		$workspace = ( new Workspace_Repository() )->reopen( (int) $request['id'], get_current_user_id() );
+		$workspace = ( new Project_Repository() )->reopen( (int) $request['id'], get_current_user_id() );
 
 		return $workspace
 			? rest_ensure_response( $workspace )
@@ -832,8 +826,8 @@ final class Routes {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function create_job( \WP_REST_Request $request ) {
-		$workspace_id = (int) $request['workspace_id'];
-		$workspace    = $this->workspace_for_current_user( $workspace_id );
+		$project_id = (int) $request['project_id'];
+		$workspace    = $this->workspace_for_current_user( $project_id );
 		if ( ! $workspace ) {
 			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
@@ -852,7 +846,7 @@ final class Routes {
 		if ( is_wp_error( $reuse_ids ) ) {
 			return $reuse_ids;
 		}
-		$reuse_valid = $this->validate_attachment_reuse( $reuse_ids, $images, $workspace_id, get_current_user_id() );
+		$reuse_valid = $this->validate_attachment_reuse( $reuse_ids, $images, $project_id, get_current_user_id() );
 		if ( is_wp_error( $reuse_valid ) ) {
 			return $reuse_valid;
 		}
@@ -899,9 +893,9 @@ final class Routes {
 		}
 		$job = null;
 		try {
-			$job = $jobs->create( $workspace_id, $task, $payload, get_current_user_id() );
+			$job = $jobs->create( $project_id, $task, $payload, get_current_user_id() );
 			if ( $has_images ) {
-				$attached = ( new Prompt_Attachment_Repository() )->attach( (int) $job['id'], $workspace_id, get_current_user_id(), $images, $reuse_ids );
+				$attached = ( new Prompt_Attachment_Repository() )->attach( (int) $job['id'], $project_id, get_current_user_id(), $images, $reuse_ids );
 				if ( is_wp_error( $attached ) ) {
 					$jobs->update(
 						(int) $job['id'],
@@ -915,8 +909,7 @@ final class Routes {
 				}
 				$job = $jobs->find( (int) $job['id'] );
 			}
-			$runner = ( new Queue() )->dispatch( $job['id'] );
-			$jobs->update( $job['id'], [ 'runner' => $runner ] );
+			( new Queue() )->dispatch( $job['id'] );
 
 			return new \WP_REST_Response( $jobs->find( $job['id'] ), 202 );
 		} catch ( \Throwable $error ) {
@@ -938,7 +931,7 @@ final class Routes {
 	/** Prepare an authorized private prompt image for binary streaming. */
 	public function prompt_attachment( \WP_REST_Request $request ) {
 		$attachment = ( new Prompt_Attachment_Repository() )->find( (int) $request['id'], false );
-		if ( ! $attachment || (int) $attachment['created_by'] !== get_current_user_id() || ! $this->workspace_for_current_user( (int) $attachment['workspace_id'] ) ) {
+		if ( ! $attachment || (int) $attachment['created_by'] !== get_current_user_id() || ! $this->workspace_for_current_user( (int) $attachment['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_prompt_attachment_not_found', __( 'Prompt image not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		$response = new \WP_REST_Response( [ 'wp_autoplugin_prompt_attachment' => (int) $attachment['id'] ] );
@@ -954,13 +947,13 @@ final class Routes {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function workspace_jobs( \WP_REST_Request $request ) {
-		$workspace_id = (int) $request['id'];
-		if ( ! $this->workspace_for_current_user( $workspace_id ) ) {
+		$project_id = (int) $request['id'];
+		if ( ! $this->workspace_for_current_user( $project_id ) ) {
 			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 
 		$jobs  = new Job_Repository();
-		$items = array_map( fn( array $job ): array => $this->with_latest_event( $job, $jobs ), $jobs->list_for_workspace( $workspace_id ) );
+		$items = array_map( fn( array $job ): array => $this->with_latest_event( $job, $jobs ), $jobs->list_for_workspace( $project_id ) );
 		return rest_ensure_response( [ 'items' => $items ] );
 	}
 
@@ -975,33 +968,33 @@ final class Routes {
 			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 
-		return rest_ensure_response( ( new Usage_Repository() )->summary_for_project( (int) $workspace['project_id'] ) );
+		return rest_ensure_response( ( new Usage_Repository() )->summary_for_project( (int) $workspace['id'] ) );
 	}
 
 	/** @return \WP_REST_Response|\WP_Error */
 	public function workspace_revisions( \WP_REST_Request $request ) {
-		$workspace_id = (int) $request['id'];
-		if ( ! $this->workspace_for_current_user( $workspace_id ) ) {
+		$project_id = (int) $request['id'];
+		if ( ! $this->workspace_for_current_user( $project_id ) ) {
 			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		$revisions = new Revision_Repository();
 		return rest_ensure_response(
 			[
-				'items'              => $revisions->list_for_workspace( $workspace_id ),
-				'latest_revision_id' => $revisions->latest_id( $workspace_id ),
+				'items'              => $revisions->list_for_workspace( $project_id ),
+				'latest_revision_id' => $revisions->latest_id( $project_id ),
 			]
 		);
 	}
 
 	/** Return immutable Review report history and exact latest-revision state. */
 	public function workspace_review_reports( \WP_REST_Request $request ) {
-		$workspace_id = (int) $request['id'];
-		if ( ! $this->workspace_for_current_user( $workspace_id ) ) {
+		$project_id = (int) $request['id'];
+		if ( ! $this->workspace_for_current_user( $project_id ) ) {
 			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		$reviews = new Review_Repository();
 		$items   = [];
-		foreach ( $reviews->list_for_workspace( $workspace_id ) as $summary ) {
+		foreach ( $reviews->list_for_workspace( $project_id ) as $summary ) {
 			$report = $reviews->find( (int) $summary['id'] );
 			if ( $report ) {
 				$items[] = [
@@ -1020,9 +1013,9 @@ final class Routes {
 				];
 			}
 		}
-		$latest_revision_id = ( new Revision_Repository() )->latest_id( $workspace_id );
-		$current            = $reviews->workspace_status( $workspace_id, $latest_revision_id );
-		$jobs               = array_reverse( ( new Job_Repository() )->list_for_workspace( $workspace_id ) );
+		$latest_revision_id = ( new Revision_Repository() )->latest_id( $project_id );
+		$current            = $reviews->workspace_status( $project_id, $latest_revision_id );
+		$jobs               = array_reverse( ( new Job_Repository() )->list_for_workspace( $project_id ) );
 		foreach ( $jobs as $job ) {
 			$is_review = 'review' === $job['task'] || ( 'conversation' === $job['task'] && 'review' === ( $job['payload']['stage'] ?? '' ) );
 			if ( ! $is_review || (int) ( $job['payload']['revision_id'] ?? 0 ) !== (int) $latest_revision_id ) {
@@ -1048,7 +1041,7 @@ final class Routes {
 	public function review_report( \WP_REST_Request $request ) {
 		$reviews = new Review_Repository();
 		$report  = $reviews->find( (int) $request['id'] );
-		if ( ! $report || ! $this->workspace_for_current_user( (int) $report['workspace_id'] ) ) {
+		if ( ! $report || ! $this->workspace_for_current_user( (int) $report['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_review_not_found', __( 'Review report not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		foreach ( $report['findings'] as &$finding ) {
@@ -1079,7 +1072,7 @@ final class Routes {
 	public function job( \WP_REST_Request $request ) {
 		$jobs      = new Job_Repository();
 		$job       = $jobs->find( (int) $request['id'] );
-		$workspace = $job ? $this->workspace_for_current_user( (int) $job['workspace_id'] ) : null;
+		$workspace = $job ? $this->workspace_for_current_user( (int) $job['project_id'] ) : null;
 		if ( ! $job || ! $workspace ) {
 			return new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
@@ -1093,7 +1086,7 @@ final class Routes {
 	public function job_events( \WP_REST_Request $request ) {
 		$jobs = new Job_Repository();
 		$job  = $jobs->find( (int) $request['id'] );
-		if ( ! $job || ! $this->workspace_for_current_user( (int) $job['workspace_id'] ) ) {
+		if ( ! $job || ! $this->workspace_for_current_user( (int) $job['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 
@@ -1106,7 +1099,7 @@ final class Routes {
 	public function cancel_job( \WP_REST_Request $request ) {
 		$jobs = new Job_Repository();
 		$job  = $jobs->find( (int) $request['id'] );
-		if ( ! $job || ! $this->workspace_for_current_user( (int) $job['workspace_id'] ) ) {
+		if ( ! $job || ! $this->workspace_for_current_user( (int) $job['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		if ( in_array( $job['status'], [ 'completed', 'failed', 'cancelled' ], true ) ) {
@@ -1124,14 +1117,18 @@ final class Routes {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function update_plan( \WP_REST_Request $request ) {
+		$plans     = new Plan_Repository();
 		$jobs      = new Job_Repository();
-		$job       = $jobs->find( (int) $request['id'] );
-		$workspace = $job ? $this->workspace_for_current_user( (int) $job['workspace_id'] ) : null;
-		if ( ! $job || ! $workspace ) {
-			return new \WP_Error( 'wp_autoplugin_job_not_found', __( 'Job not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		$plan      = $plans->find( (int) $request['id'] );
+		$workspace = $plan ? $this->workspace_for_current_user( (int) $plan['project_id'] ) : null;
+		if ( ! $plan || ! $workspace ) {
+			return new \WP_Error( 'wp_autoplugin_plan_not_found', __( 'Plan not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
-		if ( ! $jobs->is_plan_artifact( $job ) ) {
+		if ( ! $plans->is_ready( $plan ) ) {
 			return new \WP_Error( 'wp_autoplugin_plan_not_editable', __( 'Only completed plan artifacts can be edited.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+		if ( '' === trim( (string) $request['content'] ) ) {
+			return new \WP_Error( 'wp_autoplugin_plan_content_required', __( 'The Plan cannot be empty.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
 
 		$payload = $this->snapshot_job_models( 'plan_structure', [], $workspace );
@@ -1139,21 +1136,17 @@ final class Routes {
 			return $payload;
 		}
 
-		$successor = $jobs->create_plan_successor( $job, (string) $request['content'], get_current_user_id() );
-		if ( ! $successor ) {
-			return new \WP_Error( 'wp_autoplugin_plan_not_editable', __( 'Only completed plan artifacts can be edited.', 'wp-autoplugin' ), [ 'status' => 409 ] );
-		}
-		$payload['artifact_job_id'] = (int) $successor['id'];
-		$regeneration               = null;
+		$successor          = $plans->create_manual_successor( $plan, (string) $request['content'], get_current_user_id() );
+		$payload['plan_id'] = (int) $successor['id'];
+		$regeneration        = null;
 		try {
 			$regeneration = $jobs->create(
-				(int) $successor['workspace_id'],
+				(int) $successor['project_id'],
 				'plan_structure',
 				$payload,
 				get_current_user_id()
 			);
-			$runner       = ( new Queue() )->dispatch( (int) $regeneration['id'] );
-			$jobs->update( (int) $regeneration['id'], [ 'runner' => $runner ] );
+			( new Queue() )->dispatch( (int) $regeneration['id'] );
 			$regeneration = $jobs->find( (int) $regeneration['id'] );
 		} catch ( \Throwable $error ) {
 			if ( $regeneration ) {
@@ -1172,7 +1165,7 @@ final class Routes {
 
 		return new \WP_REST_Response(
 			[
-				'artifact'         => $successor,
+				'plan'             => $successor,
 				'regeneration_job' => $regeneration,
 			],
 			$regeneration && 'queued' === $regeneration['status'] ? 202 : 200
@@ -1182,7 +1175,7 @@ final class Routes {
 	/** Return revision provenance and a body-free file manifest. */
 	public function revision( \WP_REST_Request $request ) {
 		$revision  = ( new Revision_Repository() )->manifest( (int) $request['id'] );
-		$workspace = $revision ? $this->workspace_for_current_user( (int) $revision['workspace_id'] ) : null;
+		$workspace = $revision ? $this->workspace_for_current_user( (int) $revision['project_id'] ) : null;
 		if ( ! $revision || ! $workspace ) {
 			return new \WP_Error( 'wp_autoplugin_revision_not_found', __( 'Revision not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
@@ -1226,7 +1219,7 @@ final class Routes {
 	public function revision_file( \WP_REST_Request $request ) {
 		$repository = new Revision_Repository();
 		$revision   = $repository->manifest( (int) $request['id'] );
-		if ( ! $revision || ! $this->workspace_for_current_user( (int) $revision['workspace_id'] ) ) {
+		if ( ! $revision || ! $this->workspace_for_current_user( (int) $revision['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_revision_not_found', __( 'Revision not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		$file = $repository->file( (int) $request['id'], (int) $request['file_id'], (string) $request['side'] );
@@ -1239,7 +1232,7 @@ final class Routes {
 	public function revision_target_file( \WP_REST_Request $request ) {
 		$repository = new Revision_Repository();
 		$revision   = $repository->manifest( (int) $request['id'] );
-		$workspace  = $revision ? $this->workspace_for_current_user( (int) $revision['workspace_id'] ) : null;
+		$workspace  = $revision ? $this->workspace_for_current_user( (int) $revision['project_id'] ) : null;
 		if ( ! $revision || ! $workspace ) {
 			return new \WP_Error( 'wp_autoplugin_revision_not_found', __( 'Revision not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
@@ -1284,10 +1277,10 @@ final class Routes {
 	public function save_revision_successor( \WP_REST_Request $request ) {
 		$repository = new Revision_Repository();
 		$revision   = $repository->manifest( (int) $request['id'] );
-		if ( ! $revision || ! $this->workspace_for_current_user( (int) $revision['workspace_id'] ) ) {
+		if ( ! $revision || ! $this->workspace_for_current_user( (int) $revision['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_revision_not_found', __( 'Revision not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
-		if ( ( new Job_Repository() )->has_active_artifact_work( (int) $revision['workspace_id'] ) ) {
+		if ( ( new Job_Repository() )->has_active_artifact_work( (int) $revision['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_artifact_active', __( 'Wait for active Code, Review, or Release work to finish before saving a revision.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		$result = $repository->save_successor( (int) $request['id'], (int) $request['expected_latest_revision_id'], (array) $request['changes'], get_current_user_id() );
@@ -1298,10 +1291,10 @@ final class Routes {
 	public function restore_revision( \WP_REST_Request $request ) {
 		$repository = new Revision_Repository();
 		$revision   = $repository->manifest( (int) $request['id'] );
-		if ( ! $revision || ! $this->workspace_for_current_user( (int) $revision['workspace_id'] ) ) {
+		if ( ! $revision || ! $this->workspace_for_current_user( (int) $revision['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_revision_not_found', __( 'Revision not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
-		if ( ( new Job_Repository() )->has_active_artifact_work( (int) $revision['workspace_id'] ) ) {
+		if ( ( new Job_Repository() )->has_active_artifact_work( (int) $revision['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_artifact_active', __( 'Wait for active Code, Review, or Release work to finish before restoring a revision.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		$result = $repository->restore( (int) $request['id'], (int) $request['expected_latest_revision_id'], get_current_user_id() );
@@ -1327,7 +1320,7 @@ final class Routes {
 		$release = new Release_Repository();
 		$release->cleanup_expired();
 		$package = $release->package( (int) $request['id'] );
-		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['workspace_id'] ) ) {
+		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_package_not_found', __( 'Release package not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		unset( $package['temp_path'] );
@@ -1340,7 +1333,7 @@ final class Routes {
 		$release = new Release_Repository();
 		$release->cleanup_expired();
 		$package = $release->package( (int) $request['id'] );
-		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['workspace_id'] ) || 'ready' !== $package['status'] || empty( $package['temp_path'] ) || ! is_file( $package['temp_path'] ) || strtotime( $package['expires_at'] . ' UTC' ) < time() ) {
+		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['project_id'] ) || 'ready' !== $package['status'] || empty( $package['temp_path'] ) || ! is_file( $package['temp_path'] ) || strtotime( $package['expires_at'] . ' UTC' ) < time() ) {
 			return new \WP_Error( 'wp_autoplugin_package_unavailable', __( 'The private release package is unavailable or expired.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		$response = new \WP_REST_Response( [ 'wp_autoplugin_package_download' => (int) $package['id'] ] );
@@ -1357,7 +1350,7 @@ final class Routes {
 		$attachment_id = is_array( $data ) ? absint( $data['wp_autoplugin_prompt_attachment'] ?? 0 ) : 0;
 		if ( $attachment_id ) {
 			$attachment = ( new Prompt_Attachment_Repository() )->find( $attachment_id );
-			if ( ! $attachment || (int) $attachment['created_by'] !== get_current_user_id() || ! $this->workspace_for_current_user( (int) $attachment['workspace_id'] ) ) {
+			if ( ! $attachment || (int) $attachment['created_by'] !== get_current_user_id() || ! $this->workspace_for_current_user( (int) $attachment['project_id'] ) ) {
 				return $served;
 			}
 			if ( ! headers_sent() ) {
@@ -1375,7 +1368,7 @@ final class Routes {
 			return $served;
 		}
 		$package = ( new Release_Repository() )->package( $id );
-		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['workspace_id'] ) || 'ready' !== $package['status'] || ! is_file( (string) $package['temp_path'] ) ) {
+		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['project_id'] ) || 'ready' !== $package['status'] || ! is_file( (string) $package['temp_path'] ) ) {
 			return $served;
 		}
 		$filename = sanitize_file_name( (string) $package['slug'] . '-' . (string) $package['mode'] . '.zip' );
@@ -1430,7 +1423,7 @@ final class Routes {
 
 	public function promotion( \WP_REST_Request $request ) {
 		$promotion = ( new Release_Repository() )->promotion( (int) $request['id'] );
-		return $promotion && $this->workspace_for_current_user( (int) $promotion['workspace_id'] )
+		return $promotion && $this->workspace_for_current_user( (int) $promotion['project_id'] )
 			? rest_ensure_response( $promotion )
 			: new \WP_Error( 'wp_autoplugin_promotion_not_found', __( 'Promotion not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 	}
@@ -1459,7 +1452,7 @@ final class Routes {
 	private function release_preflight( \WP_REST_Request $request, string $resource ) {
 		$revision_id = (int) $request['id'];
 		$revision    = ( new Revision_Repository() )->find( $revision_id );
-		$workspace   = $revision ? $this->workspace_for_current_user( (int) $revision['workspace_id'] ) : null;
+		$workspace   = $revision ? $this->workspace_for_current_user( (int) $revision['project_id'] ) : null;
 		if ( ! $revision || ! $workspace ) {
 			return new \WP_Error( 'wp_autoplugin_revision_not_found', __( 'Revision not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
@@ -1506,7 +1499,7 @@ final class Routes {
 		$report_id = absint( $request['review_report_id'] ?? 0 );
 		if ( $report_id ) {
 			$report = $reviews->find( $report_id );
-			if ( ! $report || (int) $report['workspace_id'] !== (int) $workspace['id'] || (int) $state['report_id'] !== $report_id ) {
+			if ( ! $report || (int) $report['project_id'] !== (int) $workspace['id'] || (int) $state['report_id'] !== $report_id ) {
 				return new \WP_Error( 'wp_autoplugin_release_review_conflict', __( 'The supplied Review report is not the current report for this release.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 		}
@@ -1524,13 +1517,12 @@ final class Routes {
 		];
 	}
 
-	private function queue_artifact_job( int $workspace_id, string $task, array $payload ) {
+	private function queue_artifact_job( int $project_id, string $task, array $payload ) {
 		$jobs = new Job_Repository();
 		$job  = null;
 		try {
-			$job    = $jobs->create( $workspace_id, $task, $payload, get_current_user_id() );
-			$runner = ( new Queue() )->dispatch( (int) $job['id'] );
-			$jobs->update( (int) $job['id'], [ 'runner' => $runner ] );
+			$job = $jobs->create( $project_id, $task, $payload, get_current_user_id() );
+			( new Queue() )->dispatch( (int) $job['id'] );
 			return new \WP_REST_Response( $jobs->find( (int) $job['id'] ), 202 );
 		} catch ( \Throwable $error ) {
 			if ( $job ) {
@@ -1549,7 +1541,7 @@ final class Routes {
 
 	private function queue_promotion_action( int $promotion_id, string $action ) {
 		$promotion = ( new Release_Repository() )->promotion( $promotion_id );
-		if ( ! $promotion || ! $this->workspace_for_current_user( (int) $promotion['workspace_id'] ) ) {
+		if ( ! $promotion || ! $this->workspace_for_current_user( (int) $promotion['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_promotion_not_found', __( 'Promotion not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		if ( is_multisite() || ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS ) ) {
@@ -1559,7 +1551,7 @@ final class Routes {
 			return new \WP_Error( 'wp_autoplugin_theme_switch_unavailable', __( 'Theme switching is not performed by WP-Autoplugin.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		return $this->queue_artifact_job(
-			(int) $promotion['workspace_id'],
+			(int) $promotion['project_id'],
 			'promotion',
 			[
 				'action'       => $action,
@@ -1579,7 +1571,7 @@ final class Routes {
 		$stage       = sanitize_key( (string) ( $payload['stage'] ?? '' ) );
 		$raw_message = (string) ( $payload['message'] ?? '' );
 		$message     = sanitize_textarea_field( $raw_message );
-		$parent      = absint( $payload['artifact_job_id'] ?? 0 );
+		$parent      = absint( $payload['plan_id'] ?? 0 );
 
 		if ( ! in_array( $stage, self::CONVERSATION_STAGES, true ) ) {
 			return new \WP_Error( 'wp_autoplugin_conversation_stage_unavailable', __( 'Follow-up messages are currently available for Plan, Code, Review, and Explain.', 'wp-autoplugin' ), [ 'status' => 409 ] );
@@ -1590,9 +1582,9 @@ final class Routes {
 		if ( strlen( $raw_message ) > 8192 ) {
 			return new \WP_Error( 'wp_autoplugin_conversation_message_large', __( 'The follow-up message exceeds the 8 KiB limit.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
-		$workspace_id = (int) $workspace['id'];
+		$project_id = (int) $workspace['id'];
 		if ( 'review' === $stage ) {
-			if ( $jobs->has_active_artifact_work( $workspace_id ) ) {
+			if ( $jobs->has_active_artifact_work( $project_id ) ) {
 				return new \WP_Error( 'wp_autoplugin_artifact_active', __( 'Wait for active Code, Review, or Release work to finish before sending a Review follow-up.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 			$revision_id = absint( $payload['revision_id'] ?? 0 );
@@ -1601,8 +1593,8 @@ final class Routes {
 			$revisions   = new Revision_Repository();
 			$reviews     = new Review_Repository();
 			$report      = $report_id ? $reviews->find( $report_id ) : null;
-			$current     = $reviews->latest_for_revision( $workspace_id, $revision_id );
-			if ( ! $report || ! $current || (int) $current['id'] !== $report_id || (int) $report['workspace_id'] !== $workspace_id || (int) $report['revision_id'] !== $revision_id || $revision_id !== $expected || $revision_id !== $revisions->latest_id( $workspace_id ) ) {
+			$current     = $reviews->latest_for_revision( $project_id, $revision_id );
+			if ( ! $report || ! $current || (int) $current['id'] !== $report_id || (int) $report['project_id'] !== $project_id || (int) $report['revision_id'] !== $revision_id || $revision_id !== $expected || $revision_id !== $revisions->latest_id( $project_id ) ) {
 				return new \WP_Error( 'wp_autoplugin_review_follow_up_conflict', __( 'Review follow-ups require the latest report for the latest staged revision.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 			$capability = ( new Direct_Transport_Factory() )->capability( 'review' );
@@ -1623,14 +1615,14 @@ final class Routes {
 			if ( ! $this->supports_code( $workspace ) ) {
 				return new \WP_Error( 'wp_autoplugin_code_workspace_invalid', __( 'Code follow-ups are not available for this workspace operation.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
-			if ( $jobs->has_active_code( $workspace_id ) ) {
+			if ( $jobs->has_active_code( $project_id ) ) {
 				return new \WP_Error( 'wp_autoplugin_code_active', __( 'Another Code job is already active in this workspace.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 			$revision_id = absint( $payload['revision_id'] ?? 0 );
 			$expected    = absint( $payload['expected_latest_revision_id'] ?? 0 );
 			$revisions   = new Revision_Repository();
 			$revision    = $revision_id ? $revisions->manifest( $revision_id ) : null;
-			if ( ! $revision || (int) $revision['workspace_id'] !== $workspace_id || $revision_id !== $expected || $revision_id !== $revisions->latest_id( $workspace_id ) ) {
+			if ( ! $revision || (int) $revision['project_id'] !== $project_id || $revision_id !== $expected || $revision_id !== $revisions->latest_id( $project_id ) ) {
 				return new \WP_Error( 'wp_autoplugin_code_follow_up_conflict', __( 'Select the latest staged revision before sending a Code follow-up.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 			$normalized   = [
@@ -1651,11 +1643,11 @@ final class Routes {
 		}
 
 		if ( $parent ) {
-			$artifact = $jobs->find( $parent );
-			if ( ! $artifact || $workspace_id !== (int) $artifact['workspace_id'] ) {
+			$artifact = ( new Plan_Repository() )->find( $parent );
+			if ( ! $artifact || $project_id !== (int) $artifact['project_id'] ) {
 				return new \WP_Error( 'wp_autoplugin_conversation_artifact_not_found', __( 'The selected conversation artifact is not available in this workspace.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 			}
-			if ( 'plan' === $stage && ! $jobs->is_plan_artifact( $artifact ) ) {
+			if ( 'plan' === $stage && ! ( new Plan_Repository() )->is_ready( $artifact ) ) {
 				return new \WP_Error( 'wp_autoplugin_conversation_artifact_invalid', __( 'Plan follow-ups must reply to a completed Plan artifact.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 		}
@@ -1663,7 +1655,7 @@ final class Routes {
 		return [
 			'stage'           => $stage,
 			'message'         => $message,
-			'artifact_job_id' => $parent,
+			'plan_id' => $parent,
 		];
 	}
 
@@ -1698,7 +1690,7 @@ final class Routes {
 	}
 
 	/** @param array<int, int> $reuse_ids @param array<int, array<string, mixed>> $images */
-	private function validate_attachment_reuse( array $reuse_ids, array $images, int $workspace_id, int $user_id ) {
+	private function validate_attachment_reuse( array $reuse_ids, array $images, int $project_id, int $user_id ) {
 		if ( count( $reuse_ids ) + count( $images ) > Prompt_Image_Validator::MAX_IMAGES ) {
 			return new \WP_Error( 'wp_autoplugin_prompt_images_count', __( 'Attach no more than six images to one message.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
@@ -1706,7 +1698,7 @@ final class Routes {
 		$repository = new Prompt_Attachment_Repository();
 		foreach ( $reuse_ids as $id ) {
 			$attachment = $repository->find( $id, false );
-			if ( ! $attachment || (int) $attachment['workspace_id'] !== $workspace_id || (int) $attachment['created_by'] !== $user_id ) {
+			if ( ! $attachment || (int) $attachment['project_id'] !== $project_id || (int) $attachment['created_by'] !== $user_id ) {
 				return new \WP_Error( 'wp_autoplugin_prompt_attachment_invalid', __( 'A reused prompt image is unavailable in this workspace.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 			}
 			$total += (int) $attachment['byte_size'];
@@ -1808,17 +1800,17 @@ final class Routes {
 
 	/** Validate an explicit latest-revision Review request and snapshot its reviewer. */
 	private function review_payload( array $payload, array $workspace ) {
-		$workspace_id = (int) $workspace['id'];
+		$project_id = (int) $workspace['id'];
 		if ( ! $this->supports_code( $workspace ) ) {
 			return new \WP_Error( 'wp_autoplugin_review_workspace_invalid', __( 'Review requires a workspace with staged Code.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
-		if ( ( new Job_Repository() )->has_active_artifact_work( $workspace_id ) ) {
+		if ( ( new Job_Repository() )->has_active_artifact_work( $project_id ) ) {
 			return new \WP_Error( 'wp_autoplugin_artifact_active', __( 'Another Code, Review, or Release operation is already active in this workspace.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		$revision_id = absint( $payload['revision_id'] ?? 0 );
 		$expected    = absint( $payload['expected_latest_revision_id'] ?? 0 );
 		$revision    = $revision_id ? ( new Revision_Repository() )->manifest( $revision_id ) : null;
-		if ( ! $revision || (int) $revision['workspace_id'] !== $workspace_id || $revision_id !== $expected || $revision_id !== ( new Revision_Repository() )->latest_id( $workspace_id ) ) {
+		if ( ! $revision || (int) $revision['project_id'] !== $project_id || $revision_id !== $expected || $revision_id !== ( new Revision_Repository() )->latest_id( $project_id ) ) {
 			return new \WP_Error( 'wp_autoplugin_review_revision_conflict', __( 'Select the latest staged revision before starting Review.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		$mode = sanitize_key( (string) ( $payload['mode'] ?? 'initial' ) );
@@ -1828,7 +1820,7 @@ final class Routes {
 		$parent_id = absint( $payload['parent_report_id'] ?? 0 );
 		if ( $parent_id ) {
 			$parent = ( new Review_Repository() )->find( $parent_id );
-			if ( ! $parent || (int) $parent['workspace_id'] !== $workspace_id ) {
+			if ( ! $parent || (int) $parent['project_id'] !== $project_id ) {
 				return new \WP_Error( 'wp_autoplugin_review_parent_invalid', __( 'The previous Review report is unavailable in this workspace.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 		}
@@ -1848,11 +1840,11 @@ final class Routes {
 
 	/** Validate selected stable finding IDs and create a bounded coder instruction. */
 	private function review_fix_payload( array $payload, array $workspace ) {
-		$workspace_id = (int) $workspace['id'];
+		$project_id = (int) $workspace['id'];
 		if ( ! $this->supports_code( $workspace ) ) {
 			return new \WP_Error( 'wp_autoplugin_review_fix_workspace_invalid', __( 'Review fixes are not available for this workspace.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
-		if ( ( new Job_Repository() )->has_active_artifact_work( $workspace_id ) ) {
+		if ( ( new Job_Repository() )->has_active_artifact_work( $project_id ) ) {
 			return new \WP_Error( 'wp_autoplugin_artifact_active', __( 'Another Code, Review, or Release operation is already active in this workspace.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		$revision_id = absint( $payload['revision_id'] ?? 0 );
@@ -1861,13 +1853,13 @@ final class Routes {
 		$revisions   = new Revision_Repository();
 		$reviews     = new Review_Repository();
 		$report      = $report_id ? $reviews->find( $report_id ) : null;
-		$current     = $reviews->latest_for_revision( $workspace_id, $revision_id );
-		if ( ! $report || ! $current || (int) $current['id'] !== $report_id || (int) $report['workspace_id'] !== $workspace_id || (int) $report['revision_id'] !== $revision_id || $revision_id !== $expected || $revision_id !== $revisions->latest_id( $workspace_id ) ) {
+		$current     = $reviews->latest_for_revision( $project_id, $revision_id );
+		if ( ! $report || ! $current || (int) $current['id'] !== $report_id || (int) $report['project_id'] !== $project_id || (int) $report['revision_id'] !== $revision_id || $revision_id !== $expected || $revision_id !== $revisions->latest_id( $project_id ) ) {
 			return new \WP_Error( 'wp_autoplugin_review_fix_conflict', __( 'Review fixes require the latest report for the latest staged revision.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		$ids = array_values( array_unique( array_filter( array_map( 'absint', (array) ( $payload['finding_ids'] ?? [] ) ) ) ) );
 		if ( 'all' === ( $payload['selection'] ?? '' ) ) {
-			$ids = array_values( array_map( static fn( array $finding ): int => (int) $finding['id'], array_filter( $reviews->required_findings( $workspace_id ), static fn( array $finding ): bool => 'open' === $finding['status'] ) ) );
+			$ids = array_values( array_map( static fn( array $finding ): int => (int) $finding['id'], array_filter( $reviews->required_findings( $project_id ), static fn( array $finding ): bool => 'open' === $finding['status'] ) ) );
 		}
 		if ( ! $ids || count( $ids ) > 20 ) {
 			return new \WP_Error( 'wp_autoplugin_review_fix_selection', __( 'Select between one and twenty open Review findings to fix.', 'wp-autoplugin' ), [ 'status' => 400 ] );
@@ -1875,7 +1867,7 @@ final class Routes {
 		$selected = [];
 		foreach ( $ids as $id ) {
 			$finding = $reviews->finding( $id );
-			if ( ! $finding || (int) $finding['workspace_id'] !== $workspace_id || 'open' !== $finding['status'] || (int) $finding['latest_report_id'] !== $report_id ) {
+			if ( ! $finding || (int) $finding['project_id'] !== $project_id || 'open' !== $finding['status'] || (int) $finding['latest_report_id'] !== $report_id ) {
 				return new \WP_Error( 'wp_autoplugin_review_fix_finding_conflict', __( 'One or more selected Review findings are no longer open in the current report.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
 			$selected[] = [
@@ -1926,15 +1918,15 @@ final class Routes {
 	private function transition_review_finding( \WP_REST_Request $request, string $transition ) {
 		$reviews = new Review_Repository();
 		$report  = $reviews->find( (int) $request['report_id'] );
-		if ( ! $report || ! $this->workspace_for_current_user( (int) $report['workspace_id'] ) ) {
+		if ( ! $report || ! $this->workspace_for_current_user( (int) $report['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_review_not_found', __( 'Review report not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
-		$workspace_id = (int) $report['workspace_id'];
-		$current      = $reviews->latest_for_revision( $workspace_id, (int) $request['revision_id'] );
-		if ( ! $current || (int) $current['id'] !== (int) $report['id'] || (int) $report['revision_id'] !== (int) $request['revision_id'] || (int) $request['revision_id'] !== ( new Revision_Repository() )->latest_id( $workspace_id ) ) {
+		$project_id = (int) $report['project_id'];
+		$current      = $reviews->latest_for_revision( $project_id, (int) $request['revision_id'] );
+		if ( ! $current || (int) $current['id'] !== (int) $report['id'] || (int) $report['revision_id'] !== (int) $request['revision_id'] || (int) $request['revision_id'] !== ( new Revision_Repository() )->latest_id( $project_id ) ) {
 			return new \WP_Error( 'wp_autoplugin_review_finding_conflict', __( 'The Review report is no longer current for the latest revision.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
-		if ( ( new Job_Repository() )->has_active_artifact_work( $workspace_id ) ) {
+		if ( ( new Job_Repository() )->has_active_artifact_work( $project_id ) ) {
 			return new \WP_Error( 'wp_autoplugin_artifact_active', __( 'Wait for active Code, Review, or Release work to finish before changing a finding.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		$result = 'dismiss' === $transition
@@ -1960,12 +1952,13 @@ final class Routes {
 		if ( ! in_array( $mode, [ 'generate', 'regenerate' ], true ) ) {
 			return new \WP_Error( 'wp_autoplugin_code_mode_invalid', __( 'Select generate or regenerate for the Code job.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 		}
-		$plan_id = absint( $payload['plan_artifact_job_id'] ?? 0 );
-		$plan    = $plan_id ? $jobs->find( $plan_id ) : null;
-		if ( ! $plan || (int) $plan['workspace_id'] !== (int) $workspace['id'] || ! $jobs->is_plan_artifact( $plan ) ) {
+		$plan_id = absint( $payload['plan_id'] ?? 0 );
+		$plans   = new Plan_Repository();
+		$plan    = $plan_id ? $plans->find( $plan_id ) : null;
+		if ( ! $plan || (int) $plan['project_id'] !== (int) $workspace['id'] || ! $plans->is_ready( $plan ) ) {
 			return new \WP_Error( 'wp_autoplugin_code_plan_invalid', __( 'Select a completed Plan artifact from this workspace.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
-		$manifest = ( new Code_Validator() )->plan( (array) ( $plan['result']['structured'] ?? [] ), $workspace );
+		$manifest = ( new Code_Validator() )->plan( (array) ( $plan['structured'] ?? [] ), $workspace );
 		if ( is_wp_error( $manifest ) ) {
 			$manifest->add_data( [ 'status' => 409 ] );
 			return $manifest;
@@ -1979,19 +1972,19 @@ final class Routes {
 			}
 			return [
 				'mode'                        => 'generate',
-				'plan_artifact_job_id'        => $plan_id,
+				'plan_id'        => $plan_id,
 				'expected_latest_revision_id' => null,
 			];
 		}
 
 		$parent      = absint( $payload['parent_revision_id'] ?? 0 );
-		$latest_plan = $jobs->latest_plan_artifact( (int) $workspace['id'] );
+		$latest_plan = $plans->latest_ready( (int) $workspace['id'] );
 		if ( ! $latest || $parent !== $latest || $expected !== $latest || ! $latest_plan || (int) $latest_plan['id'] !== $plan_id ) {
 			return new \WP_Error( 'wp_autoplugin_code_regenerate_conflict', __( 'Regeneration requires the latest revision and the latest completed Plan.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		return [
 			'mode'                        => 'regenerate',
-			'plan_artifact_job_id'        => $plan_id,
+			'plan_id'        => $plan_id,
 			'parent_revision_id'          => $parent,
 			'expected_latest_revision_id' => $expected,
 		];
@@ -2009,8 +2002,8 @@ final class Routes {
 	/**
 	 * @return array<string, mixed>|null
 	 */
-	private function workspace_for_current_user( int $workspace_id ): ?array {
-		$workspace = ( new Workspace_Repository() )->find( $workspace_id );
+	private function workspace_for_current_user( int $project_id ): ?array {
+		$workspace = ( new Project_Repository() )->find( $project_id );
 
 		return $workspace && (int) $workspace['created_by'] === get_current_user_id()
 			? $workspace

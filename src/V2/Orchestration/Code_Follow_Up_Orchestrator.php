@@ -14,9 +14,10 @@ use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\Database\Code_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Plan_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 
@@ -34,7 +35,7 @@ final class Code_Follow_Up_Orchestrator {
 		if ( null !== $result || ! Job_Repository::is_code_work( $job ) || ! in_array( (string) ( $job['task'] ?? '' ), [ 'conversation', 'review_fix' ], true ) ) {
 			return $result;
 		}
-		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
+		$workspace = ( new Project_Repository() )->find( (int) $job['project_id'] );
 		if ( ! $workspace || ! $this->supports( $workspace ) ) {
 			return new \WP_Error( 'code_follow_up_workspace', __( 'Code follow-ups are not available for this workspace operation.', 'wp-autoplugin' ) );
 		}
@@ -45,7 +46,7 @@ final class Code_Follow_Up_Orchestrator {
 		$run       = $runs->find_by_job( (int) $job['id'] );
 		$base_id   = (int) ( $job['payload']['revision_id'] ?? 0 );
 		$base      = $revisions->find( $base_id );
-		if ( ! $base || (int) $base['workspace_id'] !== (int) $workspace['id'] || $base_id !== (int) ( $job['payload']['expected_latest_revision_id'] ?? 0 ) ) {
+		if ( ! $base || (int) $base['project_id'] !== (int) $workspace['id'] || $base_id !== (int) ( $job['payload']['expected_latest_revision_id'] ?? 0 ) ) {
 			return new \WP_Error( 'code_follow_up_revision', __( 'The Code follow-up must be anchored to the current latest revision.', 'wp-autoplugin' ) );
 		}
 		if ( ! is_array( $base['project_manifest'] ?? null ) ) {
@@ -68,7 +69,7 @@ final class Code_Follow_Up_Orchestrator {
 			$prompt = $this->prompt_metadata( $workspace, $base['project_manifest'] );
 			$run    = $runs->create_follow_up(
 				(int) $job['id'],
-				(int) $base['plan_job_id'],
+				(int) $base['plan_id'],
 				$base_id,
 				$capability['provider'],
 				$capability['model'],
@@ -160,7 +161,7 @@ final class Code_Follow_Up_Orchestrator {
 			}
 			return $this->cancel( $run, $token, $jobs, $runs );
 		}
-		if ( ( new Revision_Repository() )->latest_id( (int) $job['workspace_id'] ) !== (int) $base['id'] ) {
+		if ( ( new Revision_Repository() )->latest_id( (int) $job['project_id'] ) !== (int) $base['id'] ) {
 			$runs->release( (int) $run['id'], $token );
 			return $this->conflict();
 		}
@@ -301,7 +302,7 @@ final class Code_Follow_Up_Orchestrator {
 			}
 			return $this->cancel( $run, $token, $jobs, $runs );
 		}
-		if ( ( new Revision_Repository() )->latest_id( (int) $job['workspace_id'] ) !== (int) $base['id'] ) {
+		if ( ( new Revision_Repository() )->latest_id( (int) $job['project_id'] ) !== (int) $base['id'] ) {
 			$runs->release( (int) $run['id'], $token );
 			return $this->conflict();
 		}
@@ -385,7 +386,7 @@ final class Code_Follow_Up_Orchestrator {
 			Global_Instructions::apply( $prompt->instructions(), $jobs->global_instructions( (int) $job['id'] ) ),
 			$prompt->input(
 				(string) $job['payload']['message'],
-				$this->history( (int) $job['workspace_id'], (int) $job['id'] ),
+				$this->history( (int) $job['project_id'], (int) $job['id'] ),
 				(string) ( $metadata['resolved_request'] ?? '' ),
 				(array) ( $metadata['acceptance_criteria'] ?? [] ),
 				$target,
@@ -408,7 +409,7 @@ final class Code_Follow_Up_Orchestrator {
 			}
 			return $this->cancel( $run, $token, $jobs, $runs );
 		}
-		if ( ( new Revision_Repository() )->latest_id( (int) $job['workspace_id'] ) !== (int) $base['id'] ) {
+		if ( ( new Revision_Repository() )->latest_id( (int) $job['project_id'] ) !== (int) $base['id'] ) {
 			$runs->release( (int) $run['id'], $token );
 			return $this->conflict();
 		}
@@ -499,7 +500,7 @@ final class Code_Follow_Up_Orchestrator {
 			$jobs->event( (int) $job['id'], 'cancelled', __( 'Code follow-up cancelled before staging. No partial revision was created.', 'wp-autoplugin' ) );
 			return [ '_continuation' => true ];
 		}
-		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
+		$workspace = ( new Project_Repository() )->find( (int) $job['project_id'] );
 		if ( ! $workspace ) {
 			return new \WP_Error( 'code_follow_up_workspace', __( 'The Code follow-up workspace is unavailable.', 'wp-autoplugin' ) );
 		}
@@ -513,7 +514,7 @@ final class Code_Follow_Up_Orchestrator {
 			$run,
 			$run['target_manifest'],
 			$files,
-			(int) $job['workspace_id'],
+			(int) $job['project_id'],
 			(int) $job['created_by'],
 			(int) $base['id'],
 			(string) $run['change_summary'],
@@ -524,7 +525,7 @@ final class Code_Follow_Up_Orchestrator {
 		}
 		if ( 'review_fix' === ( $job['task'] ?? '' ) ) {
 			$addressed = ( new \WP_Autoplugin\V2\Infrastructure\Database\Review_Repository() )->address(
-				(int) $job['workspace_id'],
+				(int) $job['project_id'],
 				(array) ( $job['payload']['finding_ids'] ?? [] ),
 				(int) $revision['id'],
 				(int) $job['id'],
@@ -553,10 +554,10 @@ final class Code_Follow_Up_Orchestrator {
 
 	/** @return array{instructions:string,input:string}|\WP_Error */
 	private function analysis_prompt( array $job, array $workspace, array $base, array $run ) {
-		$history  = $this->history( (int) $job['workspace_id'], (int) $job['id'] );
+		$history  = $this->history( (int) $job['project_id'], (int) $job['id'] );
 		$message  = (string) $job['payload']['message'];
 		$feedback = (int) $run['retry_count'] ? substr( (string) $run['last_error'], 0, 500 ) : '';
-		$plan     = $this->plan_content( (int) $base['plan_job_id'] );
+		$plan     = $this->plan_content( (int) $base['plan_id'] );
 		$target   = $this->target_metadata( $workspace, (array) $base['project_manifest'] );
 		if ( is_wp_error( $target ) ) {
 			return $target;
@@ -606,7 +607,7 @@ final class Code_Follow_Up_Orchestrator {
 	/** @return array{instructions:string,input:string,current_content:string}|\WP_Error */
 	private function file_prompt( array $job, array $workspace, array $base, array $run, array $run_files, array $current, array $feedback ) {
 		$target   = $this->target_metadata( $workspace, (array) $run['target_manifest'] );
-		$history  = $this->history( (int) $job['workspace_id'], (int) $job['id'] );
+		$history  = $this->history( (int) $job['project_id'], (int) $job['id'] );
 		$metadata = (array) $run['change_instructions'];
 		$message  = (string) $job['payload']['message'];
 		if ( is_wp_error( $target ) ) {
@@ -891,9 +892,9 @@ final class Code_Follow_Up_Orchestrator {
 		return '';
 	}
 
-	private function plan_content( int $job_id ): string {
-		$plan = ( new Job_Repository() )->find( $job_id );
-		return (string) ( $plan['result']['artifact']['content'] ?? $plan['result']['content'] ?? '' );
+	private function plan_content( int $plan_id ): string {
+		$plan = ( new Plan_Repository() )->find( $plan_id );
+		return (string) ( $plan['content'] ?? '' );
 	}
 
 	/** @return array<string,mixed>|\WP_Error */
@@ -1167,9 +1168,9 @@ final class Code_Follow_Up_Orchestrator {
 	}
 
 	/** Return recent Code conversation context without source bodies. */
-	private function history( int $workspace_id, int $before_job_id ): array {
+	private function history( int $project_id, int $before_job_id ): array {
 		$history = [];
-		foreach ( array_reverse( ( new Job_Repository() )->list_for_workspace( $workspace_id ) ) as $previous ) {
+		foreach ( array_reverse( ( new Job_Repository() )->list_for_workspace( $project_id ) ) as $previous ) {
 			if ( (int) $previous['id'] >= $before_job_id || 'conversation' !== $previous['task'] || 'code' !== ( $previous['payload']['stage'] ?? '' ) ) {
 				continue;
 			}

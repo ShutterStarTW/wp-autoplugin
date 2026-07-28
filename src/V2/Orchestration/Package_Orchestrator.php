@@ -5,7 +5,7 @@ namespace WP_Autoplugin\V2\Orchestration;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Release_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Release\Package_Builder;
 use WP_Autoplugin\V2\Release\Release_Matrix;
 use WP_Autoplugin\V2\Release\Theme_Package_Builder;
@@ -21,9 +21,9 @@ final class Package_Orchestrator {
 			return $result;
 		}
 		$revisions = new Revision_Repository();
-		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
+		$workspace = ( new Project_Repository() )->find( (int) $job['project_id'] );
 		$revision  = $revisions->find( absint( $job['payload']['revision_id'] ?? 0 ) );
-		if ( ! $workspace || ! $revision || (int) $revision['workspace_id'] !== (int) $workspace['id'] || (int) $revision['id'] !== $revisions->latest_id( (int) $workspace['id'] ) ) {
+		if ( ! $workspace || ! $revision || (int) $revision['project_id'] !== (int) $workspace['id'] || (int) $revision['id'] !== $revisions->latest_id( (int) $workspace['id'] ) ) {
 			return new \WP_Error( 'release_revision_conflict', __( 'Only the latest staged revision can be packaged.', 'wp-autoplugin' ) );
 		}
 		$mode = sanitize_key( (string) ( $job['payload']['mode'] ?? '' ) );
@@ -103,7 +103,6 @@ final class Package_Orchestrator {
 			'artifact_kind'     => $package['artifact_kind'],
 			'slug'              => $package['slug'],
 			'target_ref'        => $package['target_ref'],
-			'plugin_file'       => $package['plugin_file'],
 			'sha256'            => $package['sha256'],
 			'size'              => (int) $package['size'],
 			'header_transforms' => $package['header_transforms'],

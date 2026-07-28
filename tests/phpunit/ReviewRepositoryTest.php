@@ -5,7 +5,7 @@ use WP_Autoplugin\V2\Infrastructure\Database\Review_Repository;
 
 /** Integration coverage for immutable reports and administrator finding history. */
 final class ReviewRepositoryTest extends WP_UnitTestCase {
-	private int $workspace_id;
+	private int $project_id;
 	private int $revision_id;
 
 	protected function setUp(): void {
@@ -16,14 +16,19 @@ final class ReviewRepositoryTest extends WP_UnitTestCase {
 		$now = current_time( 'mysql', true );
 		$wpdb->insert(
 			Installer::table( 'projects' ),
-			[ 'name' => 'Review fixture', 'status' => 'active', 'created_by' => 1, 'created_at' => $now, 'updated_at' => $now ]
+			[
+				'name'            => 'Review fixture',
+				'target_kind'     => 'new_plugin',
+				'target_ref'      => 'review-fixture',
+				'target_snapshot' => '{}',
+				'operation'       => 'create',
+				'request'         => 'Create a fixture.',
+				'created_by'      => 1,
+				'created_at'      => $now,
+				'updated_at'      => $now,
+			]
 		);
-		$project_id = (int) $wpdb->insert_id;
-		$wpdb->insert(
-			Installer::table( 'workspaces' ),
-			[ 'project_id' => $project_id, 'operation' => 'create', 'status' => 'staged', 'request' => 'Create a fixture.', 'created_by' => 1, 'created_at' => $now, 'updated_at' => $now ]
-		);
-		$this->workspace_id = (int) $wpdb->insert_id;
+		$this->project_id = (int) $wpdb->insert_id;
 		$this->revision_id = $this->create_revision_fixture( $now );
 	}
 
@@ -46,7 +51,7 @@ final class ReviewRepositoryTest extends WP_UnitTestCase {
 		$this->assertSame( 'action_required', $report['verdict'] );
 		$finding_id = (int) $report['findings'][0]['id'];
 		$this->assertFalse( is_wp_error( $reviews->dismiss( $finding_id, (int) $report['id'], $this->revision_id, 'Accepted risk.', 1 ) ) );
-		$this->assertSame( 'cleared_with_dismissals', $reviews->workspace_status( $this->workspace_id, $this->revision_id )['status'] );
+		$this->assertSame( 'cleared_with_dismissals', $reviews->workspace_status( $this->project_id, $this->revision_id )['status'] );
 		$this->assertFalse( is_wp_error( $reviews->reopen( $finding_id, (int) $report['id'], $this->revision_id, 'Reconsider.', 1 ) ) );
 
 		$successor = $reviews->create_report(
@@ -74,7 +79,7 @@ final class ReviewRepositoryTest extends WP_UnitTestCase {
 	private function job( int $id, string $mode, int $parent = 0 ): array {
 		return [
 			'id'           => $id,
-			'workspace_id' => $this->workspace_id,
+			'project_id'   => $this->project_id,
 			'created_by'   => 1,
 			'payload'      => [ 'mode' => $mode, 'parent_report_id' => $parent ?: null ],
 		];
@@ -92,9 +97,8 @@ final class ReviewRepositoryTest extends WP_UnitTestCase {
 		$inserted = $wpdb->insert(
 			Installer::table( 'revisions' ),
 			[
-				'workspace_id'    => $this->workspace_id,
+				'project_id'      => $this->project_id,
 				'revision_number' => 1,
-				'status'          => 'staged',
 				'summary'         => 'Fixture revision',
 				'origin'          => 'ai',
 				'created_by'      => 1,

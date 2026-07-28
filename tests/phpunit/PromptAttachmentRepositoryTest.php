@@ -3,29 +3,24 @@
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Rest\Routes;
 
 /** Verifies durable, private, message-scoped attachment persistence. */
 final class PromptAttachmentRepositoryTest extends WP_UnitTestCase {
 	/** @var array<int, int> */
-	private array $workspace_ids = [];
-	/** @var array<int, int> */
 	private array $project_ids = [];
 
 	public function tear_down(): void {
 		global $wpdb;
-		foreach ( $this->workspace_ids as $workspace_id ) {
-			$job_ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'jobs' ) . ' WHERE workspace_id = %d', $workspace_id ) ) );
+		foreach ( $this->project_ids as $project_id ) {
+			$job_ids = array_map( 'intval', $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'jobs' ) . ' WHERE project_id = %d', $project_id ) ) );
 			foreach ( $job_ids as $job_id ) {
 				$wpdb->delete( Installer::table( 'job_prompt_attachments' ), [ 'job_id' => $job_id ] );
 				$wpdb->delete( Installer::table( 'job_events' ), [ 'job_id' => $job_id ] );
 			}
-			$wpdb->delete( Installer::table( 'prompt_attachments' ), [ 'workspace_id' => $workspace_id ] );
-			$wpdb->delete( Installer::table( 'jobs' ), [ 'workspace_id' => $workspace_id ] );
-			$wpdb->delete( Installer::table( 'workspaces' ), [ 'id' => $workspace_id ] );
-		}
-		foreach ( $this->project_ids as $project_id ) {
+			$wpdb->delete( Installer::table( 'prompt_attachments' ), [ 'project_id' => $project_id ] );
+			$wpdb->delete( Installer::table( 'jobs' ), [ 'project_id' => $project_id ] );
 			$wpdb->delete( Installer::table( 'projects' ), [ 'id' => $project_id ] );
 		}
 		parent::tear_down();
@@ -51,7 +46,7 @@ final class PromptAttachmentRepositoryTest extends WP_UnitTestCase {
 		$this->assertFalse( is_wp_error( $attached ) );
 		$this->assertSame( [ 'first.png', 'second.png' ], array_column( $attached, 'filename' ) );
 		$this->assertArrayNotHasKey( 'content', $attached[0] );
-		$this->assertArrayNotHasKey( 'workspace_id', $attached[0] );
+		$this->assertArrayNotHasKey( 'project_id', $attached[0] );
 		$this->assertArrayNotHasKey( 'created_by', $attached[0] );
 
 		$retry_job = $jobs->create( $workspace, 'conversation', [ 'stage' => 'explain', 'message' => 'Retry.' ], $user_id );
@@ -128,7 +123,7 @@ final class PromptAttachmentRepositoryTest extends WP_UnitTestCase {
 	}
 
 	private function workspace( int $user_id, string $suffix ): int {
-		$created = ( new Workspace_Repository() )->create(
+		$created = ( new Project_Repository() )->create(
 			[
 				'kind' => 'new_plugin',
 				'ref'  => 'prompt-image-test-' . $suffix . '-' . wp_generate_uuid4(),
@@ -138,9 +133,8 @@ final class PromptAttachmentRepositoryTest extends WP_UnitTestCase {
 			'Build a test plugin.',
 			$user_id
 		);
-		$this->workspace_ids[] = (int) $created['workspace_id'];
-		$this->project_ids[]   = (int) $created['project_id'];
-		return (int) $created['workspace_id'];
+		$this->project_ids[] = (int) $created['id'];
+		return (int) $created['id'];
 	}
 
 	/** @return array<string, mixed> */
@@ -156,8 +150,8 @@ final class PromptAttachmentRepositoryTest extends WP_UnitTestCase {
 		];
 	}
 
-	private function attachment_count( int $workspace_id ): int {
+	private function attachment_count( int $project_id ): int {
 		global $wpdb;
-		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . Installer::table( 'prompt_attachments' ) . ' WHERE workspace_id = %d', $workspace_id ) );
+		return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM ' . Installer::table( 'prompt_attachments' ) . ' WHERE project_id = %d', $project_id ) );
 	}
 }

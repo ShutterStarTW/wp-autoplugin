@@ -11,8 +11,9 @@ use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 use WP_Autoplugin\V2\Infrastructure\AI\Agent_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\Database\Agent_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Plan_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
 use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 
@@ -39,7 +40,7 @@ final class Source_Agent {
 			return $result;
 		}
 
-		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
+		$workspace = ( new Project_Repository() )->find( (int) $job['project_id'] );
 		if ( ! $workspace ) {
 			return new \WP_Error( 'workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ) );
 		}
@@ -178,23 +179,12 @@ final class Source_Agent {
 			$model_turns   = (int) $run['model_turns'] + 1;
 			$input_tokens  = (int) $run['input_tokens'] + (int) ( $usage['input_tokens'] ?? 0 );
 			$output_tokens = (int) $run['output_tokens'] + (int) ( $usage['output_tokens'] ?? 0 );
-			$runs->step(
-				(int) $run['id'],
-				'model',
-				[
-					'type'       => $response['type'],
-					'request_id' => (string) ( $response['request_id'] ?? '' ),
-					'usage'      => $usage,
-					'response'   => $response,
-				]
-			);
-
 			if ( 'final' === ( $response['type'] ?? '' ) ) {
 				if ( 'plan' === $stage ) {
 					$task_result = ( new Plan_Response() )->parse(
 						(string) $response['content'],
 						'conversation' === $job['task'],
-						(int) ( $job['payload']['artifact_job_id'] ?? 0 ),
+						(int) ( $job['payload']['plan_id'] ?? 0 ),
 						(string) $workspace['operation']
 					);
 					if ( is_wp_error( $task_result ) ) {
@@ -204,9 +194,9 @@ final class Source_Agent {
 						$artifact                = $this->plan_artifact( $workspace, $job );
 						$task_result['content']  = $artifact['content'];
 						$task_result['artifact'] = [
-							'type'          => 'plan',
-							'content'       => $artifact['content'],
-							'parent_job_id' => $artifact['id'],
+							'type'           => 'plan',
+							'content'        => $artifact['content'],
+							'parent_plan_id' => $artifact['id'],
 						];
 					}
 				} else {
@@ -306,18 +296,6 @@ final class Source_Agent {
 					'name'    => (string) $call['name'],
 					'content' => $tool_result['content'],
 				];
-				$runs->step(
-					(int) $run['id'],
-					'tool',
-					[
-						'arguments' => $call['arguments'],
-						'content'   => $tool_result['content'],
-						'bytes'     => $tool_result['bytes'],
-						'hashes'    => $tool_result['inspected'],
-					],
-					(string) $call['name'],
-					(string) $tool_result['path']
-				);
 				$tool_failed = ! empty( $tool_result['error'] );
 				$jobs->event(
 					(int) $job['id'],
@@ -426,12 +404,13 @@ final class Source_Agent {
 
 		$artifact = '';
 		if ( 'conversation' === $job['task'] ) {
-			$artifact_id = (int) ( $job['payload']['artifact_job_id'] ?? 0 );
-			$parent      = $artifact_id ? ( new Job_Repository() )->find( $artifact_id ) : null;
-			if ( ! $parent || (int) $workspace['id'] !== (int) $parent['workspace_id'] || ! ( new Job_Repository() )->is_plan_artifact( $parent ) ) {
+			$artifact_id = (int) ( $job['payload']['plan_id'] ?? 0 );
+			$plans       = new Plan_Repository();
+			$parent      = $artifact_id ? $plans->find( $artifact_id ) : null;
+			if ( ! $parent || (int) $workspace['id'] !== (int) $parent['project_id'] || ! $plans->is_ready( $parent ) ) {
 				throw new \RuntimeException( __( 'A completed Plan artifact is required for this follow-up.', 'wp-autoplugin' ) );
 			}
-			$artifact = (string) ( $parent['result']['artifact']['content'] ?? $parent['result']['content'] ?? '' );
+			$artifact = (string) $parent['content'];
 		}
 
 		$operation = (string) $workspace['operation'];
@@ -449,28 +428,28 @@ final class Source_Agent {
 	 * @return array{id:int,content:string,structured:array<string, mixed>}
 	 */
 	private function plan_artifact( array $workspace, array $job ): array {
-		$artifact_id = (int) ( $job['payload']['artifact_job_id'] ?? 0 );
-		$jobs        = new Job_Repository();
-		$artifact    = $artifact_id ? $jobs->find( $artifact_id ) : null;
-		if ( ! $artifact || (int) $workspace['id'] !== (int) $artifact['workspace_id'] || ! $jobs->is_plan_artifact( $artifact ) ) {
+		$artifact_id = (int) ( $job['payload']['plan_id'] ?? 0 );
+		$artifact    = $artifact_id ? ( new Plan_Repository() )->find( $artifact_id ) : null;
+		if ( ! $artifact || (int) $workspace['id'] !== (int) $artifact['project_id'] || 'pending_structure' !== $artifact['status'] ) {
 			throw new \RuntimeException( __( 'A completed Plan artifact is required to regenerate its file structure.', 'wp-autoplugin' ) );
 		}
 
-		$content = (string) ( $artifact['result']['artifact']['content'] ?? $artifact['result']['content'] ?? '' );
+		$content = (string) $artifact['content'];
 		if ( '' === trim( $content ) ) {
 			throw new \RuntimeException( __( 'The Plan artifact is empty and its file structure cannot be regenerated.', 'wp-autoplugin' ) );
 		}
+		$parent = ! empty( $artifact['parent_plan_id'] ) ? ( new Plan_Repository() )->find( (int) $artifact['parent_plan_id'] ) : null;
 
 		return [
 			'id'         => $artifact_id,
 			'content'    => $content,
-			'structured' => is_array( $artifact['result']['structured'] ?? null ) ? $artifact['result']['structured'] : [],
+			'structured' => is_array( $parent['structured'] ?? null ) ? $parent['structured'] : [],
 		];
 	}
 
-	private function history( int $workspace_id, int $current_job_id, string $stage ): string {
+	private function history( int $project_id, int $current_job_id, string $stage ): string {
 		$messages = [];
-		foreach ( ( new Job_Repository() )->list_for_workspace( $workspace_id ) as $item ) {
+		foreach ( ( new Job_Repository() )->list_for_workspace( $project_id ) as $item ) {
 			if ( (int) $item['id'] === $current_job_id || $stage !== Agent_Task::stage( $item ) || ( 'plan' === $stage && 'conversation' !== $item['task'] ) ) {
 				continue;
 			}

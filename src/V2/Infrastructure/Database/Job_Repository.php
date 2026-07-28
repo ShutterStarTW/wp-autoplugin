@@ -3,7 +3,6 @@
 namespace WP_Autoplugin\V2\Infrastructure\Database;
 
 use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
-use WP_Autoplugin\V2\Domain\AI\Json_Response;
 
 /**
  * Durable job state and append-only event persistence.
@@ -13,7 +12,7 @@ final class Job_Repository extends Repository {
 	 * @param array<string, mixed> $payload Scoped task input.
 	 * @return array<string, mixed>
 	 */
-	public function create( int $workspace_id, string $task, array $payload, int $user_id ): array {
+	public function create( int $project_id, string $task, array $payload, int $user_id ): array {
 		$now           = $this->now();
 		$artifact_lock = self::is_artifact_work(
 			[
@@ -31,16 +30,16 @@ final class Job_Repository extends Repository {
 			: null;
 		$this->wpdb->query( 'START TRANSACTION' );
 		try {
-			$this->lock_workspace( $workspace_id );
+			$this->lock_project( $project_id );
 			if ( $artifact_lock ) {
-				if ( $this->has_active_artifact_work( $workspace_id ) ) {
+				if ( $this->has_active_artifact_work( $project_id ) ) {
 					throw new \RuntimeException( __( 'Another Code, Review, or Release operation is already active in this workspace.', 'wp-autoplugin' ), 409 );
 				}
 			}
 			$this->wpdb->insert(
 				Installer::table( 'jobs' ),
 				[
-					'workspace_id'             => $workspace_id,
+					'project_id'             => $project_id,
 					'task'                     => $task,
 					'status'                   => 'queued',
 					'progress'                 => 0,
@@ -59,9 +58,9 @@ final class Job_Repository extends Repository {
 				throw new \RuntimeException( __( 'Could not create job.', 'wp-autoplugin' ) );
 			}
 			$this->wpdb->update(
-				Installer::table( 'workspaces' ),
+				Installer::table( 'projects' ),
 				[ 'updated_at' => $now ],
-				[ 'id' => $workspace_id ],
+				[ 'id' => $project_id ],
 				[ '%s' ],
 				[ '%d' ]
 			);
@@ -99,11 +98,11 @@ final class Job_Repository extends Repository {
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	public function list_for_workspace( int $workspace_id ): array {
+	public function list_for_workspace( int $project_id ): array {
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE workspace_id = %d ORDER BY id ASC',
-				$workspace_id
+				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE project_id = %d ORDER BY id ASC',
+				$project_id
 			),
 			ARRAY_A
 		);
@@ -111,22 +110,12 @@ final class Job_Repository extends Repository {
 		return array_map( [ $this, 'hydrate' ], $rows );
 	}
 
-	/** Return the newest completed Plan artifact for a workspace. */
-	public function latest_plan_artifact( int $workspace_id ): ?array {
-		foreach ( array_reverse( $this->list_for_workspace( $workspace_id ) ) as $job ) {
-			if ( $this->is_plan_artifact( $job ) ) {
-				return $job;
-			}
-		}
-		return null;
-	}
-
 	/** Whether billable Code work is already active in the workspace. */
-	public function has_active_code( int $workspace_id ): bool {
+	public function has_active_code( int $project_id ): bool {
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE workspace_id = %d AND status IN (%s,%s,%s)',
-				$workspace_id,
+				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE project_id = %d AND status IN (%s,%s,%s)',
+				$project_id,
 				'queued',
 				'running',
 				'retrying'
@@ -142,11 +131,11 @@ final class Job_Repository extends Repository {
 	}
 
 	/** Whether revision-mutating or revision-bound work is active in the workspace. */
-	public function has_active_artifact_work( int $workspace_id ): bool {
+	public function has_active_artifact_work( int $project_id ): bool {
 		$rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
-				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE workspace_id = %d AND status IN (%s,%s,%s)',
-				$workspace_id,
+				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE project_id = %d AND status IN (%s,%s,%s)',
+				$project_id,
 				'queued',
 				'running',
 				'retrying'
@@ -302,7 +291,7 @@ final class Job_Repository extends Repository {
 	 * @param array<string, mixed> $fields State fields to update.
 	 */
 	public function update( int $id, array $fields ): bool {
-		$allowed = [ 'status', 'progress', 'runner', 'result', 'error_message', 'started_at', 'finished_at' ];
+		$allowed = [ 'status', 'progress', 'result', 'error_message', 'started_at', 'finished_at' ];
 		$data    = [ 'updated_at' => $this->now() ];
 
 		foreach ( $fields as $field => $value ) {
@@ -312,111 +301,6 @@ final class Job_Repository extends Repository {
 		}
 
 		return false !== $this->wpdb->update( Installer::table( 'jobs' ), $data, [ 'id' => $id ] );
-	}
-
-	/**
-	 * Whether a completed job represents a staged Plan artifact.
-	 *
-	 * Older Plan jobs predate explicit artifact metadata, so they remain valid
-	 * Plan artifacts for compatibility.
-	 *
-	 * @param array<string, mixed> $job Hydrated job record.
-	 */
-	public function is_plan_artifact( array $job ): bool {
-		if ( 'completed' !== ( $job['status'] ?? '' ) || ! is_array( $job['result'] ?? null ) ) {
-			return false;
-		}
-
-		if ( 'plan' === ( $job['task'] ?? '' ) ) {
-			return isset( $job['result']['content'] );
-		}
-		if ( 'plan_structure' === ( $job['task'] ?? '' ) ) {
-			return 'plan' === ( $job['result']['artifact']['type'] ?? '' )
-				&& isset( $job['result']['artifact']['content'] );
-		}
-
-		return 'conversation' === ( $job['task'] ?? '' )
-			&& 'plan' === ( $job['payload']['stage'] ?? '' )
-			&& 'artifact' === ( $job['result']['outcome'] ?? '' )
-			&& 'plan' === ( $job['result']['artifact']['type'] ?? '' )
-			&& isset( $job['result']['artifact']['content'] );
-	}
-
-	/**
-	 * Store a human-edited Plan as a new immutable successor job.
-	 *
-	 * @param array<string, mixed> $source Completed Plan artifact being edited.
-	 * @return array<string, mixed>|null
-	 */
-	public function create_plan_successor( array $source, string $content, int $user_id ): ?array {
-		if ( ! $this->is_plan_artifact( $source ) ) {
-			return null;
-		}
-
-		$now        = $this->now();
-		$structured = json_decode( Json_Response::strip_fence( $content ), true );
-		if ( ! is_array( $structured ) && is_array( $source['result']['structured'] ?? null ) ) {
-			// Markdown edits change the narrative Plan, not its static file map.
-			$structured = $source['result']['structured'];
-		}
-		$this->wpdb->query( 'START TRANSACTION' );
-		try {
-			$this->lock_workspace( (int) $source['workspace_id'] );
-			$this->wpdb->insert(
-				Installer::table( 'jobs' ),
-				[
-					'workspace_id' => $source['workspace_id'],
-					'task'         => 'plan',
-					'status'       => 'completed',
-					'progress'     => 100,
-					'payload'      => $this->json(
-						[
-							'stage'                  => 'plan',
-							'source'                 => 'manual_edit',
-							'artifact_parent_job_id' => $source['id'],
-						]
-					),
-					'result'       => $this->json(
-						[
-							'content'    => $content,
-							'structured' => is_array( $structured ) ? $structured : null,
-							'artifact'   => [
-								'type'          => 'plan',
-								'parent_job_id' => $source['id'],
-							],
-						]
-					),
-					'created_by'   => $user_id,
-					'created_at'   => $now,
-					'started_at'   => $now,
-					'finished_at'  => $now,
-					'updated_at'   => $now,
-				],
-				[ '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s' ]
-			);
-
-			$id = (int) $this->wpdb->insert_id;
-			if ( ! $id ) {
-				throw new \RuntimeException( 'Could not create Plan successor.' );
-			}
-
-			$this->wpdb->update(
-				Installer::table( 'workspaces' ),
-				[ 'updated_at' => $now ],
-				[ 'id' => $source['workspace_id'] ],
-				[ '%s' ],
-				[ '%d' ]
-			);
-			$this->event( $id, 'plan_successor', __( 'Plan edited by an administrator.', 'wp-autoplugin' ), [ 'parent_job_id' => $source['id'] ] );
-			if ( false === $this->wpdb->query( 'COMMIT' ) ) {
-				throw new \RuntimeException( 'Could not finalize Plan successor.' );
-			}
-		} catch ( \Throwable $error ) {
-			$this->wpdb->query( 'ROLLBACK' );
-			throw $error;
-		}
-
-		return $this->find( $id );
 	}
 
 	/**
@@ -447,23 +331,29 @@ final class Job_Repository extends Repository {
 	 * @return array<string, mixed>
 	 */
 	private function hydrate( array $row ): array {
-		foreach ( [ 'id', 'workspace_id', 'progress', 'cancel_requested', 'created_by' ] as $field ) {
+		foreach ( [ 'id', 'project_id', 'progress', 'cancel_requested', 'created_by' ] as $field ) {
 			$row[ $field ] = (int) $row[ $field ];
 		}
 		$row['payload'] = $this->decode( $row['payload'] );
 		$row['result']  = $this->decode( $row['result'] );
+		if (
+			in_array( (string) $row['task'], [ 'plan', 'plan_structure' ], true )
+			|| ( 'conversation' === $row['task'] && 'plan' === ( $row['payload']['stage'] ?? '' ) )
+		) {
+			$row['result'] = ( new Plan_Repository( $this->wpdb ) )->expand_job_result( $row['result'] );
+		}
 		unset( $row['global_instructions'], $row['global_instructions_hash'] );
 		$row['prompt_attachments'] = ( new Prompt_Attachment_Repository( $this->wpdb ) )->for_job( (int) $row['id'] );
 
 		return $row;
 	}
 
-	/** Lock an existing workspace so job creation cannot race project deletion. */
-	private function lock_workspace( int $workspace_id ): void {
-		$workspace_exists = $this->wpdb->get_var(
-			$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'workspaces' ) . ' WHERE id = %d FOR UPDATE', $workspace_id )
+	/** Lock an existing project so job creation cannot race project deletion. */
+	private function lock_project( int $project_id ): void {
+		$project_exists = $this->wpdb->get_var(
+			$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'projects' ) . ' WHERE id = %d FOR UPDATE', $project_id )
 		);
-		if ( ! $workspace_exists ) {
+		if ( ! $project_exists ) {
 			throw new \RuntimeException( __( 'The workspace no longer exists.', 'wp-autoplugin' ), 404 );
 		}
 	}

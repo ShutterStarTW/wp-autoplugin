@@ -49,7 +49,7 @@ type Target = {
 
 type Job = {
 	id: number;
-	workspace_id: number;
+	project_id: number;
 	task: string;
 	status: string;
 	progress: number;
@@ -57,7 +57,7 @@ type Job = {
 	payload: {
 		message?: string;
 		stage?: string;
-		artifact_job_id?: number;
+		plan_id?: number;
 		mode?:
 			| 'generate'
 			| 'regenerate'
@@ -70,7 +70,6 @@ type Job = {
 			| 'modify_original'
 			| 'install_theme_copy'
 			| 'modify_theme_original';
-		plan_artifact_job_id?: number;
 		parent_revision_id?: number;
 		revision_id?: number;
 		expected_latest_revision_id?: number | null;
@@ -99,7 +98,8 @@ type Job = {
 		artifact?: {
 			type?: string;
 			content?: string;
-			parent_job_id?: number;
+			plan_id?: number;
+			parent_plan_id?: number | null;
 		};
 		model?: string;
 		provider?: string;
@@ -113,7 +113,6 @@ type Job = {
 		action?: 'activate' | 'rollback';
 		artifact_kind?: 'plugin' | 'theme';
 		target_ref?: string;
-		plugin_file?: string;
 		template?: string;
 		is_child?: boolean;
 		expires_at?: string;
@@ -121,7 +120,7 @@ type Job = {
 		added_paths?: string[];
 		updated_paths?: string[];
 		deleted_paths?: string[];
-		plan_artifact_job_id?: number;
+		plan_id?: number;
 		parent_revision_id?: number | null;
 		files_count?: number;
 		usage?: { input_tokens: number; output_tokens: number };
@@ -183,11 +182,10 @@ type CodeProgress = {
 
 type RevisionSummary = {
 	id: number;
-	workspace_id: number;
+	project_id: number;
 	revision_number: number;
-	status: string;
 	origin: 'ai' | 'manual' | 'restore' | 'review_fix';
-	plan_job_id: number | null;
+	plan_id: number | null;
 	source_job_id: number | null;
 	parent_revision_id: number | null;
 	restored_from_revision_id: number | null;
@@ -273,7 +271,7 @@ type ReviewTest = { title: string; steps: string[]; expected: string };
 type ReviewReport = {
 	id: number;
 	job_id: number;
-	workspace_id: number;
+	project_id: number;
 	revision_id: number;
 	parent_report_id: number | null;
 	mode: 'initial' | 'verification' | 'follow_up';
@@ -386,7 +384,11 @@ type JobEvent = {
 };
 
 type PlanSaveResponse = {
-	artifact: Job;
+	plan: {
+		id: number;
+		project_id: number;
+		status: 'pending_structure';
+	};
 	regeneration_job: Job | null;
 };
 
@@ -532,11 +534,8 @@ const operations = [
 
 type Workspace = {
 	id: number;
-	workspace_id?: number;
-	project_id: number;
 	project_name: string;
 	operation: string;
-	status: string;
 	request: string;
 	latest_job_id: number | null;
 	latest_job_status: string | null;
@@ -578,7 +577,6 @@ type ProjectsResponse = {
 
 type DeleteProjectResponse = {
 	project_id: number;
-	workspace_ids: number[];
 	deleted: true;
 };
 
@@ -614,12 +612,12 @@ async function postJob(
 		return apiFetch< Job >( {
 			path: `${ rest }/jobs`,
 			method: 'POST',
-			data: { workspace_id: workspaceId, task, payload },
+			data: { project_id: workspaceId, task, payload },
 		} );
 	}
 
 	const body = new FormData();
-	body.append( 'workspace_id', String( workspaceId ) );
+	body.append( 'project_id', String( workspaceId ) );
 	body.append( 'task', task );
 	body.append( 'payload', JSON.stringify( payload ) );
 	body.append( 'prompt_attachment_ids', JSON.stringify( attachmentIds ) );
@@ -1083,7 +1081,7 @@ function App() {
 			refreshBootstrap(),
 			apiFetch< { items: Target[] } >( { path: `${ rest }/targets` } ),
 			apiFetch< { items: Workspace[] } >( {
-				path: `${ rest }/workspaces`,
+				path: `${ rest }/projects`,
 			} ),
 		] )
 			.then( ( [ boot, targetResponse, workspaceResponse ] ) => {
@@ -1158,7 +1156,7 @@ function App() {
 			String( activeWorkspaceId )
 		);
 		const availableStages = workspaceStages( activeWorkspace?.operation );
-		const activeProjectId = activeWorkspace?.project_id;
+		const activeProjectId = activeWorkspace?.id;
 		const savedStage = activeProjectId
 			? window.localStorage.getItem(
 					`${ ACTIVE_STAGE_KEY_PREFIX }${ activeProjectId }`
@@ -1173,7 +1171,7 @@ function App() {
 		let current = true;
 		setJobsLoading( true );
 		apiFetch< { items: Job[] } >( {
-			path: `${ rest }/workspaces/${ activeWorkspaceId }/jobs`,
+			path: `${ rest }/projects/${ activeWorkspaceId }/jobs`,
 		} )
 			.then( ( response ) => {
 				if ( current ) {
@@ -1194,11 +1192,7 @@ function App() {
 		return () => {
 			current = false;
 		};
-	}, [
-		activeWorkspaceId,
-		activeWorkspace?.operation,
-		activeWorkspace?.project_id,
-	] );
+	}, [ activeWorkspaceId, activeWorkspace?.operation, activeWorkspace?.id ] );
 
 	function selectWorkspaceStage( stage: string ) {
 		if (
@@ -1209,7 +1203,7 @@ function App() {
 		setActiveTab( stage );
 		if ( activeWorkspace ) {
 			window.localStorage.setItem(
-				`${ ACTIVE_STAGE_KEY_PREFIX }${ activeWorkspace.project_id }`,
+				`${ ACTIVE_STAGE_KEY_PREFIX }${ activeWorkspace.id }`,
 				stage
 			);
 		}
@@ -1241,7 +1235,7 @@ function App() {
 					if ( latestJob ) {
 						setWorkspaces( ( items ) =>
 							items.map( ( item ) =>
-								item.id === latestJob.workspace_id
+								item.id === latestJob.project_id
 									? {
 											...item,
 											latest_job_status: latestJob.status,
@@ -1259,7 +1253,7 @@ function App() {
 						)
 					) {
 						const refreshed = await apiFetch< { items: Job[] } >( {
-							path: `${ rest }/workspaces/${ activeWorkspaceId }/jobs`,
+							path: `${ rest }/projects/${ activeWorkspaceId }/jobs`,
 						} );
 						setJobs( refreshed.items );
 					}
@@ -1314,7 +1308,7 @@ function App() {
 		setError( '' );
 		try {
 			const workspace = await apiFetch< Workspace >( {
-				path: `${ rest }/workspaces`,
+				path: `${ rest }/projects`,
 				method: 'POST',
 				data: {
 					target_kind: target.kind,
@@ -1323,7 +1317,7 @@ function App() {
 					request,
 				},
 			} );
-			const workspaceId = workspace.id || workspace.workspace_id;
+			const workspaceId = workspace.id;
 			const created = await postJob(
 				workspaceId as number,
 				operation === 'explain' ? 'explain' : 'plan',
@@ -1356,7 +1350,7 @@ function App() {
 	async function closeWorkspace( workspaceId: number ) {
 		try {
 			await apiFetch( {
-				path: `${ rest }/workspaces/${ workspaceId }/close`,
+				path: `${ rest }/projects/${ workspaceId }/close`,
 				method: 'POST',
 			} );
 			const remaining = workspaces.filter(
@@ -1373,7 +1367,7 @@ function App() {
 
 	async function reopenWorkspace( workspaceId: number ) {
 		const reopened = await apiFetch< Workspace >( {
-			path: `${ rest }/workspaces/${ workspaceId }/reopen`,
+			path: `${ rest }/projects/${ workspaceId }/reopen`,
 			method: 'POST',
 		} );
 		setWorkspaces( ( current ) => [
@@ -1401,12 +1395,11 @@ function App() {
 
 	async function deleteProject( project: Workspace ) {
 		const deleted = await apiFetch< DeleteProjectResponse >( {
-			path: `${ rest }/projects/${ project.project_id }`,
+			path: `${ rest }/projects/${ project.id }`,
 			method: 'DELETE',
 		} );
-		const deletedWorkspaceIds = new Set( deleted.workspace_ids );
 		const remaining = workspaces.filter(
-			( item ) => ! deletedWorkspaceIds.has( item.id )
+			( item ) => item.id !== deleted.project_id
 		);
 
 		setWorkspaces( remaining );
@@ -1415,7 +1408,7 @@ function App() {
 		);
 		if (
 			activeWorkspaceId !== 'new' &&
-			deletedWorkspaceIds.has( activeWorkspaceId )
+			deleted.project_id === activeWorkspaceId
 		) {
 			setActiveWorkspaceId( remaining[ 0 ]?.id ?? 'new' );
 		}
@@ -1431,7 +1424,7 @@ function App() {
 		);
 		setWorkspaces( ( items ) =>
 			items.map( ( item ) =>
-				item.id === updated.workspace_id
+				item.id === updated.project_id
 					? { ...item, latest_job_status: updated.status }
 					: item
 			)
@@ -1523,26 +1516,25 @@ function App() {
 	async function savePlan( job: Job, content: string ) {
 		try {
 			const saved = await apiFetch< PlanSaveResponse >( {
-				path: `${ rest }/jobs/${ job.id }/plan`,
+				path: `${ rest }/plans/${ job.result?.plan_id ?? 0 }`,
 				method: 'POST',
 				data: { content },
 			} );
 			setJobs( ( items ) => [
 				...items,
-				saved.artifact,
 				...( saved.regeneration_job ? [ saved.regeneration_job ] : [] ),
 			] );
 			setWorkspaces( ( items ) =>
 				items.map( ( item ) =>
-					item.id === saved.artifact.workspace_id
+					item.id === saved.plan.project_id
 						? {
 								...item,
 								latest_job_id:
 									saved.regeneration_job?.id ??
-									saved.artifact.id,
+									item.latest_job_id,
 								latest_job_status:
 									saved.regeneration_job?.status ??
-									saved.artifact.status,
+									item.latest_job_status,
 						  }
 						: item
 				)
@@ -2032,7 +2024,7 @@ function TokenUsageControl( {
 		setError( '' );
 		try {
 			const response = await apiFetch< TokenUsageSummary >( {
-				path: `${ rest }/workspaces/${ workspaceId }/usage`,
+				path: `${ rest }/projects/${ workspaceId }/usage`,
 			} );
 			if ( requestNumber === requestSequence.current ) {
 				setSummary( response );
@@ -2711,8 +2703,7 @@ function AllProjectsModal( {
 			await onDelete( projectToDelete );
 			setProjects( ( current ) =>
 				current.filter(
-					( project ) =>
-						project.project_id !== projectToDelete.project_id
+					( project ) => project.id !== projectToDelete.id
 				)
 			);
 			setTotal( ( current ) => Math.max( 0, current - 1 ) );
@@ -3002,7 +2993,7 @@ function AllProjectsModal( {
 }
 
 function getProjectsPath( search: string, page: number ): string {
-	return `${ rest }/projects?search=${ encodeURIComponent(
+	return `${ rest }/projects?view=all&search=${ encodeURIComponent(
 		search
 	) }&page=${ page }&per_page=${ PROJECTS_PAGE_SIZE }`;
 }
@@ -3353,7 +3344,6 @@ function WorkspaceView( {
 					<h2>{ workspace.project_name }</h2>
 				</div>
 				<div className="workspace-editor__metrics">
-					<span>{ workspace.status }</span>
 					{ target?.version && <span>v{ target.version }</span> }
 					{ target?.source_files > 0 && (
 						<span>
@@ -3453,7 +3443,7 @@ function WorkspaceView( {
 							onContinue={ () => onTabSelect( 'code' ) }
 							onFollowUp={ (
 								message,
-								artifactJobId,
+								planId,
 								images,
 								attachmentIds
 							) =>
@@ -3462,7 +3452,7 @@ function WorkspaceView( {
 									{
 										stage: 'plan',
 										message,
-										artifact_job_id: artifactJobId,
+										plan_id: planId,
 									},
 									images,
 									attachmentIds
@@ -3548,15 +3538,11 @@ function latestPlanArtifact( jobs: Job[] ): Job | null {
 			.find(
 				( job ) =>
 					job.status === 'completed' &&
-					( ( job.task === 'plan' && !! job.result?.content ) ||
-						( job.task === 'plan_structure' &&
-							job.result?.artifact?.type === 'plan' &&
-							!! job.result.artifact.content ) ||
+					( [ 'plan', 'plan_structure' ].includes( job.task ) ||
 						( job.task === 'conversation' &&
-							job.payload.stage === 'plan' &&
-							job.result?.outcome === 'artifact' &&
-							job.result.artifact?.type === 'plan' &&
-							!! job.result.artifact.content ) )
+							job.payload.stage === 'plan' ) ) &&
+					!! job.result?.plan_id &&
+					!! job.result.content
 			) ?? null
 	);
 }
@@ -3881,7 +3867,7 @@ function PlanStage( {
 	onContinue: () => void;
 	onFollowUp: (
 		message: string,
-		artifactJobId: number,
+		planId: number,
 		images?: File[],
 		attachmentIds?: number[]
 	) => Promise< Job | null >;
@@ -3975,7 +3961,7 @@ function PlanEditor( {
 	onContinue: () => void;
 	onFollowUp: (
 		message: string,
-		artifactJobId: number,
+		planId: number,
 		images?: File[],
 		attachmentIds?: number[]
 	) => Promise< Job | null >;
@@ -4128,15 +4114,17 @@ function PlanEditor( {
 			<StageConversation
 				stage="plan"
 				jobs={ conversationJobs }
-				artifactJobId={ job.id }
+				planId={ job.result?.plan_id }
 				capability={ capability }
 				onCancel={ onCancel }
-				onFollowUp={ (
-					message,
-					_artifactJobId,
-					images,
-					attachmentIds
-				) => onFollowUp( message, job.id, images, attachmentIds ) }
+				onFollowUp={ ( message, _planId, images, attachmentIds ) =>
+					onFollowUp(
+						message,
+						job.result?.plan_id ?? 0,
+						images,
+						attachmentIds
+					)
+				}
 			/>
 		</div>
 	);
@@ -4298,7 +4286,7 @@ function CodeStage( {
 		[ 'queued', 'running', 'retrying' ].includes( structureRun.status );
 	const displayedPlan = activeCodeJob
 		? jobs.find(
-				( job ) => job.id === activeCodeJob.payload.plan_artifact_job_id
+				( job ) => job.result?.plan_id === activeCodeJob.payload.plan_id
 		  ) ?? plan
 		: plan;
 	const normalizesProjectRoot = [ 'create', 'hook_extension' ].includes(
@@ -4314,6 +4302,7 @@ function CodeStage( {
 	const requiresMainFile = normalizesProjectRoot;
 	const planValid =
 		!! plan &&
+		!! plan.result?.plan_id &&
 		( ! requiresMainFile || !! selectedMainFile ) &&
 		( ! requiresMainFile ||
 			currentPlanFiles.every( ( file ) => file.action === 'add' ) ) &&
@@ -4333,7 +4322,7 @@ function CodeStage( {
 			const response = await apiFetch< {
 				items: RevisionSummary[];
 				latest_revision_id: number | null;
-			} >( { path: `${ rest }/workspaces/${ workspace.id }/revisions` } );
+			} >( { path: `${ rest }/projects/${ workspace.id }/revisions` } );
 			setRevisions( response.items );
 			setLatestRevisionId( response.latest_revision_id );
 			setSelectedRevisionId( ( current ) => {
@@ -4679,13 +4668,13 @@ function CodeStage( {
 			regenerate
 				? {
 						mode: 'regenerate',
-						plan_artifact_job_id: plan.id,
+						plan_id: plan.result?.plan_id,
 						parent_revision_id: latestRevisionId,
 						expected_latest_revision_id: latestRevisionId,
 				  }
 				: {
 						mode: 'generate',
-						plan_artifact_job_id: plan.id,
+						plan_id: plan.result?.plan_id,
 						expected_latest_revision_id: null,
 				  }
 		);
@@ -4834,7 +4823,7 @@ function CodeStage( {
 					{ localError }
 				</Notice>
 			) }
-			{ manifest && plan && manifest.plan_job_id !== plan.id && (
+			{ manifest && plan && manifest.plan_id !== plan.result?.plan_id && (
 				<Notice status="warning" isDismissible={ false }>
 					{ __(
 						'The Plan has changed since this revision.',
@@ -4902,9 +4891,9 @@ function CodeStage( {
 						<strong>{ revisionOrigin( manifest.origin ) }</strong>
 						<span>
 							{ sprintf(
-								/* translators: %d: Plan job ID. */
-								__( 'Plan job #%d', 'wp-autoplugin' ),
-								manifest.plan_job_id ?? 0
+								/* translators: %d: Plan ID. */
+								__( 'Plan #%d', 'wp-autoplugin' ),
+								manifest.plan_id ?? 0
 							) }
 						</span>
 						<span className="is-valid">
@@ -5579,12 +5568,12 @@ function CodeGenerationPanel( {
 				<p>
 					{ plan
 						? sprintf(
-								/* translators: 1: Plan job ID, 2: planned file count. */
+								/* translators: 1: Plan ID, 2: planned file count. */
 								__(
-									'Plan job #%1$d · %2$d planned files',
+									'Plan #%1$d · %2$d planned files',
 									'wp-autoplugin'
 								),
-								plan.id,
+								plan.result?.plan_id ?? 0,
 								planned.length
 						  )
 						: __(
@@ -6365,10 +6354,10 @@ function ReviewStage( {
 					items: RevisionSummary[];
 					latest_revision_id: number | null;
 				} >( {
-					path: `${ rest }/workspaces/${ workspace.id }/revisions`,
+					path: `${ rest }/projects/${ workspace.id }/revisions`,
 				} ),
 				apiFetch< ReviewHistory >( {
-					path: `${ rest }/workspaces/${ workspace.id }/review-reports`,
+					path: `${ rest }/projects/${ workspace.id }/review-reports`,
 				} ),
 			] );
 			setRevisions( revisionResponse.items );
@@ -9101,7 +9090,7 @@ function StageConversation( {
 	stage,
 	jobs,
 	initialMessage = '',
-	artifactJobId,
+	planId,
 	capability,
 	onCancel,
 	onFollowUp,
@@ -9109,12 +9098,12 @@ function StageConversation( {
 	stage: 'plan' | 'explain';
 	jobs: Job[];
 	initialMessage?: string;
-	artifactJobId?: number;
+	planId?: number;
 	capability: AgentCapability | null;
 	onCancel: ( job: Job ) => void;
 	onFollowUp: (
 		message: string,
-		artifactJobId?: number,
+		planId?: number,
 		images?: File[],
 		attachmentIds?: number[]
 	) => Promise< Job | null >;
@@ -9134,11 +9123,7 @@ function StageConversation( {
 			return;
 		}
 		setSubmitting( true );
-		const created = await onFollowUp(
-			message.trim(),
-			artifactJobId,
-			images
-		);
+		const created = await onFollowUp( message.trim(), planId, images );
 		setSubmitting( false );
 		if ( created ) {
 			setMessage( '' );
@@ -9203,7 +9188,7 @@ function StageConversation( {
 										onClick={ () =>
 											onFollowUp(
 												job.payload.message || '',
-												artifactJobId,
+												planId,
 												[],
 												job.prompt_attachments.map(
 													( item ) => item.id
@@ -9237,7 +9222,7 @@ function StageConversation( {
 											onClick={ () =>
 												onFollowUp(
 													job.payload.message || '',
-													artifactJobId,
+													planId,
 													[],
 													job.prompt_attachments.map(
 														( item ) => item.id

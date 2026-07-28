@@ -7,8 +7,9 @@ use WP_Autoplugin\V2\Domain\AI\Plan_Response;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Plan_Prompt;
 use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Plan_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
 
 /** Executes direct v2 Plan requests for workspaces that have no source target. */
@@ -27,7 +28,7 @@ final class Direct_Planner {
 			return $result;
 		}
 
-		$workspace = ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
+		$workspace = ( new Project_Repository() )->find( (int) $job['project_id'] );
 		if ( ! $workspace ) {
 			return new \WP_Error( 'workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ) );
 		}
@@ -87,7 +88,7 @@ final class Direct_Planner {
 				? ( new Plan_Response() )->parse(
 					$response['content'],
 					'plan' !== $job['task'],
-					(int) ( $prepared['artifact_job_id'] ?? 0 ),
+					(int) ( $prepared['plan_id'] ?? 0 ),
 					'create'
 				)
 				: new \WP_Error( 'direct_plan_response_invalid', __( 'The provider did not return a final Plan response.', 'wp-autoplugin' ) );
@@ -147,18 +148,23 @@ final class Direct_Planner {
 			];
 		}
 
-		$artifact_id = (int) ( $job['payload']['artifact_job_id'] ?? 0 );
-		$artifact    = $artifact_id ? $jobs->find( $artifact_id ) : null;
-		if ( ! $artifact || (int) $workspace['id'] !== (int) $artifact['workspace_id'] || ! $jobs->is_plan_artifact( $artifact ) ) {
+		$artifact_id = (int) ( $job['payload']['plan_id'] ?? 0 );
+		$plans       = new Plan_Repository();
+		$artifact    = $artifact_id ? $plans->find( $artifact_id ) : null;
+		$is_source   = $artifact
+			&& (int) $workspace['id'] === (int) $artifact['project_id']
+			&& ( 'plan_structure' === $job['task'] ? 'pending_structure' === $artifact['status'] : $plans->is_ready( $artifact ) );
+		if ( ! $is_source ) {
 			return new \WP_Error( 'direct_plan_artifact_missing', __( 'A completed Plan artifact is required for this request.', 'wp-autoplugin' ) );
 		}
 		$artifact_content = $this->artifact_content( $artifact );
 
 		if ( 'plan_structure' === $job['task'] ) {
+			$parent = ! empty( $artifact['parent_plan_id'] ) ? $plans->find( (int) $artifact['parent_plan_id'] ) : null;
 			return [
 				'instructions'     => $prompt->structure_instructions(),
-				'input'            => $prompt->structure_input( $request, $artifact_content, (array) ( $artifact['result']['structured'] ?? [] ) ),
-				'artifact_job_id'  => $artifact_id,
+				'input'            => $prompt->structure_input( $request, $artifact_content, (array) ( $parent['structured'] ?? [] ) ),
+				'plan_id'          => $artifact_id,
 				'artifact_content' => $artifact_content,
 			];
 		}
@@ -171,13 +177,13 @@ final class Direct_Planner {
 				$this->history( $jobs->list_for_workspace( (int) $workspace['id'] ), (int) $job['id'] ),
 				trim( (string) ( $job['payload']['message'] ?? '' ) )
 			),
-			'artifact_job_id' => $artifact_id,
+			'plan_id' => $artifact_id,
 		];
 	}
 
 	/** @param array<string, mixed> $artifact */
 	private function artifact_content( array $artifact ): string {
-		return (string) ( $artifact['result']['artifact']['content'] ?? $artifact['result']['content'] ?? '' );
+		return (string) ( $artifact['content'] ?? '' );
 	}
 
 	/** @param array<int, array<string, mixed>> $jobs */

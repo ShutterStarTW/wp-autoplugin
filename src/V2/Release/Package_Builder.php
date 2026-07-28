@@ -146,7 +146,6 @@ final class Package_Builder {
 				'slug'                    => $slug,
 				'artifact_kind'           => 'plugin',
 				'target_ref'              => $slug . '/' . $main_relative,
-				'plugin_file'             => $slug . '/' . $main_relative,
 				'source_tree_fingerprint' => $source_fingerprint,
 				'tree_fingerprint'        => $tree['fingerprint'],
 				'header_transforms'       => $headers,

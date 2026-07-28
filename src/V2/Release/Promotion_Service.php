@@ -41,26 +41,25 @@ final class Promotion_Service {
 			if ( is_wp_error( $tree ) || ! hash_equals( (string) $built['tree_fingerprint'], (string) ( $tree['fingerprint'] ?? '' ) ) ) {
 				return is_wp_error( $tree ) ? $tree : new \WP_Error( 'promotion_manifest_mismatch', __( 'The installed temporary tree did not match the verified package.', 'wp-autoplugin' ) );
 			}
-			$main = $extracted . '/' . basename( (string) $built['plugin_file'] );
+			$main = $extracted . '/' . basename( (string) $built['target_ref'] );
 			if ( ! is_file( $main ) || ! $this->valid_plugin_header( $main ) ) {
 				return new \WP_Error( 'promotion_plugin_header', __( 'The installed package does not contain its verified main plugin header.', 'wp-autoplugin' ) );
 			}
 			if ( file_exists( $destination ) || ! $filesystem->move( $extracted, $destination, false ) ) {
 				return new \WP_Error( 'promotion_move', __( 'The verified plugin could not be moved to its final destination.', 'wp-autoplugin' ) );
 			}
-			$plugin_file = $built['plugin_file'];
-			if ( ! file_exists( WP_PLUGIN_DIR . '/' . $plugin_file ) ) {
+			$target_ref = $built['target_ref'];
+			if ( ! file_exists( WP_PLUGIN_DIR . '/' . $target_ref ) ) {
 				$filesystem->delete( $destination, true );
 				return new \WP_Error( 'promotion_verify', __( 'The installed plugin could not be verified at its final destination.', 'wp-autoplugin' ) );
 			}
 			( new Release_Repository() )->update_promotion(
 				(int) $promotion['id'],
 				[
-					'status'                  => 'installed',
-					'artifact_kind'           => 'plugin',
-					'destination_target_ref'  => $plugin_file,
-					'destination_plugin_file' => $plugin_file,
-					'destination_slug'        => $built['slug'],
+					'status'                 => 'installed',
+					'artifact_kind'          => 'plugin',
+					'destination_target_ref' => $target_ref,
+					'destination_slug'       => $built['slug'],
 					'target_fingerprint'      => $built['tree_fingerprint'],
 					'header_transforms'       => $built['header_transforms'],
 					'active_before'           => 0,
@@ -70,7 +69,7 @@ final class Promotion_Service {
 			);
 			return [
 				'status'            => 'installed',
-				'plugin_file'       => $plugin_file,
+				'target_ref'        => $target_ref,
 				'slug'              => $built['slug'],
 				'active'            => false,
 				'header_transforms' => $built['header_transforms'],
@@ -94,8 +93,8 @@ final class Promotion_Service {
 			return new \WP_Error( 'promotion_activation_state', __( 'This promotion is not waiting for activation.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		$destination     = (string) $promotion['destination_plugin_file'];
-		$source          = (string) $promotion['source_plugin_file'];
+		$destination     = (string) $promotion['destination_target_ref'];
+		$source          = (string) $promotion['source_target_ref'];
 		$original_active = '' !== $source && is_plugin_active( $source );
 		$valid           = validate_plugin( $destination );
 		if ( is_wp_error( $valid ) ) {
@@ -140,12 +139,12 @@ final class Promotion_Service {
 			]
 		);
 		return [
-			'status'               => $status,
-			'plugin_file'          => $destination,
-			'active'               => true,
-			'original_plugin_file' => $source ?: null,
-			'original_active'      => false,
-			'side_effect_warning'  => __( 'Activation and deactivation may have database or runtime side effects that file rollback cannot undo.', 'wp-autoplugin' ),
+			'status'              => $status,
+			'target_ref'          => $destination,
+			'active'              => true,
+			'original_target_ref' => $source ?: null,
+			'original_active'     => false,
+			'side_effect_warning' => __( 'Activation and deactivation may have database or runtime side effects that file rollback cannot undo.', 'wp-autoplugin' ),
 		];
 	}
 
@@ -298,7 +297,7 @@ final class Promotion_Service {
 		);
 		return [
 			'status'             => 'completed',
-			'plugin_file'        => (string) $workspace['target_ref'],
+			'target_ref'         => (string) $workspace['target_ref'],
 			'active'             => $active,
 			'rollback_available' => true,
 			'warning'            => __( 'Upstream updates remain enabled and may overwrite these changes. Rollback restores files only.', 'wp-autoplugin' ),
@@ -315,11 +314,11 @@ final class Promotion_Service {
 			return $filesystem;
 		}
 		$repository = new Release_Repository();
-		if ( 'modify_original' !== $promotion['mode'] || 'completed' !== $promotion['status'] || ! $repository->is_latest_in_place( (int) $promotion['id'], (string) $promotion['destination_plugin_file'] ) ) {
+		if ( 'modify_original' !== $promotion['mode'] || 'completed' !== $promotion['status'] || ! $repository->is_latest_in_place( (int) $promotion['id'], (string) $promotion['destination_target_ref'] ) ) {
 			return new \WP_Error( 'promotion_rollback_state', __( 'Only the latest successful direct modification can be rolled back.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		$builder = new Package_Builder();
-		$root    = $builder->target_root( (string) $promotion['destination_plugin_file'] );
+		$root    = $builder->target_root( (string) $promotion['destination_target_ref'] );
 		if ( is_wp_error( $root ) ) {
 			return $root;
 		}
@@ -359,10 +358,10 @@ final class Promotion_Service {
 			]
 		);
 		return [
-			'status'      => 'rolled_back',
-			'plugin_file' => $promotion['destination_plugin_file'],
-			'active'      => $active,
-			'warning'     => __( 'Files were restored. Database and runtime side effects were not reverted.', 'wp-autoplugin' ),
+			'status'     => 'rolled_back',
+			'target_ref' => $promotion['destination_target_ref'],
+			'active'     => $active,
+			'warning'    => __( 'Files were restored. Database and runtime side effects were not reverted.', 'wp-autoplugin' ),
 		];
 	}
 

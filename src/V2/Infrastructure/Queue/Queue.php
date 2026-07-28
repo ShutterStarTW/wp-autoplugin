@@ -6,7 +6,7 @@ use WP_Autoplugin\V2\Domain\AI\Agent_Task;
 use WP_Autoplugin\V2\Infrastructure\Database\Agent_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Code_Run_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 
 /**
  * Enqueues short job-runner callbacks outside the originating request.
@@ -46,10 +46,10 @@ final class Queue {
 			$this->dispatch( $args[0], $args[1], true );
 			$jobs->event( $args[0], 'code_recovered', __( 'Recovered a stalled Code generation continuation.', 'wp-autoplugin' ), [ 'generation' => $args[1] ], 'warning' );
 		}
-		$workspaces = new Workspace_Repository();
+		$workspaces = new Project_Repository();
 		$before     = gmdate( 'Y-m-d H:i:s', time() - self::STALE_AFTER );
 		foreach ( $jobs->active_before( $before ) as $job ) {
-			$this->reconcile_abandoned_job( $job, $workspaces->find( (int) $job['workspace_id'] ) );
+			$this->reconcile_abandoned_job( $job, $workspaces->find( (int) $job['project_id'] ) );
 		}
 	}
 
@@ -62,7 +62,7 @@ final class Queue {
 		if ( false === $updated || $updated > time() - self::STALE_AFTER ) {
 			return $job;
 		}
-		$workspace ??= ( new Workspace_Repository() )->find( (int) $job['workspace_id'] );
+		$workspace ??= ( new Project_Repository() )->find( (int) $job['project_id'] );
 		if ( Job_Repository::is_code_work( $job ) || ( $workspace && Agent_Task::uses_source_tools( $job, $workspace ) ) ) {
 			return $job;
 		}

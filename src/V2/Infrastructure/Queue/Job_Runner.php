@@ -6,7 +6,8 @@ use WP_Autoplugin\V2\Domain\AI\Agent_Task;
 use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Agent_Run_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Code_Run_Repository;
-use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Plan_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 
 /**
  * Executes one bounded job and persists every terminal state.
@@ -18,9 +19,9 @@ final class Job_Runner {
 
 	public function run( int $job_id, int $generation = 0 ): void {
 		$jobs         = new Job_Repository();
-		$workspaces   = new Workspace_Repository();
+		$workspaces   = new Project_Repository();
 		$job          = $jobs->find( $job_id );
-		$workspace    = $job ? $workspaces->find( (int) $job['workspace_id'] ) : null;
+		$workspace    = $job ? $workspaces->find( (int) $job['project_id'] ) : null;
 		$is_agent_job = $job && $workspace && Agent_Task::uses_source_tools( $job, $workspace );
 		$is_resumable = $is_agent_job || ( $job && Job_Repository::is_code_work( $job ) );
 
@@ -121,18 +122,31 @@ final class Job_Runner {
 				return;
 			}
 
+			$plugin_name = is_string( $result['structured']['plugin_name'] ?? null )
+				? trim( $result['structured']['plugin_name'] )
+				: '';
+			$stored_result = $result;
+			if ( 'plan' === Agent_Task::stage( $job ) && 'artifact' === ( $result['outcome'] ?? '' ) ) {
+				$plans         = new Plan_Repository();
+				$plan          = $plans->create_artifact(
+					(int) $job['project_id'],
+					$job_id,
+					$result,
+					(int) $job['created_by'],
+					(int) ( $job['payload']['plan_id'] ?? 0 )
+				);
+				$stored_result = $plans->compact_job_result( $result, (int) $plan['id'] );
+			}
+
 			$jobs->update(
 				$job_id,
 				[
 					'status'      => 'completed',
 					'progress'    => 100,
-					'result'      => $result,
+					'result'      => $stored_result,
 					'finished_at' => current_time( 'mysql', true ),
 				]
 			);
-			$plugin_name = is_string( $result['structured']['plugin_name'] ?? null )
-				? trim( $result['structured']['plugin_name'] )
-				: '';
 			if (
 				$workspace
 				&& 'new_plugin' === ( $workspace['target_kind'] ?? '' )

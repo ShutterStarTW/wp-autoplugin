@@ -10,7 +10,7 @@ final class Plan_Response {
 	/**
 	 * @return array<string, mixed>|\WP_Error
 	 */
-	public function parse( string $response, bool $follow_up = false, int $parent_job_id = 0, string $operation = '' ) {
+	public function parse( string $response, bool $follow_up = false, int $parent_plan_id = 0, string $operation = '' ) {
 		$decoded = json_decode( Json_Response::strip_fence( $response ), true );
 		$outcome = is_array( $decoded ) ? (string) ( $decoded['outcome'] ?? '' ) : '';
 		$content = is_array( $decoded ) && is_string( $decoded['content'] ?? null ) ? trim( $decoded['content'] ) : '';
@@ -64,9 +64,9 @@ final class Plan_Response {
 		];
 		if ( $follow_up ) {
 			$result['artifact'] = [
-				'type'          => 'plan',
-				'content'       => $content,
-				'parent_job_id' => $parent_job_id,
+				'type'           => 'plan',
+				'content'        => $content,
+				'parent_plan_id' => $parent_plan_id,
 			];
 		}
 

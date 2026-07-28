@@ -37,15 +37,13 @@ final class Usage_Repository extends Repository {
 	public function summary_for_project( int $project_id ): array {
 		$usage      = Installer::table( 'usage' );
 		$jobs       = Installer::table( 'jobs' );
-		$workspaces = Installer::table( 'workspaces' );
 		$model_rows = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				"SELECT u.provider, u.model, COUNT(DISTINCT u.job_id) AS job_count,
 					SUM(u.input_tokens) AS input_tokens, SUM(u.output_tokens) AS output_tokens
 				FROM $usage u
 				INNER JOIN $jobs j ON j.id = u.job_id
-				INNER JOIN $workspaces w ON w.id = j.workspace_id
-				WHERE w.project_id = %d
+				WHERE j.project_id = %d
 				GROUP BY u.provider, u.model
 				ORDER BY (SUM(u.input_tokens) + SUM(u.output_tokens)) DESC, u.provider ASC, u.model ASC",
 				$project_id
@@ -59,8 +57,7 @@ final class Usage_Repository extends Repository {
 					SUM(u.input_tokens) AS input_tokens, SUM(u.output_tokens) AS output_tokens
 				FROM $usage u
 				INNER JOIN $jobs j ON j.id = u.job_id
-				INNER JOIN $workspaces w ON w.id = j.workspace_id
-				WHERE w.project_id = %d
+				WHERE j.project_id = %d
 				GROUP BY j.id, j.task, j.status, j.payload, j.created_at, j.started_at, j.finished_at,
 					u.task, u.provider, u.model
 				ORDER BY j.id DESC, u.provider ASC, u.model ASC, u.task ASC",

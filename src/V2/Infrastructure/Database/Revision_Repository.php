@@ -8,7 +8,7 @@ use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 /** Persists and reads immutable validated staged revisions. */
 final class Revision_Repository extends Repository {
 	/** Atomically stage a completed Code run and scrub its temporary source. */
-	public function stage_code_run( array $run, array $manifest, int $workspace_id, int $user_id, ?int $expected_latest_revision_id, array $source_files = [] ) {
+	public function stage_code_run( array $run, array $manifest, int $project_id, int $user_id, ?int $expected_latest_revision_id, array $source_files = [] ) {
 		$run_files = ( new Code_Run_Repository( $this->wpdb ) )->files( (int) $run['id'] );
 		$source    = [];
 		foreach ( $source_files as $file ) {
@@ -43,7 +43,7 @@ final class Revision_Repository extends Repository {
 
 		$this->wpdb->query( 'START TRANSACTION' );
 		try {
-			$latest = $this->locked_latest_id( $workspace_id );
+			$latest = $this->locked_latest_id( $project_id );
 			if ( $latest !== $expected_latest_revision_id ) {
 				$this->wpdb->query( 'ROLLBACK' );
 				return $this->conflict();
@@ -52,13 +52,13 @@ final class Revision_Repository extends Repository {
 				? __( 'AI-generated target changes.', 'wp-autoplugin' )
 				: ( 'hook_extension' === ( $manifest['operation'] ?? '' ) ? __( 'AI-generated extension plugin code.', 'wp-autoplugin' ) : __( 'AI-generated plugin code.', 'wp-autoplugin' ) );
 			$revision    = $this->insert_complete(
-				$workspace_id,
+				$project_id,
 				$files,
 				$summary,
 				$user_id,
-				[
-					'origin'             => 'ai',
-					'plan_job_id'        => (int) $run['plan_job_id'],
+					[
+						'origin'             => 'ai',
+						'plan_id'            => (int) $run['plan_id'],
 					'source_job_id'      => (int) $run['job_id'],
 					'parent_revision_id' => $run['parent_revision_id'],
 				],
@@ -98,7 +98,7 @@ final class Revision_Repository extends Repository {
 	 * @param array<string, mixed>             $manifest Normalized desired manifest.
 	 * @param array<int, array<string, mixed>> $files    Complete merged project.
 	 */
-	public function stage_code_follow_up( array $run, array $manifest, array $files, int $workspace_id, int $user_id, int $expected_latest_revision_id, string $summary, string $origin = 'ai' ) {
+	public function stage_code_follow_up( array $run, array $manifest, array $files, int $project_id, int $user_id, int $expected_latest_revision_id, string $summary, string $origin = 'ai' ) {
 		$issues = ( new Code_Validator() )->project_issues( $files, $manifest );
 		if ( $issues ) {
 			return new \WP_Error(
@@ -113,18 +113,18 @@ final class Revision_Repository extends Repository {
 
 		$this->wpdb->query( 'START TRANSACTION' );
 		try {
-			if ( $this->locked_latest_id( $workspace_id ) !== $expected_latest_revision_id ) {
+			if ( $this->locked_latest_id( $project_id ) !== $expected_latest_revision_id ) {
 				$this->wpdb->query( 'ROLLBACK' );
 				return $this->conflict();
 			}
 			$revision    = $this->insert_complete(
-				$workspace_id,
+				$project_id,
 				array_map( [ $this, 'normalize_file' ], $files ),
 				$summary,
 				$user_id,
-				[
-					'origin'             => in_array( $origin, [ 'ai', 'review_fix' ], true ) ? $origin : 'ai',
-					'plan_job_id'        => (int) $run['plan_job_id'],
+					[
+						'origin'             => in_array( $origin, [ 'ai', 'review_fix' ], true ) ? $origin : 'ai',
+						'plan_id'            => (int) $run['plan_id'],
 					'source_job_id'      => (int) $run['job_id'],
 					'parent_revision_id' => $expected_latest_revision_id,
 				],
@@ -158,7 +158,7 @@ final class Revision_Repository extends Repository {
 	}
 
 	/** @return array<int, array<string, mixed>> */
-	public function list_for_workspace( int $workspace_id ): array {
+	public function list_for_workspace( int $project_id ): array {
 		$revisions = Installer::table( 'revisions' );
 		$files     = Installer::table( 'revision_files' );
 		$rows      = $this->wpdb->get_results(
@@ -167,9 +167,9 @@ final class Revision_Repository extends Repository {
 				SUM(CASE WHEN f.change_type = 'add' THEN 1 ELSE 0 END) AS adds,
 				SUM(CASE WHEN f.change_type = 'update' THEN 1 ELSE 0 END) AS updates,
 				SUM(CASE WHEN f.change_type = 'delete' THEN 1 ELSE 0 END) AS deletes
-				FROM $revisions r LEFT JOIN $files f ON f.revision_id = r.id WHERE r.workspace_id = %d
+				FROM $revisions r LEFT JOIN $files f ON f.revision_id = r.id WHERE r.project_id = %d
 				GROUP BY r.id ORDER BY r.revision_number DESC",
-				$workspace_id
+				$project_id
 			), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed tables.
 			ARRAY_A
 		);
@@ -183,9 +183,9 @@ final class Revision_Repository extends Repository {
 		);
 	}
 
-	public function latest_id( int $workspace_id ): ?int {
+	public function latest_id( int $project_id ): ?int {
 		$id = $this->wpdb->get_var(
-			$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'revisions' ) . ' WHERE workspace_id = %d ORDER BY revision_number DESC LIMIT 1', $workspace_id )
+			$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'revisions' ) . ' WHERE project_id = %d ORDER BY revision_number DESC LIMIT 1', $project_id )
 		);
 		return $id ? (int) $id : null;
 	}
@@ -201,7 +201,7 @@ final class Revision_Repository extends Repository {
 		}
 		$revision                           = $this->hydrate_summary( $revision );
 		$effective_manifest                 = $this->revision_manifest( $revision );
-		$plan_manifest                      = $this->plan_manifest( (int) ( $revision['plan_job_id'] ?? 0 ) );
+		$plan_manifest                      = $this->plan_manifest( (int) ( $revision['plan_id'] ?? 0 ) );
 		$revision['project_manifest']       = is_wp_error( $effective_manifest ) ? null : $effective_manifest;
 		$revision['plan_structure_matches'] = ! is_wp_error( $effective_manifest ) && ! is_wp_error( $plan_manifest ) && $this->same_structure( $effective_manifest, $plan_manifest );
 		$files                              = $this->wpdb->get_results(
@@ -274,7 +274,7 @@ final class Revision_Repository extends Repository {
 	 */
 	public function save_successor( int $base_revision_id, int $expected_latest_revision_id, array $changes, int $user_id ) {
 		$base = $this->find( $base_revision_id );
-		if ( ! $base || $base_revision_id !== $expected_latest_revision_id || $this->latest_id( (int) $base['workspace_id'] ) !== $expected_latest_revision_id ) {
+		if ( ! $base || $base_revision_id !== $expected_latest_revision_id || $this->latest_id( (int) $base['project_id'] ) !== $expected_latest_revision_id ) {
 			return $this->conflict();
 		}
 		$changed = [];
@@ -313,7 +313,7 @@ final class Revision_Repository extends Repository {
 			if ( 'changes' !== ( $manifest['scope'] ?? '' ) || count( $manifest['files'] ) + count( $changed ) > Code_Validator::MAX_FILES ) {
 				return new \WP_Error( 'revision_topology_change', __( 'This Code slice does not allow files to be added, removed, renamed, or moved.', 'wp-autoplugin' ), [ 'status' => 422 ] );
 			}
-			$workspace = ( new Workspace_Repository( $this->wpdb ) )->find( (int) $base['workspace_id'] );
+			$workspace = ( new Project_Repository( $this->wpdb ) )->find( (int) $base['project_id'] );
 			try {
 				$tools = new Source_Tools( (array) ( $workspace['target_metadata'] ?? [] ) );
 			} catch ( \Throwable $error ) {
@@ -365,13 +365,13 @@ final class Revision_Repository extends Repository {
 		}
 
 		return $this->create_complete(
-			(int) $base['workspace_id'],
+			(int) $base['project_id'],
 			$files,
 			__( 'Administrator code edit.', 'wp-autoplugin' ),
 			$user_id,
 			[
 				'origin'             => 'manual',
-				'plan_job_id'        => (int) $base['plan_job_id'],
+				'plan_id'        => (int) $base['plan_id'],
 				'parent_revision_id' => $base_revision_id,
 			],
 			$expected_latest_revision_id,
@@ -383,7 +383,7 @@ final class Revision_Repository extends Repository {
 	/** Restore historical contents by copying them into a new immutable successor. */
 	public function restore( int $selected_revision_id, int $expected_latest_revision_id, int $user_id ) {
 		$selected = $this->find( $selected_revision_id );
-		if ( ! $selected || $this->latest_id( (int) $selected['workspace_id'] ) !== $expected_latest_revision_id ) {
+		if ( ! $selected || $this->latest_id( (int) $selected['project_id'] ) !== $expected_latest_revision_id ) {
 			return $this->conflict();
 		}
 		if ( $selected_revision_id === $expected_latest_revision_id ) {
@@ -416,13 +416,13 @@ final class Revision_Repository extends Repository {
 			);
 		}
 		return $this->create_complete(
-			(int) $selected['workspace_id'],
+			(int) $selected['project_id'],
 			$files,
 			__( 'Restored historical revision.', 'wp-autoplugin' ),
 			$user_id,
 			[
 				'origin'                    => 'restore',
-				'plan_job_id'               => (int) $selected['plan_job_id'],
+				'plan_id'               => (int) $selected['plan_id'],
 				'parent_revision_id'        => $expected_latest_revision_id,
 				'restored_from_revision_id' => $selected_revision_id,
 			],
@@ -436,7 +436,7 @@ final class Revision_Repository extends Repository {
 	 * @param array<int, array<string, mixed>> $files
 	 * @param array<string, mixed>             $provenance
 	 */
-	private function create_complete( int $workspace_id, array $files, string $summary, int $user_id, array $provenance, ?int $expected_latest_revision_id, bool $enforce_expected = true, ?array $project_manifest = null ) {
+	private function create_complete( int $project_id, array $files, string $summary, int $user_id, array $provenance, ?int $expected_latest_revision_id, bool $enforce_expected = true, ?array $project_manifest = null ) {
 		$files = array_map( [ $this, 'normalize_file' ], $files );
 		$paths = array_column( $files, 'path' );
 		if ( ! $files || count( $paths ) !== count( array_unique( $paths ) ) ) {
@@ -445,18 +445,18 @@ final class Revision_Repository extends Repository {
 		$this->wpdb->query( 'START TRANSACTION' );
 		try {
 			$this->wpdb->get_var(
-				$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'workspaces' ) . ' WHERE id = %d FOR UPDATE', $workspace_id )
+				$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'projects' ) . ' WHERE id = %d FOR UPDATE', $project_id )
 			);
-			if ( ( new Job_Repository( $this->wpdb ) )->has_active_artifact_work( $workspace_id ) ) {
+			if ( ( new Job_Repository( $this->wpdb ) )->has_active_artifact_work( $project_id ) ) {
 				$this->wpdb->query( 'ROLLBACK' );
 				return new \WP_Error( 'artifact_work_active', __( 'Wait for active Code, Review, or Release work to finish before changing revision history.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 			}
-			$latest = $this->locked_latest_id( $workspace_id );
+			$latest = $this->locked_latest_id( $project_id );
 			if ( $enforce_expected && $latest !== $expected_latest_revision_id ) {
 				$this->wpdb->query( 'ROLLBACK' );
 				return $this->conflict();
 			}
-			$revision = $this->insert_complete( $workspace_id, $files, $summary, $user_id, $provenance, $project_manifest );
+			$revision = $this->insert_complete( $project_id, $files, $summary, $user_id, $provenance, $project_manifest );
 			$this->wpdb->query( 'COMMIT' );
 			return $revision;
 		} catch ( \Throwable $error ) {
@@ -466,21 +466,20 @@ final class Revision_Repository extends Repository {
 	}
 
 	/** @param array<int, array<string, mixed>> $files @param array<string, mixed> $provenance */
-	private function insert_complete( int $workspace_id, array $files, string $summary, int $user_id, array $provenance, ?array $project_manifest = null ): array {
+	private function insert_complete( int $project_id, array $files, string $summary, int $user_id, array $provenance, ?array $project_manifest = null ): array {
 		$revisions = Installer::table( 'revisions' );
 		$number    = (int) $this->wpdb->get_var(
-			$this->wpdb->prepare( "SELECT COALESCE(MAX(revision_number), 0) + 1 FROM $revisions WHERE workspace_id = %d", $workspace_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
+			$this->wpdb->prepare( "SELECT COALESCE(MAX(revision_number), 0) + 1 FROM $revisions WHERE project_id = %d", $project_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
 		);
 		$now       = $this->now();
 		$this->wpdb->insert(
 			$revisions,
 			[
-				'workspace_id'              => $workspace_id,
+				'project_id'              => $project_id,
 				'revision_number'           => $number,
-				'status'                    => 'staged',
 				'summary'                   => $summary,
 				'origin'                    => sanitize_key( (string) ( $provenance['origin'] ?? 'ai' ) ),
-				'plan_job_id'               => $provenance['plan_job_id'] ?? null,
+				'plan_id'                   => $provenance['plan_id'] ?? null,
 				'source_job_id'             => $provenance['source_job_id'] ?? null,
 				'parent_revision_id'        => $provenance['parent_revision_id'] ?? null,
 				'restored_from_revision_id' => $provenance['restored_from_revision_id'] ?? null,
@@ -501,7 +500,6 @@ final class Revision_Repository extends Repository {
 					'path'              => $file['path'],
 					'change_type'       => $file['change_type'],
 					'content'           => $file['content'],
-					'patch'             => null,
 					'content_hash'      => hash( 'sha256', $file['content'] ),
 					'base_content'      => $file['base_content'],
 					'base_content_hash' => $file['base_content_hash'],
@@ -511,28 +509,25 @@ final class Revision_Repository extends Repository {
 				throw new \RuntimeException( __( 'Could not persist a complete revision file.', 'wp-autoplugin' ) );
 			}
 		}
-		$workspace_updated = $this->wpdb->update(
-			Installer::table( 'workspaces' ),
-			[
-				'status'     => 'staged',
-				'updated_at' => $now,
-			],
-			[ 'id' => $workspace_id ]
+		$project_updated = $this->wpdb->update(
+			Installer::table( 'projects' ),
+			[ 'updated_at' => $now ],
+			[ 'id' => $project_id ]
 		);
-		if ( false === $workspace_updated ) {
-			throw new \RuntimeException( __( 'Could not mark the workspace staged.', 'wp-autoplugin' ) );
+		if ( false === $project_updated ) {
+			throw new \RuntimeException( __( 'Could not update the project.', 'wp-autoplugin' ) );
 		}
 		return [
 			'id'              => $revision_id,
 			'revision_number' => $number,
-			'workspace_id'    => $workspace_id,
+			'project_id'      => $project_id,
 			'files_count'     => count( $files ),
 		];
 	}
 
-	private function locked_latest_id( int $workspace_id ): ?int {
+	private function locked_latest_id( int $project_id ): ?int {
 		$id = $this->wpdb->get_var(
-			$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'revisions' ) . ' WHERE workspace_id = %d ORDER BY revision_number DESC LIMIT 1 FOR UPDATE', $workspace_id )
+			$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'revisions' ) . ' WHERE project_id = %d ORDER BY revision_number DESC LIMIT 1 FOR UPDATE', $project_id )
 		);
 		return $id ? (int) $id : null;
 	}
@@ -553,13 +548,14 @@ final class Revision_Repository extends Repository {
 		);
 	}
 
-	private function plan_manifest( int $plan_job_id ) {
-		$plan = ( new Job_Repository( $this->wpdb ) )->find( $plan_job_id );
-		if ( ! $plan || ! ( new Job_Repository( $this->wpdb ) )->is_plan_artifact( $plan ) ) {
+	private function plan_manifest( int $plan_id ) {
+		$plans = new Plan_Repository( $this->wpdb );
+		$plan  = $plans->find( $plan_id );
+		if ( ! $plan || ! $plans->is_ready( $plan ) ) {
 			return new \WP_Error( 'revision_plan_missing', __( 'The revision Plan artifact is unavailable.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
-		$workspace = ( new Workspace_Repository( $this->wpdb ) )->find( (int) $plan['workspace_id'] );
-		$manifest  = ( new Code_Validator() )->plan( (array) ( $plan['result']['structured'] ?? [] ), $workspace ?: [] );
+		$workspace = ( new Project_Repository( $this->wpdb ) )->find( (int) $plan['project_id'] );
+		$manifest  = ( new Code_Validator() )->plan( (array) ( $plan['structured'] ?? [] ), $workspace ?: [] );
 		if ( is_wp_error( $manifest ) ) {
 			$manifest->add_data( [ 'status' => 409 ] );
 		}
@@ -578,7 +574,7 @@ final class Revision_Repository extends Repository {
 				return $manifest;
 			}
 		}
-		return $this->plan_manifest( (int) ( $revision['plan_job_id'] ?? 0 ) );
+		return $this->plan_manifest( (int) ( $revision['plan_id'] ?? 0 ) );
 	}
 
 	/** Compare topology without allowing generated prose descriptions to affect divergence. */
@@ -630,7 +626,7 @@ final class Revision_Repository extends Repository {
 
 	/** @param array<string, mixed> $row */
 	private function hydrate_summary( array $row ): array {
-		foreach ( [ 'id', 'workspace_id', 'revision_number', 'created_by', 'plan_job_id', 'source_job_id', 'parent_revision_id', 'restored_from_revision_id', 'files_count', 'aggregate_size', 'adds', 'updates', 'deletes' ] as $field ) {
+		foreach ( [ 'id', 'project_id', 'revision_number', 'created_by', 'plan_id', 'source_job_id', 'parent_revision_id', 'restored_from_revision_id', 'files_count', 'aggregate_size', 'adds', 'updates', 'deletes' ] as $field ) {
 			if ( array_key_exists( $field, $row ) ) {
 				$row[ $field ] = null === $row[ $field ] ? null : (int) $row[ $field ];
 			}
