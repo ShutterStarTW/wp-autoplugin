@@ -1,6 +1,7 @@
 <?php
 /**
  * Plugin Name: WP-Autoplugin
+ * Plugin URI: https://wp-autoplugin.com
  * Description: A plugin that generates other plugins on-demand using AI.
  * Version: 2.0.0-dev
  * Requires at least: 6.6

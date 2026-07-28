@@ -1,643 +1,527 @@
 <?php
 /**
- * GitHub Updater
+ * GitHub-backed plugin updates.
  *
- * This is a modified version of the WP_GitHub_Updater class originally created by Joachim Kudish.
- *
- * @version 1.8
- * @author WP-Autoplugin
- * @link https://wp-autoplugin.com
- * @package WP-Autoplugin
- *
- * Based on WP_GitHub_Updater by Joachim Kudish
- * @link https://github.com/jkudish/WP-GitHub-Plugin-Updater
- * @license http://www.gnu.org/copyleft/gpl.html GNU Public License
+ * @package WP_Autoplugin
  */
 
 namespace WP_Autoplugin\V2\Infrastructure\Update;
 
-// Exit if accessed directly.
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-
 /**
- * GitHub Updater class.
+ * Supplies WordPress with update metadata from an immutable GitHub commit.
  */
-class GitHub_Updater {
+final class GitHub_Updater {
+	private const HTTP_TIMEOUT       = 10;
+	private const MAX_API_BYTES      = 65536;
+	private const MAX_SOURCE_BYTES   = 1048576;
+	private const PLUGIN_HEADER_SIZE = 8192;
 
 	/**
-	 * Updater version.
+	 * Absolute path to the plugin's main file.
 	 *
 	 * @var string
 	 */
-	const VERSION = '1.8';
+	private string $plugin_file;
 
 	/**
-	 * Configuration parameters.
+	 * Plugin path relative to the plugins directory.
 	 *
-	 * @var array
+	 * @var string
 	 */
-	public $config = [];
+	private string $plugin_basename;
 
 	/**
-	 * Missing configuration.
+	 * Installed plugin directory name.
 	 *
-	 * @var array
+	 * @var string
 	 */
-	public $missing_config = [];
+	private string $folder;
 
 	/**
-	 * GitHub data.
+	 * GitHub owner and repository pair.
 	 *
-	 * @var object|null
+	 * @var string
 	 */
-	private $github_data = null;
+	private string $repository;
 
 	/**
-	 * Set up the updater.
+	 * Stable plugin identity used by WordPress update checks.
 	 *
-	 * @param array $config Configuration parameters.
+	 * @var string
 	 */
-	public function __construct( $config = [] ) {
+	private string $update_uri;
 
-		$defaults = [
-			'slug'               => plugin_basename( __FILE__ ),
-			'proper_folder_name' => dirname( plugin_basename( __FILE__ ) ),
-			'sslverify'          => true,
-		];
+	/**
+	 * Hostname-derived WordPress update filter suffix.
+	 *
+	 * @var string
+	 */
+	private string $update_host;
 
-		$this->config = wp_parse_args( $config, $defaults );
+	/**
+	 * Whether this instance has registered its hooks.
+	 *
+	 * @var bool
+	 */
+	private bool $registered = false;
 
-		// Sanitize inputs.
-		$this->config['slug']               = sanitize_text_field( $this->config['slug'] );
-		$this->config['proper_folder_name'] = sanitize_text_field( $this->config['proper_folder_name'] );
-		$this->config['github_url']         = isset( $this->config['github_url'] ) ? esc_url_raw( $this->config['github_url'] ) : '';
-		$this->config['raw_url']            = isset( $this->config['raw_url'] ) ? esc_url_raw( $this->config['raw_url'] ) : '';
-		$this->config['zip_url']            = isset( $this->config['zip_url'] ) ? esc_url_raw( $this->config['zip_url'] ) : '';
+	/**
+	 * Request-local remote metadata memoization.
+	 *
+	 * @var array<string, string>|false|null
+	 */
+	private $remote_metadata = null;
 
-		if ( ! $this->has_minimum_config() ) {
-			$message  = 'The GitHub Updater was initialized without the minimum required configuration, please check the config in your plugin. The following params are missing: ';
-			$message .= implode( ',', $this->missing_config );
-			_doing_it_wrong( __CLASS__, esc_html( $message ), esc_html( self::VERSION ) );
+	/**
+	 * Configure a GitHub update channel.
+	 *
+	 * @param string $plugin_file Absolute path to the plugin's main file.
+	 * @param string $repository  GitHub owner and repository pair.
+	 * @param string $update_uri  Stable Update URI from the plugin header.
+	 *
+	 * @throws \InvalidArgumentException When repository or update configuration is invalid.
+	 */
+	public function __construct( string $plugin_file, string $repository, string $update_uri ) {
+		$plugin_basename = plugin_basename( $plugin_file );
+		$folder          = dirname( $plugin_basename );
+		$update_host     = wp_parse_url( $update_uri, PHP_URL_HOST );
+
+		if (
+			! is_file( $plugin_file )
+			|| '.' === $folder
+			|| ! preg_match( '#^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$#', $repository )
+			|| ! is_string( $update_host )
+			|| '' === $update_host
+			|| 'https' !== wp_parse_url( $update_uri, PHP_URL_SCHEME )
+		) {
+			throw new \InvalidArgumentException( 'Invalid GitHub updater configuration.' );
+		}
+
+		$this->plugin_file     = wp_normalize_path( $plugin_file );
+		$this->plugin_basename = $plugin_basename;
+		$this->folder          = $folder;
+		$this->repository      = $repository;
+		$this->update_uri      = $update_uri;
+		$this->update_host     = strtolower( $update_host );
+	}
+
+	/**
+	 * Register update hooks without performing network requests.
+	 */
+	public function register(): void {
+		if ( $this->registered ) {
 			return;
 		}
 
-		$this->set_defaults();
-
-		add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'api_check' ] );
-		add_filter( 'plugins_api', [ $this, 'get_plugin_info' ], 10, 3 );
-		add_filter( 'upgrader_post_install', [ $this, 'upgrader_post_install' ], 10, 3 );
-
-		// Optionally override the plugin details modal with a simple message.
-		if ( ! empty( $this->config['override_modal_with_message'] ) ) {
-			add_action( 'install_plugins_pre_plugin-information', [ $this, 'pre_plugin_information' ] );
-		}
+		add_filter( 'update_plugins_' . $this->update_host, [ $this, 'filter_update' ], 10, 3 );
+		add_filter( 'plugins_api', [ $this, 'filter_plugin_information' ], 10, 3 );
+		add_filter( 'upgrader_source_selection', [ $this, 'normalize_package_source' ], 10, 4 );
+		$this->registered = true;
 	}
 
 	/**
-	 * Check if the required configuration parameters are set.
+	 * Return an update payload for this plugin's Update URI.
 	 *
-	 * @return bool
+	 * @param array<string, mixed>|false $update      Existing update response.
+	 * @param array<string, mixed>       $plugin_data Installed plugin headers.
+	 * @param string                     $plugin_file Installed plugin basename.
+	 * @return array<string, mixed>|false
 	 */
-	public function has_minimum_config() {
-		$this->missing_config = [];
-
-		$required_config_params = [
-			'api_url',
-			'raw_url',
-			'github_url',
-			'zip_url',
-			'requires',
-			'tested',
-		];
-
-		foreach ( $required_config_params as $required_param ) {
-			if ( empty( $this->config[ $required_param ] ) ) {
-				$this->missing_config[] = $required_param;
-			}
+	public function filter_update( $update, array $plugin_data, string $plugin_file ) {
+		if (
+			$this->plugin_basename !== $plugin_file
+			|| $this->update_uri !== ( $plugin_data['UpdateURI'] ?? '' )
+		) {
+			return $update;
 		}
 
-		return ( empty( $this->missing_config ) );
-	}
-
-	/**
-	 * Whether to overrule transients and call API on every page load.
-	 *
-	 * @return bool
-	 */
-	public function overrule_transients() {
-		return ( defined( 'WP_GITHUB_FORCE_UPDATE' ) && WP_GITHUB_FORCE_UPDATE );
-	}
-
-	/**
-	 * Set default values for the configuration parameters.
-	 *
-	 * @return void
-	 */
-	public function set_defaults() {
-		if ( ! isset( $this->config['new_version'] ) ) {
-			$this->config['new_version'] = $this->get_new_version();
-		}
-
-		if ( ! isset( $this->config['last_updated'] ) ) {
-			$this->config['last_updated'] = $this->get_date();
-		}
-
-		// Keep a short text fallback from GitHub API for description.
-		if ( ! isset( $this->config['description'] ) ) {
-			$this->config['description'] = $this->get_description_text_from_github();
-		}
-
-		// Default readme file to probe when fetching sections.
-		if ( empty( $this->config['readme'] ) ) {
-			$this->config['readme'] = 'readme.txt';
-		}
-
-		$plugin_data = $this->get_plugin_data();
-		if ( ! isset( $this->config['plugin_name'] ) ) {
-			$this->config['plugin_name'] = $plugin_data['Name'];
-		}
-
-		if ( ! isset( $this->config['version'] ) ) {
-			$this->config['version'] = $plugin_data['Version'];
-		}
-
-		if ( ! isset( $this->config['author'] ) ) {
-			$this->config['author'] = $plugin_data['Author'];
-		}
-
-		if ( ! isset( $this->config['homepage'] ) ) {
-			$this->config['homepage'] = $plugin_data['PluginURI'];
-		}
-	}
-
-	/**
-	 * Get the HTTP request timeout.
-	 *
-	 * @return int
-	 */
-	public function http_request_timeout() {
-		return (int) apply_filters( 'github_updater_http_timeout', 5 );
-	}
-
-	/**
-	 * Set the SSL verification for the HTTP request.
-	 *
-	 * @param array  $args HTTP request arguments.
-	 * @param string $url  URL.
-	 *
-	 * @return array
-	 */
-	public function http_request_sslverify( $args, $url ) {
-		if ( isset( $this->config['zip_url'] ) && $this->config['zip_url'] === $url ) {
-			$args['sslverify'] = (bool) $this->config['sslverify'];
-		}
-		return $args;
-	}
-
-	/**
-	 * Get the new version number for the plugin.
-	 *
-	 * @return string|bool
-	 */
-	public function get_new_version() {
-		$version = get_site_transient( md5( $this->config['slug'] ) . '_new_version' );
-
-		if ( $this->overrule_transients() || ( ! isset( $version ) || ! $version || '' === $version ) ) {
-			$raw_response = $this->remote_get( trailingslashit( $this->config['raw_url'] ) . basename( $this->config['slug'] ) );
-
-			if ( is_wp_error( $raw_response ) ) {
-				$version = false;
-			}
-
-			if ( is_array( $raw_response ) && ! empty( $raw_response['body'] ) ) {
-				preg_match( '/.*Version\:\s*(.*)$/mi', $raw_response['body'], $matches );
-			}
-
-			$version = ! empty( $matches[1] ) ? trim( $matches[1] ) : false;
-
-			// Backward compatibility for README version checking.
-			if ( false === $version ) {
-				$raw_response = $this->remote_get( trailingslashit( $this->config['raw_url'] ) . ltrim( $this->config['readme'], '/' ) );
-
-				if ( ! is_wp_error( $raw_response ) && ! empty( $raw_response['body'] ) ) {
-					preg_match( '#^\s*`*~Current Version\:\s*([^~]*)~#im', $raw_response['body'], $__version );
-					if ( isset( $__version[1] ) && -1 === version_compare( $version, $__version[1] ) ) {
-						$version = trim( $__version[1] );
-					}
-				}
-			}
-
-			$transient_expiration = (int) apply_filters( 'github_updater_transient_expiration', 6 * HOUR_IN_SECONDS );
-			if ( false !== $version ) {
-				set_site_transient( md5( $this->config['slug'] ) . '_new_version', $version, $transient_expiration );
-			}
-		}
-
-		return $version;
-	}
-
-	/**
-	 * Perform a remote GET request.
-	 *
-	 * @param string $query URL to query.
-	 *
-	 * @return bool|array
-	 */
-	public function remote_get( $query ) {
-		$raw_response = wp_remote_get(
-			$query,
-			[
-				'sslverify' => (bool) $this->config['sslverify'],
-				'timeout'   => $this->http_request_timeout(),
-			]
-		);
-
-		if ( is_wp_error( $raw_response ) || (int) wp_remote_retrieve_response_code( $raw_response ) !== 200 ) {
+		$metadata = $this->get_remote_metadata();
+		if ( false === $metadata ) {
 			return false;
 		}
 
-		return $raw_response;
+		return array_filter(
+			[
+				'id'           => $this->update_uri,
+				'slug'         => $this->folder,
+				'version'      => $metadata['version'],
+				'url'          => $metadata['url'],
+				'package'      => $metadata['package'],
+				'requires'     => $metadata['requires'],
+				'tested'       => $metadata['tested'],
+				'requires_php' => $metadata['requires_php'],
+			],
+			static fn( $value ): bool => '' !== $value
+		);
 	}
 
 	/**
-	 * Fetch the GitHub repo data via API.
+	 * Supply the native plugin-details modal for this non-WordPress.org plugin.
 	 *
-	 * @return object|false
-	 */
-	public function get_github_data() {
-		if ( isset( $this->github_data ) && ! empty( $this->github_data ) ) {
-			return $this->github_data;
-		}
-
-		$github_data = get_site_transient( md5( $this->config['slug'] ) . '_github_data' );
-
-		if ( $this->overrule_transients() || ! isset( $github_data ) || ! $github_data || '' === $github_data ) {
-			$github_data = $this->remote_get( $this->config['api_url'] );
-
-			if ( is_wp_error( $github_data ) || false === $github_data ) {
-				return false;
-			}
-
-			$github_data = json_decode( $github_data['body'] );
-			set_site_transient( md5( $this->config['slug'] ) . '_github_data', $github_data, 6 * HOUR_IN_SECONDS );
-		}
-
-		$this->github_data = $github_data;
-		return $github_data;
-	}
-
-	/**
-	 * Get the date the plugin was last updated.
-	 *
-	 * @return string|bool
-	 */
-	public function get_date() {
-		$_date = $this->get_github_data();
-		return ( ! empty( $_date->updated_at ) ) ? gmdate( 'Y-m-d', strtotime( $_date->updated_at ) ) : false;
-	}
-
-	/**
-	 * Fallback short description from GitHub API description (plain text).
-	 *
-	 * @return string|bool
-	 */
-	public function get_description_text_from_github() {
-		$_description = $this->get_github_data();
-		return ( ! empty( $_description->description ) ) ? (string) $_description->description : false;
-	}
-
-	/**
-	 * Get the plugin data.
-	 *
-	 * @return array
-	 */
-	public function get_plugin_data() {
-		include_once ABSPATH . '/wp-admin/includes/plugin.php';
-		return get_plugin_data( WP_PLUGIN_DIR . '/' . $this->config['slug'] );
-	}
-
-	/**
-	 * Check for updates and inject response for this plugin.
-	 *
-	 * @param object $transient The plugin data transient.
-	 *
-	 * @return object
-	 */
-	public function api_check( $transient ) {
-		if ( empty( $transient->checked ) ) {
-			return $transient;
-		}
-
-		$update = version_compare( $this->config['new_version'], $this->config['version'] );
-
-		if ( 1 === (int) $update ) {
-			$response              = new \stdClass();
-			$response->new_version = $this->config['new_version'];
-			$response->id          = $this->config['slug'];
-			$response->slug        = $this->config['proper_folder_name']; // Folder slug for modal.
-			$response->plugin      = $this->config['slug']; // Plugin basename (folder/main.php).
-			$response->url         = $this->config['github_url'];
-			$response->package     = $this->config['zip_url'];
-
-			$transient->response[ $this->config['slug'] ] = $response;
-		}
-
-		return $transient;
-	}
-
-	/**
-	 * Provide data for the plugin details modal (native ThickBox) via plugins_api.
-	 *
-	 * @param mixed  $result  Default false or data from other filters.
-	 * @param string $action  Action name.
-	 * @param object $args    Request args (expects ->slug = folder slug).
-	 *
+	 * @param mixed  $result Existing API result.
+	 * @param string $action Requested API action.
+	 * @param object $args   API request arguments.
 	 * @return mixed
 	 */
-	public function get_plugin_info( $result, $action, $args ) { // phpcs:ignore
-		if ( 'plugin_information' !== $action ) {
+	public function filter_plugin_information( $result, string $action, object $args ) {
+		if ( 'plugin_information' !== $action || ( $args->slug ?? '' ) !== $this->folder ) {
 			return $result;
 		}
 
-		if ( empty( $args->slug ) || $args->slug !== $this->config['proper_folder_name'] ) {
-			return $result; // Not our plugin.
+		$local    = $this->get_local_plugin_data();
+		$metadata = $this->get_remote_metadata();
+		$remote   = is_array( $metadata ) ? $metadata : [];
+		$sections = [
+			'description' => $remote['description'] ?? wpautop( esc_html( (string) ( $local['Description'] ?? '' ) ) ),
+		];
+		if ( ! empty( $remote['changelog'] ) ) {
+			$sections['changelog'] = $remote['changelog'];
 		}
 
-		$resp = new \stdClass();
+		return (object) array_filter(
+			[
+				'name'          => (string) ( $local['Name'] ?? 'WP-Autoplugin' ),
+				'slug'          => $this->folder,
+				'version'       => (string) ( $remote['version'] ?? $local['Version'] ?? '' ),
+				'author'        => (string) ( $local['AuthorName'] ?? $local['Author'] ?? '' ),
+				'homepage'      => (string) ( $local['PluginURI'] ?? $this->repository_url() ),
+				'requires'      => (string) ( $remote['requires'] ?? $local['RequiresWP'] ?? '' ),
+				'tested'        => (string) ( $remote['tested'] ?? '' ),
+				'requires_php'  => (string) ( $remote['requires_php'] ?? $local['RequiresPHP'] ?? '' ),
+				'last_updated'  => (string) ( $remote['last_updated'] ?? '' ),
+				'download_link' => (string) ( $remote['package'] ?? '' ),
+				'sections'      => $sections,
+			],
+			static fn( $value ): bool => '' !== $value
+		);
+	}
 
-		$resp->name          = $this->config['plugin_name'];
-		$resp->slug          = $this->config['proper_folder_name']; // Folder slug.
-		$resp->version       = $this->config['new_version'];
-		$resp->author        = $this->config['author'];
-		$resp->homepage      = $this->config['homepage'];
-		$resp->requires      = $this->config['requires'];
-		$resp->tested        = $this->config['tested'];
-		$resp->download_link = $this->config['zip_url'];
+	/**
+	 * Rename GitHub's commit folder before WordPress selects the install destination.
+	 *
+	 * @param string|\WP_Error    $source        Extracted package source.
+	 * @param string              $remote_source Package extraction root.
+	 * @param \WP_Upgrader        $upgrader      Active upgrader.
+	 * @param array<string,mixed> $hook_extra Upgrade context.
+	 * @return string|\WP_Error
+	 */
+	public function normalize_package_source( $source, string $remote_source, $upgrader, array $hook_extra ) {
+		unset( $upgrader );
 
-		$sections = [
-			'description' => $this->get_description_html_from_readme_or_fallback(),
+		if ( ! is_string( $source ) || ! $this->is_our_plugin_update( $hook_extra ) ) {
+			return $source;
+		}
+
+		global $wp_filesystem;
+		if ( ! is_object( $wp_filesystem ) ) {
+			return new \WP_Error(
+				'wp_autoplugin_update_filesystem_unavailable',
+				__( 'WP-Autoplugin could not access the filesystem to prepare its update.', 'wp-autoplugin' )
+			);
+		}
+
+		$source           = trailingslashit( $source );
+		$source_path      = untrailingslashit( $source );
+		$remote_path      = untrailingslashit( $remote_source );
+		$main_file        = $source . basename( $this->plugin_basename );
+		$destination      = trailingslashit( $remote_source ) . $this->folder;
+		$destination_path = untrailingslashit( $destination );
+
+		if ( ! $wp_filesystem->exists( $main_file ) ) {
+			return new \WP_Error(
+				'wp_autoplugin_update_invalid_package',
+				__( 'The WP-Autoplugin update package does not contain the expected plugin file.', 'wp-autoplugin' )
+			);
+		}
+
+		if ( $this->folder === basename( $source_path ) ) {
+			return $source;
+		}
+
+		if (
+			$source_path === $remote_path
+			|| $wp_filesystem->exists( $destination_path )
+			|| ! $wp_filesystem->move( $source_path, $destination_path )
+		) {
+			return new \WP_Error(
+				'wp_autoplugin_update_source_move_failed',
+				__( 'WordPress could not prepare the WP-Autoplugin update package.', 'wp-autoplugin' )
+			);
+		}
+
+		return trailingslashit( $destination_path );
+	}
+
+	/**
+	 * Fetch the latest stable release and pin its package to the inspected commit.
+	 *
+	 * @return array<string, string>|false
+	 */
+	private function get_remote_metadata() {
+		if ( null !== $this->remote_metadata ) {
+			return $this->remote_metadata;
+		}
+
+		$api_root     = 'https://api.github.com/repos/' . $this->repository . '/';
+		$release_body = $this->remote_get(
+			$api_root . 'releases/latest',
+			'application/vnd.github+json',
+			self::MAX_API_BYTES,
+			[ 'X-GitHub-Api-Version' => '2022-11-28' ]
+		);
+		$release      = false !== $release_body ? json_decode( $release_body, true ) : null;
+		$tag          = is_array( $release ) ? (string) ( $release['tag_name'] ?? '' ) : '';
+		$tag_version  = ltrim( $tag, 'vV' );
+		if (
+			! is_array( $release )
+			|| ! empty( $release['draft'] )
+			|| ! empty( $release['prerelease'] )
+			|| ! preg_match( '/^[vV]?[0-9][0-9A-Za-z._+-]{0,63}$/', $tag )
+			|| ! $this->is_valid_version( $tag_version )
+		) {
+			$this->remote_metadata = false;
+			return false;
+		}
+
+		$commit_body = $this->remote_get(
+			$api_root . 'commits/' . rawurlencode( $tag ),
+			'application/vnd.github+json',
+			self::MAX_API_BYTES,
+			[ 'X-GitHub-Api-Version' => '2022-11-28' ]
+		);
+		$commit      = false !== $commit_body ? json_decode( $commit_body, true ) : null;
+		$sha         = is_array( $commit ) ? strtolower( (string) ( $commit['sha'] ?? '' ) ) : '';
+		if ( ! preg_match( '/^[a-f0-9]{40}$/', $sha ) ) {
+			$this->remote_metadata = false;
+			return false;
+		}
+
+		$raw_root      = 'https://raw.githubusercontent.com/' . $this->repository . '/' . $sha . '/';
+		$plugin_source = $this->remote_get(
+			$raw_root . rawurlencode( basename( $this->plugin_basename ) ),
+			'text/plain',
+			self::MAX_SOURCE_BYTES
+		);
+		if ( false === $plugin_source ) {
+			$this->remote_metadata = false;
+			return false;
+		}
+
+		$plugin_headers = $this->parse_headers(
+			$plugin_source,
+			[
+				'version'      => 'Version',
+				'requires'     => 'Requires at least',
+				'requires_php' => 'Requires PHP',
+			],
+			self::PLUGIN_HEADER_SIZE
+		);
+		$version        = $plugin_headers['version'] ?? '';
+		if ( ! $this->is_valid_version( $version ) || $tag_version !== $version ) {
+			$this->remote_metadata = false;
+			return false;
+		}
+
+		$readme         = $this->remote_get( $raw_root . 'readme.txt', 'text/plain', self::MAX_SOURCE_BYTES );
+		$readme_headers = false !== $readme
+			? $this->parse_headers(
+				$readme,
+				[
+					'requires'     => 'Requires at least',
+					'tested'       => 'Tested up to',
+					'requires_php' => 'Requires PHP',
+				],
+				self::PLUGIN_HEADER_SIZE
+			)
+			: [];
+
+		$this->remote_metadata = [
+			'version'      => $version,
+			'requires'     => $this->valid_requirement( $plugin_headers['requires'] ?? $readme_headers['requires'] ?? '' ),
+			'tested'       => $this->valid_requirement( $readme_headers['tested'] ?? '' ),
+			'requires_php' => $this->valid_requirement( $plugin_headers['requires_php'] ?? $readme_headers['requires_php'] ?? '' ),
+			'package'      => 'https://github.com/' . $this->repository . '/archive/' . $sha . '.zip',
+			'url'          => $this->repository_url() . '/releases/tag/' . rawurlencode( $tag ),
+			'last_updated' => $this->release_date( (string) ( $release['published_at'] ?? '' ) ),
+			'description'  => false !== $readme ? $this->render_readme_section( $readme, 'Description' ) : '',
+			'changelog'    => false !== $readme ? $this->render_readme_section( $readme, 'Changelog' ) : '',
 		];
 
-		$changelog_html = $this->get_changelog_html();
-		if ( '' !== $changelog_html ) {
-			$sections['changelog'] = $changelog_html;
-		}
-
-		$resp->sections = $sections;
-
-		return $resp;
+		return $this->remote_metadata;
 	}
 
 	/**
-	 * Optional quick override: show a simple message instead of native modal.
-	 * Requires $this->config['override_modal_with_message'] = true.
-	 */
-	public function pre_plugin_information() {
-		$plugin = isset( $_GET['plugin'] ) ? sanitize_text_field( wp_unslash( $_GET['plugin'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only modal routing does not change state.
-
-		if ( $plugin !== $this->config['proper_folder_name'] ) {
-			return; // Not our plugin; let WP proceed.
-		}
-
-		$github = ! empty( $this->config['github_url'] ) ? $this->config['github_url'] : '#';
-
-		echo '<div class="wrap">';
-		echo '<h2>' . esc_html__( 'Plugin Information', 'wp-autoplugin' ) . '</h2>';
-		echo '<p>' . esc_html__( 'See the GitHub page for details.', 'wp-autoplugin' ) . '</p>';
-		echo '<p><a href="' . esc_url( $github ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'GitHub Repository', 'wp-autoplugin' ) . '</a></p>';
-		echo '</div>';
-
-		exit; // Stop Core from loading the default (wp.org) screen.
-	}
-
-	/**
-	 * Fetch raw README contents from GitHub (tries configured file, then common fallbacks).
+	 * Perform a bounded, SSL-verified request to a fixed GitHub URL.
 	 *
-	 * @return string Empty string on failure.
+	 * @param string                $url     GitHub URL.
+	 * @param string                $accept  Accept header value.
+	 * @param int                   $limit   Maximum response bytes.
+	 * @param array<string, string> $headers Extra request headers.
+	 * @return string|false
 	 */
-	private function get_readme_body() {
-		$cache_key = md5( $this->config['slug'] ) . '_readme_body';
-		$cached    = get_site_transient( $cache_key );
-		if ( false !== $cached ) {
-			return $cached;
-		}
-
-		$candidates = [];
-		// Respect configured file first.
-		if ( ! empty( $this->config['readme'] ) ) {
-			$candidates[] = ltrim( $this->config['readme'], '/' );
-		}
-		// Fallbacks (common names / case variants).
-		$candidates = array_unique(
-			array_merge(
-				$candidates,
-				[
-					'readme.txt',
-					'README.txt',
-					'README.md',
-					'readme.md',
-				]
-			)
+	private function remote_get( string $url, string $accept, int $limit, array $headers = [] ) {
+		$response = wp_safe_remote_get(
+			$url,
+			[
+				'timeout'             => self::HTTP_TIMEOUT,
+				'redirection'         => 3,
+				'limit_response_size' => $limit,
+				'headers'             => array_merge(
+					[
+						'Accept'     => $accept,
+						'User-Agent' => 'WP-Autoplugin/' . ( defined( 'WP_AUTOPLUGIN_VERSION' ) ? WP_AUTOPLUGIN_VERSION : 'unknown' ) . '; ' . home_url( '/' ),
+					],
+					$headers
+				),
+			]
 		);
 
-		$body = '';
-		foreach ( $candidates as $file ) {
-			$resp = $this->remote_get( trailingslashit( $this->config['raw_url'] ) . $file );
-			if ( is_array( $resp ) && ! empty( $resp['body'] ) ) {
-				$body = (string) $resp['body'];
-				break;
-			}
+		if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+			return false;
 		}
 
-		set_site_transient( $cache_key, $body, 6 * HOUR_IN_SECONDS );
-		return $body;
+		$body = wp_remote_retrieve_body( $response );
+		return is_string( $body ) && '' !== $body ? $body : false;
 	}
 
 	/**
-	 * Extract Description section as HTML from README (supports WP readme.txt & Markdown).
-	 * Falls back to GitHub API short description when no README section is found.
+	 * Extract bounded plugin or readme header values.
 	 *
-	 * @return string HTML
+	 * @param string                $source Source file contents.
+	 * @param array<string, string> $fields Output key to header label map.
+	 * @param int                   $limit  Maximum bytes to inspect.
+	 * @return array<string, string>
 	 */
-	private function get_description_html_from_readme_or_fallback() {
-		$readme = $this->get_readme_body();
-		if ( '' !== $readme ) {
-			// Try WordPress readme.txt: == Description == ... until next == Heading ==.
-			if ( preg_match( '/^==\s*Description\s*==\s*(.+?)(?=^\s*==\s*[^=]+==|\z)/ims', $readme, $m ) ) {
-				return $this->simple_markdownish_to_html( trim( $m[1] ) );
-			}
-
-			// Try Markdown: ## Description ... until next ##.
-			if ( preg_match( '/^##+\s*Description\s*$([\s\S]*?)(?=^\s*##+\s+\S|\z)/im', $readme, $m ) ) {
-				return $this->simple_markdownish_to_html( trim( $m[1] ) );
-			}
-
-			// Fallback for Markdown: content after H1 (# Title) until next H2 (## ...).
-			if ( preg_match( '/^#\s+.*\n([\s\S]*?)(?=^\s*##\s+\S|\z)/m', $readme, $m ) ) {
-				$chunk = trim( $m[1] );
-				if ( '' !== $chunk ) {
-					return $this->simple_markdownish_to_html( $chunk );
-				}
-			}
-
-			// Or: everything until the first major heading (## Installation/Usage/Changelog).
-			if ( preg_match( '/^([\s\S]*?)(?=^\s*##\s+(?:Installation|Usage|Changelog|FAQ|Screenshots)\b|\z)/im', $readme, $m ) ) {
-				$chunk = trim( $m[1] );
-				if ( '' !== $chunk ) {
-					return $this->simple_markdownish_to_html( $chunk );
-				}
+	private function parse_headers( string $source, array $fields, int $limit ): array {
+		$source  = substr( $source, 0, $limit );
+		$headers = [];
+		foreach ( $fields as $key => $label ) {
+			if ( preg_match( '/^[ \t\/*#@]*' . preg_quote( $label, '/' ) . ':\s*(.+)$/mi', $source, $matches ) ) {
+				$headers[ $key ] = sanitize_text_field( trim( $matches[1] ) );
 			}
 		}
-
-		// Last resort: short description from GitHub API, escaped and wrapped.
-		$fallback = $this->get_description_text_from_github();
-		$fallback = $fallback ? wpautop( esc_html( $fallback ) ) : '';
-		return $fallback;
+		return $headers;
 	}
 
 	/**
-	 * Extract a "Changelog" section from README and return sanitized HTML.
-	 * Supports WP readme.txt and Markdown formats.
+	 * Determine whether a remote version header is safe for version_compare().
 	 *
-	 * @return string
+	 * @param string $version Version header value.
 	 */
-	private function get_changelog_html() {
-		$readme = $this->get_readme_body();
-		if ( '' === $readme ) {
+	private function is_valid_version( string $version ): bool {
+		return 1 === preg_match( '/^[0-9][0-9A-Za-z._+-]{0,63}$/', $version );
+	}
+
+	/**
+	 * Return a validated requirement or omit it from update metadata.
+	 *
+	 * @param string $version Requirement header value.
+	 */
+	private function valid_requirement( string $version ): string {
+		return $this->is_valid_version( $version ) ? $version : '';
+	}
+
+	/**
+	 * Normalize a GitHub release date for the WordPress details modal.
+	 *
+	 * @param string $published_at ISO 8601 release timestamp.
+	 */
+	private function release_date( string $published_at ): string {
+		$timestamp = strtotime( $published_at );
+		return false !== $timestamp ? gmdate( 'Y-m-d H:i:s', $timestamp ) : '';
+	}
+
+	/**
+	 * Render a WordPress readme section as a small, sanitized HTML subset.
+	 *
+	 * @param string $readme Readme contents.
+	 * @param string $section Section heading.
+	 */
+	private function render_readme_section( string $readme, string $section ): string {
+		if ( ! preg_match( '/^==\s*' . preg_quote( $section, '/' ) . '\s*==\s*(.+?)(?=^\s*==\s*[^=]+==|\z)/ims', $readme, $matches ) ) {
 			return '';
 		}
 
-		$changelog = '';
-
-		// 1) WordPress readme.txt style: "== Changelog ==" ... until next heading
-		if ( preg_match( '/^==\s*Changelog\s*==\s*(.+?)(?=^\s*==\s*[^=]+==|\z)/ims', $readme, $m ) ) {
-			$changelog = trim( $m[1] );
-		}
-
-		// 2) Markdown style: "## Changelog" ... until next H2
-		if ( '' === $changelog && preg_match( '/^##+\s*Changelog\s*$([\s\S]*?)(?=^\s*##+\s+\S|\z)/im', $readme, $m ) ) {
-			$changelog = trim( $m[1] );
-		}
-
-		if ( '' === $changelog ) {
-			return '';
-		}
-
-		return $this->simple_markdownish_to_html( $changelog );
-	}
-
-	/**
-	 * Very light markdown-ish -> HTML converter with sanitization.
-	 * - Preserves paragraphs
-	 * - Turns lines starting with `-` or `*` into <ul><li>
-	 * - Converts "= Heading =" lines to HTML headings
-	 * - Converts **bold** text to <strong> tags
-	 * - Converts Markdown links [text](url) to HTML links
-	 *
-	 * @param string $text Text to convert.
-	 * @return string HTML
-	 */
-	private function simple_markdownish_to_html( $text ) {
-		$text = preg_replace( "/\r\n|\r/", "\n", (string) $text );
-
-		$lines = preg_split( '/\n/', $text );
-		$buf   = [];
-		$in_ul = false;
-		foreach ( $lines as $line ) {
-				// Handle heading lines: = Heading =, == Heading ==, etc.
-			if ( preg_match( '/^(\s*)(=+)\s*(.+?)\s*\2\s*$/', $line, $hm ) ) {
-				if ( $in_ul ) {
-					$buf[] = '</ul>';
-					$in_ul = false;
-				}
-				$level        = min( strlen( $hm[2] ), 6 ); // H1-H6 max.
-				$heading_text = $this->process_inline_markdown( trim( $hm[3] ) );
-				$buf[]        = '<h' . $level . '>' . $heading_text . '</h' . $level . '>';
-			} elseif ( preg_match( '/^\s*[-*]\s+(.+)$/', $line, $mm ) ) {
-				// Handle list items.
-				if ( ! $in_ul ) {
-					$buf[] = '<ul>';
-					$in_ul = true;
-				}
-				$list_content = $this->process_inline_markdown( rtrim( $mm[1] ) );
-				$buf[]        = '<li>' . $list_content . '</li>';
-			} else {
-				if ( $in_ul ) {
-					$buf[] = '</ul>';
-					$in_ul = false;
-				}
-				$trimmed = trim( $line );
-				if ( '' !== $trimmed ) {
-					$paragraph_content = $this->process_inline_markdown( $trimmed );
-					$buf[]             = '<p>' . $paragraph_content . '</p>';
-				}
+		$blocks = preg_split( '/\n\s*\n/', trim( str_replace( [ "\r\n", "\r" ], "\n", $matches[1] ) ) );
+		$html   = [];
+		foreach ( is_array( $blocks ) ? $blocks : [] as $block ) {
+			$lines = array_values( array_filter( array_map( 'trim', explode( "\n", $block ) ), static fn( string $line ): bool => '' !== $line ) );
+			if ( [] === $lines ) {
+				continue;
 			}
-		}
-		if ( $in_ul ) {
-			$buf[] = '</ul>';
+
+			if ( 1 === count( $lines ) && preg_match( '/^=+\s*(.+?)\s*=+$/', $lines[0], $heading ) ) {
+				$html[] = '<h4>' . $this->render_inline_markup( $heading[1] ) . '</h4>';
+				continue;
+			}
+
+			$list_items = [];
+			foreach ( $lines as $line ) {
+				if ( ! preg_match( '/^[*-]\s+(.+)$/', $line, $item ) ) {
+					$list_items = [];
+					break;
+				}
+				$list_items[] = '<li>' . $this->render_inline_markup( $item[1] ) . '</li>';
+			}
+			if ( [] !== $list_items ) {
+				$html[] = '<ul>' . implode( '', $list_items ) . '</ul>';
+				continue;
+			}
+
+			$html[] = '<p>' . $this->render_inline_markup( implode( ' ', $lines ) ) . '</p>';
 		}
 
-		$html = implode( "\n", $buf );
-		return wp_kses_post( $html );
+		return wp_kses_post( implode( "\n", $html ) );
 	}
 
 	/**
-	 * Process inline Markdown elements like **bold** and [text](url) links.
+	 * Render the small inline-markup subset used by WordPress readmes.
 	 *
-	 * @param string $text Text to process.
-	 * @return string HTML with inline elements processed.
+	 * @param string $text Readme text.
 	 */
-	private function process_inline_markdown( $text ) {
-		// Escape any HTML in the text first.
+	private function render_inline_markup( string $text ): string {
 		$text = esc_html( $text );
-
-		// Convert **bold** to <strong>.
-		$text = preg_replace( '/\*\*([^*]+)\*\*/', '<strong>$1</strong>', $text );
-
-		// Convert [text](url) to <a> tags.
+		$text = preg_replace( '/\*\*([^*]+)\*\*/', '<strong>$1</strong>', $text ) ?? $text;
 		$text = preg_replace_callback(
 			'/\[([^\]]+)\]\(([^)]+)\)/',
-			function ( $matches ) {
-				$link_text = $matches[1]; // Already escaped above.
-				$url       = esc_url( html_entity_decode( $matches[2] ) );
-				return '<a href="' . $url . '" target="_blank" rel="noopener noreferrer">' . $link_text . '</a>';
+			static function ( array $matches ): string {
+				$url = esc_url( html_entity_decode( $matches[2] ) );
+				return '' !== $url
+					? '<a href="' . $url . '" target="_blank" rel="noopener noreferrer">' . $matches[1] . '</a>'
+					: $matches[1];
 			},
 			$text
-		);
-
-		// Un-escape our processed HTML tags.
-		$text = str_replace(
-			[ '&lt;strong&gt;', '&lt;/strong&gt;', '&lt;a href=&quot;', '&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot;&gt;', '&lt;/a&gt;' ],
-			[ '<strong>', '</strong>', '<a href="', '" target="_blank" rel="noopener noreferrer">', '</a>' ],
-			$text
-		);
-
-		return $text;
+		) ?? $text;
+		return wp_kses_post( $text );
 	}
 
 	/**
-	 * Post-installation hook.
+	 * Load unformatted local plugin headers.
 	 *
-	 * @param bool   $true       True.
-	 * @param array  $hook_extra Hook extra.
-	 * @param object $result     Result.
-	 *
-	 * @return object
+	 * @return array<string, mixed>
 	 */
-	public function upgrader_post_install( $true, $hook_extra, $result ) { // phpcs:ignore
-		global $wp_filesystem;
+	private function get_local_plugin_data(): array {
+		if ( ! function_exists( 'get_plugin_data' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		return get_plugin_data( $this->plugin_file, false, false );
+	}
 
-		$proper_destination = WP_PLUGIN_DIR . '/' . $this->config['proper_folder_name'];
-		$wp_filesystem->move( $result['destination'], $proper_destination );
-		$result['destination'] = $proper_destination;
-		$activate              = activate_plugin( WP_PLUGIN_DIR . '/' . $this->config['slug'] );
+	/**
+	 * Determine whether an upgrader operation targets this plugin.
+	 *
+	 * @param array<string, mixed> $hook_extra Upgrade context.
+	 */
+	private function is_our_plugin_update( array $hook_extra ): bool {
+		return 'plugin' === ( $hook_extra['type'] ?? '' )
+			&& 'update' === ( $hook_extra['action'] ?? '' )
+			&& $this->plugin_basename === ( $hook_extra['plugin'] ?? '' );
+	}
 
-		$fail_message    = __( 'The plugin has been updated, but could not be reactivated. Please reactivate it manually.', 'wp-autoplugin' );
-		$success_message = __( 'Plugin reactivated successfully.', 'wp-autoplugin' );
-
-		echo is_wp_error( $activate ) ? esc_html( $fail_message ) : esc_html( $success_message );
-		return $result;
+	/**
+	 * Return the public GitHub repository URL.
+	 */
+	private function repository_url(): string {
+		return 'https://github.com/' . $this->repository;
 	}
 }
