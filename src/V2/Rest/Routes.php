@@ -112,6 +112,21 @@ final class Routes {
 		);
 		register_rest_route(
 			self::NAMESPACE,
+			'/projects/(?P<id>\d+)',
+			[
+				'methods'             => \WP_REST_Server::DELETABLE,
+				'callback'            => [ $this, 'delete_project' ],
+				'permission_callback' => $permission,
+				'args'                => [
+					'id' => [
+						'type'    => 'integer',
+						'minimum' => 1,
+					],
+				],
+			]
+		);
+		register_rest_route(
+			self::NAMESPACE,
 			'/workspaces',
 			[
 				[
@@ -712,6 +727,22 @@ final class Routes {
 				(int) $request['per_page']
 			)
 		);
+	}
+
+	/**
+	 * Permanently delete an owned project and all of its durable workspace data.
+	 *
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function delete_project( \WP_REST_Request $request ) {
+		try {
+			$deleted = ( new Workspace_Repository() )->delete_project( (int) $request['id'], get_current_user_id() );
+			return is_wp_error( $deleted )
+				? $deleted
+				: rest_ensure_response( $deleted );
+		} catch ( \Throwable $error ) {
+			return new \WP_Error( 'wp_autoplugin_project_delete_error', __( 'The project could not be deleted.', 'wp-autoplugin' ), [ 'status' => 500 ] );
+		}
 	}
 
 	public function workspaces(): \WP_REST_Response {

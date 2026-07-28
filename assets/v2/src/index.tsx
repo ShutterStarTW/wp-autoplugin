@@ -576,6 +576,12 @@ type ProjectsResponse = {
 	has_more: boolean;
 };
 
+type DeleteProjectResponse = {
+	project_id: number;
+	workspace_ids: number[];
+	deleted: true;
+};
+
 const ACTIVE_WORKSPACE_KEY = 'wp-autoplugin-v2-active-workspace';
 const ACTIVE_STAGE_KEY_PREFIX = 'wp-autoplugin-v2-active-stage:';
 const DISTRACTION_FREE_KEY = 'wp-autoplugin-v2-distraction-free';
@@ -1393,6 +1399,28 @@ function App() {
 		setActiveWorkspaceId( project.id );
 	}
 
+	async function deleteProject( project: Workspace ) {
+		const deleted = await apiFetch< DeleteProjectResponse >( {
+			path: `${ rest }/projects/${ project.project_id }`,
+			method: 'DELETE',
+		} );
+		const deletedWorkspaceIds = new Set( deleted.workspace_ids );
+		const remaining = workspaces.filter(
+			( item ) => ! deletedWorkspaceIds.has( item.id )
+		);
+
+		setWorkspaces( remaining );
+		window.localStorage.removeItem(
+			`${ ACTIVE_STAGE_KEY_PREFIX }${ deleted.project_id }`
+		);
+		if (
+			activeWorkspaceId !== 'new' &&
+			deletedWorkspaceIds.has( activeWorkspaceId )
+		) {
+			setActiveWorkspaceId( remaining[ 0 ]?.id ?? 'new' );
+		}
+	}
+
 	async function cancel( job: Job ) {
 		const updated = await apiFetch< Job >( {
 			path: `${ rest }/jobs/${ job.id }/cancel`,
@@ -1615,6 +1643,7 @@ function App() {
 				<AllProjectsModal
 					onClose={ () => setAllProjectsOpen( false ) }
 					onOpen={ openProject }
+					onDelete={ deleteProject }
 				/>
 			) }
 			{ workspaceContent }
@@ -2477,6 +2506,11 @@ function WorkspaceTabBar( {
 				controls={ [
 					[
 						{
+							title: __( 'New project', 'wp-autoplugin' ),
+							icon: 'plus',
+							onClick: onNew,
+						},
+						{
 							title: __( 'All projects', 'wp-autoplugin' ),
 							icon: 'open-folder',
 							onClick: onLoadProjects,
@@ -2505,9 +2539,11 @@ function WorkspaceTabBar( {
 function AllProjectsModal( {
 	onClose,
 	onOpen,
+	onDelete,
 }: {
 	onClose: () => void;
 	onOpen: ( project: Workspace ) => Promise< void >;
+	onDelete: ( project: Workspace ) => Promise< void >;
 } ) {
 	const [ projects, setProjects ] = useState< Workspace[] >( [] );
 	const [ search, setSearch ] = useState( '' );
@@ -2518,7 +2554,12 @@ function AllProjectsModal( {
 	const [ total, setTotal ] = useState( 0 );
 	const [ hasMore, setHasMore ] = useState( false );
 	const [ openingId, setOpeningId ] = useState< number | null >( null );
+	const [ deletingId, setDeletingId ] = useState< number | null >( null );
+	const [ projectToDelete, setProjectToDelete ] =
+		useState< Workspace | null >( null );
+	const [ deleteError, setDeleteError ] = useState( '' );
 	const [ loadError, setLoadError ] = useState( '' );
+	const [ reloadSequence, setReloadSequence ] = useState( 0 );
 	const requestSequence = useRef( 0 );
 	const loadingMoreRef = useRef( false );
 	const loadMoreTriggerRef = useRef< HTMLDivElement | null >( null );
@@ -2567,7 +2608,7 @@ function AllProjectsModal( {
 		return () => {
 			current = false;
 		};
-	}, [ debouncedSearch ] );
+	}, [ debouncedSearch, reloadSequence ] );
 
 	const loadMore = useCallback( async () => {
 		if ( loading || loadingMoreRef.current || ! hasMore ) {
@@ -2647,17 +2688,56 @@ function AllProjectsModal( {
 		}
 	}
 
+	function requestDelete( project: Workspace ) {
+		setDeleteError( '' );
+		setProjectToDelete( project );
+	}
+
+	function closeDeleteConfirmation() {
+		if ( null === deletingId ) {
+			setDeleteError( '' );
+			setProjectToDelete( null );
+		}
+	}
+
+	async function deleteSelectedProject() {
+		if ( ! projectToDelete ) {
+			return;
+		}
+
+		setDeletingId( projectToDelete.id );
+		setDeleteError( '' );
+		try {
+			await onDelete( projectToDelete );
+			setProjects( ( current ) =>
+				current.filter(
+					( project ) =>
+						project.project_id !== projectToDelete.project_id
+				)
+			);
+			setTotal( ( current ) => Math.max( 0, current - 1 ) );
+			setProjectToDelete( null );
+			setReloadSequence( ( current ) => current + 1 );
+		} catch ( reason: any ) {
+			setDeleteError( reason.message );
+		} finally {
+			setDeletingId( null );
+		}
+	}
+
+	const busy = null !== openingId || null !== deletingId;
+
 	return (
 		<Modal
 			className="all-projects-modal"
 			title={ __( 'All projects', 'wp-autoplugin' ) }
 			size="large"
-			isDismissible={ null === openingId }
+			isDismissible={ ! busy && null === projectToDelete }
 			onRequestClose={ onClose }
 		>
 			<p className="all-projects__intro">
 				{ __(
-					'Browse every project, switch to an open workspace, or reopen a closed one.',
+					'Browse every project, switch to an open workspace, reopen a closed one, or permanently delete its history.',
 					'wp-autoplugin'
 				) }
 			</p>
@@ -2819,17 +2899,34 @@ function AllProjectsModal( {
 									</dl>
 								</div>
 								<ProjectActivity project={ project } />
-								<Button
-									variant="secondary"
-									isBusy={ openingId === project.id }
-									disabled={ null !== openingId }
-									onClick={ () => open( project ) }
-									aria-label={ actionAriaLabel }
-								>
-									{ isClosed
-										? __( 'Reopen', 'wp-autoplugin' )
-										: __( 'Open', 'wp-autoplugin' ) }
-								</Button>
+								<div className="all-projects__actions">
+									<Button
+										variant="secondary"
+										isBusy={ openingId === project.id }
+										disabled={ busy }
+										onClick={ () => open( project ) }
+										aria-label={ actionAriaLabel }
+									>
+										{ isClosed
+											? __( 'Reopen', 'wp-autoplugin' )
+											: __( 'Open', 'wp-autoplugin' ) }
+									</Button>
+									<Button
+										variant="tertiary"
+										isDestructive
+										disabled={ busy }
+										onClick={ () =>
+											requestDelete( project )
+										}
+										aria-label={ sprintf(
+											/* translators: %s: Project name. */
+											__( 'Delete %s', 'wp-autoplugin' ),
+											project.project_name
+										) }
+									>
+										{ __( 'Delete', 'wp-autoplugin' ) }
+									</Button>
+								</div>
 							</li>
 						);
 					} ) }
@@ -2851,6 +2948,54 @@ function AllProjectsModal( {
 							: __( 'Load more projects', 'wp-autoplugin' ) }
 					</Button>
 				</div>
+			) }
+			{ projectToDelete && (
+				<Modal
+					className="delete-project-modal"
+					title={ sprintf(
+						/* translators: %s: Project name. */
+						__( 'Delete “%s”?', 'wp-autoplugin' ),
+						projectToDelete.project_name
+					) }
+					isDismissible={ null === deletingId }
+					onRequestClose={ closeDeleteConfirmation }
+				>
+					{ deleteError && (
+						<Notice status="error" isDismissible={ false }>
+							{ deleteError }
+						</Notice>
+					) }
+					<p>
+						{ __(
+							'This permanently deletes all workspaces, jobs, conversations, revisions, reviews, and release history for this project.',
+							'wp-autoplugin'
+						) }
+					</p>
+					<p>
+						{ __(
+							'Installed plugins and themes will not be removed or reverted. This action cannot be undone.',
+							'wp-autoplugin'
+						) }
+					</p>
+					<div className="delete-project-modal__actions">
+						<Button
+							variant="tertiary"
+							disabled={ null !== deletingId }
+							onClick={ closeDeleteConfirmation }
+						>
+							{ __( 'Cancel', 'wp-autoplugin' ) }
+						</Button>
+						<Button
+							variant="primary"
+							isDestructive
+							isBusy={ deletingId === projectToDelete.id }
+							disabled={ null !== deletingId }
+							onClick={ deleteSelectedProject }
+						>
+							{ __( 'Delete project', 'wp-autoplugin' ) }
+						</Button>
+					</div>
+				</Modal>
 			) }
 		</Modal>
 	);

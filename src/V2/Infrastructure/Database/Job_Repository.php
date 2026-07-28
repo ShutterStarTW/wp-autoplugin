@@ -29,14 +29,10 @@ final class Job_Repository extends Repository {
 		)
 			? Global_Instructions::snapshot()
 			: null;
-		if ( $artifact_lock ) {
-			$this->wpdb->query( 'START TRANSACTION' );
-		}
+		$this->wpdb->query( 'START TRANSACTION' );
 		try {
+			$this->lock_workspace( $workspace_id );
 			if ( $artifact_lock ) {
-				$this->wpdb->get_var(
-					$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'workspaces' ) . ' WHERE id = %d FOR UPDATE', $workspace_id )
-				);
 				if ( $this->has_active_artifact_work( $workspace_id ) ) {
 					throw new \RuntimeException( __( 'Another Code, Review, or Release operation is already active in this workspace.', 'wp-autoplugin' ), 409 );
 				}
@@ -69,13 +65,11 @@ final class Job_Repository extends Repository {
 				[ '%s' ],
 				[ '%d' ]
 			);
-			if ( $artifact_lock ) {
-				$this->wpdb->query( 'COMMIT' );
+			if ( false === $this->wpdb->query( 'COMMIT' ) ) {
+				throw new \RuntimeException( __( 'Could not finalize the job.', 'wp-autoplugin' ) );
 			}
 		} catch ( \Throwable $error ) {
-			if ( $artifact_lock ) {
-				$this->wpdb->query( 'ROLLBACK' );
-			}
+			$this->wpdb->query( 'ROLLBACK' );
 			throw $error;
 		}
 
@@ -365,52 +359,62 @@ final class Job_Repository extends Repository {
 			// Markdown edits change the narrative Plan, not its static file map.
 			$structured = $source['result']['structured'];
 		}
-		$this->wpdb->insert(
-			Installer::table( 'jobs' ),
-			[
-				'workspace_id' => $source['workspace_id'],
-				'task'         => 'plan',
-				'status'       => 'completed',
-				'progress'     => 100,
-				'payload'      => $this->json(
-					[
-						'stage'                  => 'plan',
-						'source'                 => 'manual_edit',
-						'artifact_parent_job_id' => $source['id'],
-					]
-				),
-				'result'       => $this->json(
-					[
-						'content'    => $content,
-						'structured' => is_array( $structured ) ? $structured : null,
-						'artifact'   => [
-							'type'          => 'plan',
-							'parent_job_id' => $source['id'],
-						],
-					]
-				),
-				'created_by'   => $user_id,
-				'created_at'   => $now,
-				'started_at'   => $now,
-				'finished_at'  => $now,
-				'updated_at'   => $now,
-			],
-			[ '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s' ]
-		);
+		$this->wpdb->query( 'START TRANSACTION' );
+		try {
+			$this->lock_workspace( (int) $source['workspace_id'] );
+			$this->wpdb->insert(
+				Installer::table( 'jobs' ),
+				[
+					'workspace_id' => $source['workspace_id'],
+					'task'         => 'plan',
+					'status'       => 'completed',
+					'progress'     => 100,
+					'payload'      => $this->json(
+						[
+							'stage'                  => 'plan',
+							'source'                 => 'manual_edit',
+							'artifact_parent_job_id' => $source['id'],
+						]
+					),
+					'result'       => $this->json(
+						[
+							'content'    => $content,
+							'structured' => is_array( $structured ) ? $structured : null,
+							'artifact'   => [
+								'type'          => 'plan',
+								'parent_job_id' => $source['id'],
+							],
+						]
+					),
+					'created_by'   => $user_id,
+					'created_at'   => $now,
+					'started_at'   => $now,
+					'finished_at'  => $now,
+					'updated_at'   => $now,
+				],
+				[ '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s' ]
+			);
 
-		$id = (int) $this->wpdb->insert_id;
-		if ( ! $id ) {
-			throw new \RuntimeException( 'Could not create Plan successor.' );
+			$id = (int) $this->wpdb->insert_id;
+			if ( ! $id ) {
+				throw new \RuntimeException( 'Could not create Plan successor.' );
+			}
+
+			$this->wpdb->update(
+				Installer::table( 'workspaces' ),
+				[ 'updated_at' => $now ],
+				[ 'id' => $source['workspace_id'] ],
+				[ '%s' ],
+				[ '%d' ]
+			);
+			$this->event( $id, 'plan_successor', __( 'Plan edited by an administrator.', 'wp-autoplugin' ), [ 'parent_job_id' => $source['id'] ] );
+			if ( false === $this->wpdb->query( 'COMMIT' ) ) {
+				throw new \RuntimeException( 'Could not finalize Plan successor.' );
+			}
+		} catch ( \Throwable $error ) {
+			$this->wpdb->query( 'ROLLBACK' );
+			throw $error;
 		}
-
-		$this->wpdb->update(
-			Installer::table( 'workspaces' ),
-			[ 'updated_at' => $now ],
-			[ 'id' => $source['workspace_id'] ],
-			[ '%s' ],
-			[ '%d' ]
-		);
-		$this->event( $id, 'plan_successor', __( 'Plan edited by an administrator.', 'wp-autoplugin' ), [ 'parent_job_id' => $source['id'] ] );
 
 		return $this->find( $id );
 	}
@@ -452,5 +456,15 @@ final class Job_Repository extends Repository {
 		$row['prompt_attachments'] = ( new Prompt_Attachment_Repository( $this->wpdb ) )->for_job( (int) $row['id'] );
 
 		return $row;
+	}
+
+	/** Lock an existing workspace so job creation cannot race project deletion. */
+	private function lock_workspace( int $workspace_id ): void {
+		$workspace_exists = $this->wpdb->get_var(
+			$this->wpdb->prepare( 'SELECT id FROM ' . Installer::table( 'workspaces' ) . ' WHERE id = %d FOR UPDATE', $workspace_id )
+		);
+		if ( ! $workspace_exists ) {
+			throw new \RuntimeException( __( 'The workspace no longer exists.', 'wp-autoplugin' ), 404 );
+		}
 	}
 }

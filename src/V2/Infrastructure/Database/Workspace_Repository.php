@@ -392,6 +392,85 @@ final class Workspace_Repository extends Repository {
 	}
 
 	/**
+	 * Permanently delete an owned project and every record belonging to its workspaces.
+	 *
+	 * Installed plugins and themes are deliberately outside this cleanup boundary.
+	 *
+	 * @return array{project_id: int, workspace_ids: array<int, int>, deleted: true}|\WP_Error
+	 */
+	public function delete_project( int $project_id, int $user_id ) {
+		$projects = Installer::table( 'projects' );
+		$this->wpdb->query( 'START TRANSACTION' );
+
+		try {
+			$owned = $this->wpdb->get_var(
+				$this->wpdb->prepare(
+					"SELECT id FROM $projects WHERE id = %d AND created_by = %d FOR UPDATE",
+					$project_id,
+					$user_id
+				)
+			); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table is an allow-listed internal name.
+			if ( ! $owned ) {
+				$this->wpdb->query( 'ROLLBACK' );
+				return new \WP_Error( 'wp_autoplugin_project_not_found', __( 'Project not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+			}
+
+			$workspace_ids = $this->ids_for( Installer::table( 'workspaces' ), 'project_id', [ $project_id ], true );
+			if ( $workspace_ids && $this->has_active_jobs( $workspace_ids ) ) {
+				$this->wpdb->query( 'ROLLBACK' );
+				return new \WP_Error(
+					'wp_autoplugin_project_active',
+					__( 'Wait for active project jobs to finish or cancel them before deleting this project.', 'wp-autoplugin' ),
+					[ 'status' => 409 ]
+				);
+			}
+
+			$job_ids       = $this->ids_for( Installer::table( 'jobs' ), 'workspace_id', $workspace_ids );
+			$revision_ids  = $this->ids_for( Installer::table( 'revisions' ), 'workspace_id', $workspace_ids );
+			$run_ids       = $this->ids_for( Installer::table( 'agent_runs' ), 'job_id', $job_ids );
+			$code_run_ids  = $this->ids_for( Installer::table( 'code_runs' ), 'job_id', $job_ids );
+			$finding_ids   = $this->ids_for( Installer::table( 'review_findings' ), 'workspace_id', $workspace_ids );
+			$promotion_ids = $this->ids_for( Installer::table( 'promotions' ), 'workspace_id', $workspace_ids );
+			$package_paths = $this->package_paths( $workspace_ids );
+
+			$this->delete_for_ids( Installer::table( 'agent_steps' ), 'run_id', $run_ids );
+			$this->delete_for_ids( Installer::table( 'agent_runs' ), 'job_id', $job_ids );
+			$this->delete_for_ids( Installer::table( 'code_run_files' ), 'run_id', $code_run_ids );
+			$this->delete_for_ids( Installer::table( 'code_runs' ), 'job_id', $job_ids );
+			$this->delete_for_ids( Installer::table( 'job_prompt_attachments' ), 'job_id', $job_ids );
+			$this->delete_for_ids( Installer::table( 'prompt_attachments' ), 'workspace_id', $workspace_ids );
+			$this->delete_for_ids( Installer::table( 'job_events' ), 'job_id', $job_ids );
+			$this->delete_for_ids( Installer::table( 'usage' ), 'job_id', $job_ids );
+			$this->delete_for_ids( Installer::table( 'review_finding_events' ), 'finding_id', $finding_ids );
+			$this->delete_for_ids( Installer::table( 'review_findings' ), 'workspace_id', $workspace_ids );
+			$this->delete_for_ids( Installer::table( 'release_packages' ), 'workspace_id', $workspace_ids );
+			$this->delete_for_ids( Installer::table( 'promotion_files' ), 'promotion_id', $promotion_ids );
+			$this->delete_for_ids( Installer::table( 'promotions' ), 'workspace_id', $workspace_ids );
+			$this->delete_for_ids( Installer::table( 'review_reports' ), 'workspace_id', $workspace_ids );
+			$this->delete_for_ids( Installer::table( 'revision_files' ), 'revision_id', $revision_ids );
+			$this->delete_for_ids( Installer::table( 'revisions' ), 'workspace_id', $workspace_ids );
+			$this->delete_for_ids( Installer::table( 'jobs' ), 'workspace_id', $workspace_ids );
+			$this->delete_for_ids( Installer::table( 'workspaces' ), 'project_id', [ $project_id ] );
+			$this->delete_for_ids( $projects, 'id', [ $project_id ] );
+
+			if ( false === $this->wpdb->query( 'COMMIT' ) ) {
+				throw new \RuntimeException( $this->persistence_error( 'project deletion' ) );
+			}
+		} catch ( \Throwable $error ) {
+			$this->wpdb->query( 'ROLLBACK' );
+			throw $error;
+		}
+
+		$this->delete_package_files( $package_paths );
+
+		return [
+			'project_id'   => $project_id,
+			'workspace_ids' => $workspace_ids,
+			'deleted'      => true,
+		];
+	}
+
+	/**
 	 * Hide a workspace tab without deleting its project, revisions, or jobs.
 	 */
 	public function close( int $id, int $user_id ): bool {
@@ -467,6 +546,106 @@ final class Workspace_Repository extends Repository {
 			[ '%s', '%s' ],
 			[ '%d' ]
 		);
+	}
+
+	/**
+	 * @param array<int, int> $workspace_ids
+	 */
+	private function has_active_jobs( array $workspace_ids ): bool {
+		if ( ! $workspace_ids ) {
+			return false;
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $workspace_ids ), '%d' ) );
+		$jobs         = Installer::table( 'jobs' );
+		$count        = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				"SELECT COUNT(*) FROM $jobs WHERE workspace_id IN ($placeholders) AND status IN (%s,%s,%s)",
+				...array_merge( $workspace_ids, [ 'queued', 'running', 'retrying' ] )
+			)
+		); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table is allow-listed and placeholders are generated for integer IDs.
+
+		return (int) $count > 0;
+	}
+
+	/**
+	 * @param array<int, int> $ids
+	 * @return array<int, int>
+	 */
+	private function ids_for( string $table, string $column, array $ids, bool $for_update = false ): array {
+		if ( ! $ids ) {
+			return [];
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+		$lock         = $for_update ? ' FOR UPDATE' : '';
+		$found        = $this->wpdb->get_col(
+			$this->wpdb->prepare(
+				"SELECT id FROM $table WHERE $column IN ($placeholders) ORDER BY id ASC$lock",
+				...$ids
+			)
+		); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tables, columns, and placeholders are internal allow-listed values.
+
+		return array_map( 'intval', (array) $found );
+	}
+
+	/**
+	 * @param array<int, int> $ids
+	 */
+	private function delete_for_ids( string $table, string $column, array $ids ): void {
+		if ( ! $ids ) {
+			return;
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+		$deleted      = $this->wpdb->query(
+			$this->wpdb->prepare(
+				"DELETE FROM $table WHERE $column IN ($placeholders)",
+				...$ids
+			)
+		); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tables, columns, and placeholders are internal allow-listed values.
+		if ( false === $deleted ) {
+			throw new \RuntimeException( $this->persistence_error( 'project data' ) );
+		}
+	}
+
+	/**
+	 * @param array<int, int> $workspace_ids
+	 * @return array<int, string>
+	 */
+	private function package_paths( array $workspace_ids ): array {
+		if ( ! $workspace_ids ) {
+			return [];
+		}
+
+		$placeholders = implode( ',', array_fill( 0, count( $workspace_ids ), '%d' ) );
+		$packages     = Installer::table( 'release_packages' );
+		$paths        = $this->wpdb->get_col(
+			$this->wpdb->prepare(
+				"SELECT temp_path FROM $packages WHERE workspace_id IN ($placeholders) AND temp_path IS NOT NULL",
+				...$workspace_ids
+			)
+		); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table is allow-listed and placeholders are generated for integer IDs.
+
+		return array_values( array_filter( array_map( 'strval', (array) $paths ) ) );
+	}
+
+	/**
+	 * Remove only release archives from the private v2 release directory.
+	 *
+	 * @param array<int, string> $paths
+	 */
+	private function delete_package_files( array $paths ): void {
+		$root = untrailingslashit( wp_normalize_path( sys_get_temp_dir() . '/wp-autoplugin-v2-release' ) );
+		foreach ( array_unique( $paths ) as $path ) {
+			$path = wp_normalize_path( $path );
+			if ( $root !== dirname( $path ) || ! preg_match( '/^package-[A-Za-z0-9]+\.zip$/', basename( $path ) ) ) {
+				continue;
+			}
+			if ( is_file( $path ) ) {
+				wp_delete_file( $path );
+			}
+		}
 	}
 
 	/**
