@@ -9,11 +9,11 @@ final class Project_Root_Normalizer {
 	 * @return array{structure:array<string, mixed>,main_file:string,unwrapped:bool}
 	 */
 	public function normalize( array $structure, string $main_file = '' ): array {
-		$files = is_array( $structure['files'] ?? null ) ? $structure['files'] : [];
+		$files  = is_array( $structure['files'] ?? null ) ? $structure['files'] : [];
 		$result = [
-			'structure'  => $structure,
-			'main_file'  => $this->path( $main_file ),
-			'unwrapped'  => false,
+			'structure' => $structure,
+			'main_file' => $this->path( $main_file ),
+			'unwrapped' => false,
 		];
 		if ( ! $files ) {
 			return $result;
@@ -34,7 +34,7 @@ final class Project_Root_Normalizer {
 		$prefix = null;
 		$paths  = [];
 		foreach ( $files as $file ) {
-			$path = is_array( $file ) ? $this->path( (string) ( $file['path'] ?? '' ) ) : '';
+			$path  = is_array( $file ) ? $this->path( (string) ( $file['path'] ?? '' ) ) : '';
 			$slash = strpos( $path, '/' );
 			if ( '' === $path || false === $slash ) {
 				return $result;

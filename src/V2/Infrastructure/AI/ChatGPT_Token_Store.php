@@ -4,8 +4,8 @@ namespace WP_Autoplugin\V2\Infrastructure\AI;
 
 /** Stores the site-wide ChatGPT token pair using authenticated encryption. */
 final class ChatGPT_Token_Store {
-	public const OPTION = '_wp_autoplugin_chatgpt_oauth_tokens';
-	private const CIPHER = 'aes-256-gcm';
+	public const OPTION   = '_wp_autoplugin_chatgpt_oauth_tokens';
+	private const CIPHER  = 'aes-256-gcm';
 	private const CONTEXT = 'wp-autoplugin/chatgpt-oauth/v1';
 
 	public function available(): bool {
@@ -25,13 +25,13 @@ final class ChatGPT_Token_Store {
 		if ( ! is_array( $envelope ) || 1 !== ( $envelope['version'] ?? null ) || self::CIPHER !== ( $envelope['cipher'] ?? null ) ) {
 			return new \WP_Error( 'chatgpt_oauth_storage_invalid', __( 'The stored ChatGPT credentials are invalid.', 'wp-autoplugin' ) );
 		}
-		$iv = base64_decode( (string) ( $envelope['iv'] ?? '' ), true );
-		$tag = base64_decode( (string) ( $envelope['tag'] ?? '' ), true );
+		$iv         = base64_decode( (string) ( $envelope['iv'] ?? '' ), true );
+		$tag        = base64_decode( (string) ( $envelope['tag'] ?? '' ), true );
 		$ciphertext = base64_decode( (string) ( $envelope['ciphertext'] ?? '' ), true );
 		if ( false === $iv || false === $tag || false === $ciphertext ) {
 			return new \WP_Error( 'chatgpt_oauth_storage_invalid', __( 'The stored ChatGPT credentials are invalid.', 'wp-autoplugin' ) );
 		}
-		$plain = openssl_decrypt( $ciphertext, self::CIPHER, $this->key(), OPENSSL_RAW_DATA, $iv, $tag, self::CONTEXT );
+		$plain  = openssl_decrypt( $ciphertext, self::CIPHER, $this->key(), OPENSSL_RAW_DATA, $iv, $tag, self::CONTEXT );
 		$tokens = is_string( $plain ) ? json_decode( $plain, true ) : null;
 		return $this->valid( $tokens ) ? $tokens : new \WP_Error( 'chatgpt_oauth_decryption_failed', __( 'The ChatGPT credentials could not be decrypted with the current WordPress salts. Reconnect the account.', 'wp-autoplugin' ), [ 'reconnect_required' => true ] );
 	}
@@ -49,12 +49,20 @@ final class ChatGPT_Token_Store {
 		} catch ( \Throwable $error ) {
 			return new \WP_Error( 'chatgpt_oauth_encryption_failed', __( 'Secure random data is unavailable for ChatGPT credential encryption.', 'wp-autoplugin' ), [ 'status' => 500 ] );
 		}
-		$tag = '';
+		$tag        = '';
 		$ciphertext = openssl_encrypt( (string) wp_json_encode( $tokens ), self::CIPHER, $this->key(), OPENSSL_RAW_DATA, $iv, $tag, self::CONTEXT, 16 );
 		if ( ! is_string( $ciphertext ) || 16 !== strlen( $tag ) ) {
 			return new \WP_Error( 'chatgpt_oauth_encryption_failed', __( 'The ChatGPT credentials could not be encrypted.', 'wp-autoplugin' ), [ 'status' => 500 ] );
 		}
-		$value = wp_json_encode( [ 'version' => 1, 'cipher' => self::CIPHER, 'iv' => base64_encode( $iv ), 'tag' => base64_encode( $tag ), 'ciphertext' => base64_encode( $ciphertext ) ] );
+		$value = wp_json_encode(
+			[
+				'version'    => 1,
+				'cipher'     => self::CIPHER,
+				'iv'         => base64_encode( $iv ),
+				'tag'        => base64_encode( $tag ),
+				'ciphertext' => base64_encode( $ciphertext ),
+			]
+		);
 		if ( ! add_option( self::OPTION, $value, '', false ) ) {
 			update_option( self::OPTION, $value, false );
 		}

@@ -12,7 +12,7 @@ final class ChatGPT_Tool_Schema {
 			if ( ! is_array( $tool['parameters'] ?? null ) ) {
 				continue;
 			}
-			$parameters = self::node( $tool['parameters'], 0 );
+			$parameters         = self::node( $tool['parameters'], 0 );
 			$parameters['type'] = 'object';
 			foreach ( [ 'allOf', 'anyOf', 'oneOf', 'enum', 'not' ] as $keyword ) {
 				unset( $parameters[ $keyword ] );

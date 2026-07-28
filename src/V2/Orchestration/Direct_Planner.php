@@ -69,13 +69,16 @@ final class Direct_Planner {
 		$input        = $prepared['input'];
 		$images       = ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true );
 		$parsed       = null;
-		$usage        = [ 'input_tokens' => 0, 'output_tokens' => 0 ];
+		$usage        = [
+			'input_tokens'  => 0,
+			'output_tokens' => 0,
+		];
 		for ( $attempt = 1; $attempt <= 3; $attempt++ ) {
 			$response = $transport->complete( $instructions, $input, [ 'prompt_images' => $images ] );
 			if ( is_wp_error( $response ) ) {
 				return $response;
 			}
-			$attempt_usage = (array) ( $response['usage'] ?? [] );
+			$attempt_usage           = (array) ( $response['usage'] ?? [] );
 			$usage['input_tokens']  += (int) ( $attempt_usage['input_tokens'] ?? 0 );
 			$usage['output_tokens'] += (int) ( $attempt_usage['output_tokens'] ?? 0 );
 			( new Usage_Repository() )->record( (int) $job['id'], $transport->provider(), $transport->model(), 'plan', $attempt_usage );

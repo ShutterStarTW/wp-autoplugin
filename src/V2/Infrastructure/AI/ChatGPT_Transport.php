@@ -11,15 +11,29 @@ final class ChatGPT_Transport implements Agent_Transport, Direct_Transport {
 		$this->tokens ??= new ChatGPT_Token_Manager();
 	}
 
-	public function provider(): string { return 'chatgpt'; }
-	public function model(): string { return $this->catalog_model; }
-	public function effort(): string { return $this->selected_effort; }
+	public function provider(): string {
+		return 'chatgpt'; }
+	public function model(): string {
+		return $this->catalog_model; }
+	public function effort(): string {
+		return $this->selected_effort; }
 
 	public function complete( string $instructions, string $input, array $options = [] ) {
 		if ( ! empty( $options['json'] ) ) {
 			$input = "Return exactly one valid JSON object.\n\n" . $input;
 		}
-		return $this->send( $instructions, [ [ 'role' => 'user', 'content' => $input, 'prompt_images' => (array) ( $options['prompt_images'] ?? [] ) ] ], [], $options );
+		return $this->send(
+			$instructions,
+			[
+				[
+					'role'          => 'user',
+					'content'       => $input,
+					'prompt_images' => (array) ( $options['prompt_images'] ?? [] ),
+				],
+			],
+			[],
+			$options
+		);
 	}
 
 	public function send( string $instructions, array $transcript, array $tools, array $options = [] ) {
@@ -30,19 +44,31 @@ final class ChatGPT_Transport implements Agent_Transport, Direct_Transport {
 		if ( is_wp_error( $tokens ) ) {
 			return $tokens;
 		}
-		$input = $this->input( $transcript );
+		$input        = $this->input( $transcript );
 		$native_tools = [];
 		foreach ( $tools as $tool ) {
-			$native_tools[] = [ 'type' => 'function', 'name' => (string) $tool['name'], 'description' => (string) $tool['description'], 'parameters' => (array) $tool['parameters'], 'strict' => false ];
+			$native_tools[] = [
+				'type'        => 'function',
+				'name'        => (string) $tool['name'],
+				'description' => (string) $tool['description'],
+				'parameters'  => (array) $tool['parameters'],
+				'strict'      => false,
+			];
 		}
 		$native_tools = ChatGPT_Tool_Schema::sanitize( $native_tools );
-		$body = [ 'model' => $this->remote_model, 'instructions' => $instructions, 'input' => $input, 'store' => false, 'stream' => true ];
+		$body         = [
+			'model'        => $this->remote_model,
+			'instructions' => $instructions,
+			'input'        => $input,
+			'store'        => false,
+			'stream'       => true,
+		];
 		if ( ! empty( $options['json'] ) ) {
 			$body['text'] = [ 'format' => [ 'type' => 'json_object' ] ];
 		}
 		if ( $native_tools ) {
-			$body['tools'] = $native_tools;
-			$body['tool_choice'] = 'auto';
+			$body['tools']               = $native_tools;
+			$body['tool_choice']         = 'auto';
 			$body['parallel_tool_calls'] = true;
 		}
 		if ( '' !== $this->selected_effort ) {
@@ -52,12 +78,21 @@ final class ChatGPT_Transport implements Agent_Transport, Direct_Transport {
 		if ( ! ChatGPT_Config::is_api_url( $url ) ) {
 			return new \WP_Error( 'chatgpt_endpoint_invalid', __( 'The ChatGPT endpoint is invalid.', 'wp-autoplugin' ) );
 		}
-		$response = wp_safe_remote_post( $url, [
-			'timeout'     => Direct_Transport::REQUEST_TIMEOUT,
-			'redirection' => 0,
-			'headers'     => array_merge( ChatGPT_Token_Manager::headers( $tokens ), [ 'Content-Type' => 'application/json', 'Accept' => 'text/event-stream' ] ),
-			'body'        => wp_json_encode( $body ),
-		] );
+		$response   = wp_safe_remote_post(
+			$url,
+			[
+				'timeout'     => Direct_Transport::REQUEST_TIMEOUT,
+				'redirection' => 0,
+				'headers'     => array_merge(
+					ChatGPT_Token_Manager::headers( $tokens ),
+					[
+						'Content-Type' => 'application/json',
+						'Accept'       => 'text/event-stream',
+					]
+				),
+				'body'        => wp_json_encode( $body ),
+			]
+		);
 		$has_images = $this->has_prompt_images( $transcript );
 		if ( is_wp_error( $response ) ) {
 			return $this->network_error( $response, $has_images );
@@ -86,24 +121,56 @@ final class ChatGPT_Transport implements Agent_Transport, Direct_Transport {
 			if ( 'user' === ( $item['role'] ?? '' ) ) {
 				$content = [];
 				if ( '' !== (string) ( $item['content'] ?? '' ) ) {
-					$content[] = [ 'type' => 'input_text', 'text' => (string) $item['content'] ];
+					$content[] = [
+						'type' => 'input_text',
+						'text' => (string) $item['content'],
+					];
 				}
 				foreach ( (array) ( $item['prompt_images'] ?? [] ) as $image ) {
 					if ( empty( $image['content'] ) || empty( $image['mime_type'] ) ) {
 						continue;
 					}
-					$content[] = [ 'type' => 'input_image', 'image_url' => 'data:' . $image['mime_type'] . ';base64,' . base64_encode( (string) $image['content'] ), 'detail' => 'auto' ]; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Provider-required private image data URI.
+					$content[] = [
+						'type'      => 'input_image',
+						'image_url' => 'data:' . $image['mime_type'] . ';base64,' . base64_encode( (string) $image['content'] ),
+						'detail'    => 'auto',
+					]; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Provider-required private image data URI.
 				}
-				$input[] = [ 'role' => 'user', 'content' => $content ?: [ [ 'type' => 'input_text', 'text' => '' ] ] ];
+				$input[] = [
+					'role'    => 'user',
+					'content' => $content ?: [
+						[
+							'type' => 'input_text',
+							'text' => '',
+						],
+					],
+				];
 			} elseif ( 'assistant' === ( $item['role'] ?? '' ) ) {
 				if ( ! empty( $item['content'] ) ) {
-					$input[] = [ 'role' => 'assistant', 'content' => [ [ 'type' => 'output_text', 'text' => (string) $item['content'] ] ] ];
+					$input[] = [
+						'role'    => 'assistant',
+						'content' => [
+							[
+								'type' => 'output_text',
+								'text' => (string) $item['content'],
+							],
+						],
+					];
 				}
 				foreach ( (array) ( $item['tool_calls'] ?? [] ) as $call ) {
-					$input[] = [ 'type' => 'function_call', 'call_id' => (string) $call['id'], 'name' => (string) $call['name'], 'arguments' => wp_json_encode( $call['arguments'] ) ];
+					$input[] = [
+						'type'      => 'function_call',
+						'call_id'   => (string) $call['id'],
+						'name'      => (string) $call['name'],
+						'arguments' => wp_json_encode( $call['arguments'] ),
+					];
 				}
 			} elseif ( 'tool' === ( $item['role'] ?? '' ) ) {
-				$input[] = [ 'type' => 'function_call_output', 'call_id' => (string) $item['call_id'], 'output' => (string) $item['content'] ];
+				$input[] = [
+					'type'    => 'function_call_output',
+					'call_id' => (string) $item['call_id'],
+					'output'  => (string) $item['content'],
+				];
 			}
 		}
 		return $input;
@@ -111,7 +178,7 @@ final class ChatGPT_Transport implements Agent_Transport, Direct_Transport {
 
 	/** @param array<string, mixed> $data @return array<string, mixed>|\WP_Error */
 	private function normalize( array $data ) {
-		$text = '';
+		$text  = '';
 		$calls = [];
 		foreach ( (array) ( $data['output'] ?? [] ) as $output ) {
 			if ( 'function_call' === ( $output['type'] ?? '' ) ) {
@@ -119,7 +186,11 @@ final class ChatGPT_Transport implements Agent_Transport, Direct_Transport {
 				if ( ! is_array( $arguments ) ) {
 					return new \WP_Error( 'agent_tool_arguments_invalid', __( 'The model returned malformed tool arguments.', 'wp-autoplugin' ) );
 				}
-				$calls[] = [ 'id' => (string) ( $output['call_id'] ?? $output['id'] ?? '' ), 'name' => (string) ( $output['name'] ?? '' ), 'arguments' => $arguments ];
+				$calls[] = [
+					'id'        => (string) ( $output['call_id'] ?? $output['id'] ?? '' ),
+					'name'      => (string) ( $output['name'] ?? '' ),
+					'arguments' => $arguments,
+				];
 			}
 			foreach ( (array) ( $output['content'] ?? [] ) as $content ) {
 				if ( 'output_text' === ( $content['type'] ?? '' ) ) {
@@ -130,25 +201,55 @@ final class ChatGPT_Transport implements Agent_Transport, Direct_Transport {
 		if ( '' === $text && is_string( $data['output_text'] ?? null ) ) {
 			$text = $data['output_text'];
 		}
-		$usage = [ 'input_tokens' => (int) ( $data['usage']['input_tokens'] ?? 0 ), 'output_tokens' => (int) ( $data['usage']['output_tokens'] ?? 0 ) ];
+		$usage = [
+			'input_tokens'  => (int) ( $data['usage']['input_tokens'] ?? 0 ),
+			'output_tokens' => (int) ( $data['usage']['output_tokens'] ?? 0 ),
+		];
 		if ( $calls ) {
-			return [ 'type' => 'tool_calls', 'tool_calls' => $calls, 'text' => trim( $text ), 'usage' => $usage, 'request_id' => (string) ( $data['id'] ?? '' ) ];
+			return [
+				'type'       => 'tool_calls',
+				'tool_calls' => $calls,
+				'text'       => trim( $text ),
+				'usage'      => $usage,
+				'request_id' => (string) ( $data['id'] ?? '' ),
+			];
 		}
 		return '' !== trim( $text )
-			? [ 'type' => 'final', 'content' => trim( $text ), 'usage' => $usage, 'request_id' => (string) ( $data['id'] ?? '' ) ]
+			? [
+				'type'       => 'final',
+				'content'    => trim( $text ),
+				'usage'      => $usage,
+				'request_id' => (string) ( $data['id'] ?? '' ),
+			]
 			: new \WP_Error( 'agent_response_empty', __( 'The model returned neither an answer nor a tool request.', 'wp-autoplugin' ) );
 	}
 
 	private function network_error( \WP_Error $error, bool $has_images ): \WP_Error {
-		$raw = $error->get_error_message();
+		$raw       = $error->get_error_message();
 		$ambiguous = false !== stripos( $raw, 'timed out' ) || false !== stripos( $raw, 'timeout' );
-		return new \WP_Error( 'agent_provider_network', $has_images ? __( 'The ChatGPT image request failed.', 'wp-autoplugin' ) : $raw, [ 'retryable' => ! $ambiguous, 'ambiguous' => $ambiguous ] );
+		return new \WP_Error(
+			'agent_provider_network',
+			$has_images ? __( 'The ChatGPT image request failed.', 'wp-autoplugin' ) : $raw,
+			[
+				'retryable' => ! $ambiguous,
+				'ambiguous' => $ambiguous,
+			]
+		);
 	}
 
 	private function http_error( int $status, string $body, bool $has_images ): \WP_Error {
-		$data = json_decode( $body, true );
+		$data    = json_decode( $body, true );
 		$message = $has_images ? __( 'The ChatGPT image request failed.', 'wp-autoplugin' ) : ( is_array( $data ) ? sanitize_text_field( (string) ( $data['error']['message'] ?? __( 'The ChatGPT request failed.', 'wp-autoplugin' ) ) ) : __( 'The ChatGPT request failed.', 'wp-autoplugin' ) );
-		return new \WP_Error( 'agent_provider_http', $message, [ 'retryable' => 429 === $status || $status >= 500, 'ambiguous' => false, 'status' => $status, 'reconnect_required' => in_array( $status, [ 401, 403 ], true ) ] );
+		return new \WP_Error(
+			'agent_provider_http',
+			$message,
+			[
+				'retryable'          => 429 === $status || $status >= 500,
+				'ambiguous'          => false,
+				'status'             => $status,
+				'reconnect_required' => in_array( $status, [ 401, 403 ], true ),
+			]
+		);
 	}
 
 	/** @param array<int, array<string, mixed>> $transcript */

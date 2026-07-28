@@ -24,16 +24,19 @@ final class Theme_Header_Transformer {
 		$transforms   = [ 'version' => $next_version ];
 
 		if ( 'copy' === $mode ) {
-			$base_name = trim( $name );
-			$copy_name = ( '' !== $base_name ? $base_name : $theme_name ) . ' — WP-Autoplugin Copy';
-			$uri       = 'https://wp-autoplugin.local/theme-copy/' . rawurlencode( $slug );
-			$source    = $this->replace_required_header( $source, 'Theme Name', $copy_name );
-			$source    = $this->set_or_insert_header( $source, 'Update URI', $uri );
+			$base_name                = trim( $name );
+			$copy_name                = ( '' !== $base_name ? $base_name : $theme_name ) . ' — WP-Autoplugin Copy';
+			$uri                      = 'https://wp-autoplugin.local/theme-copy/' . rawurlencode( $slug );
+			$source                   = $this->replace_required_header( $source, 'Theme Name', $copy_name );
+			$source                   = $this->set_or_insert_header( $source, 'Update URI', $uri );
 			$transforms['theme_name'] = $copy_name;
 			$transforms['update_uri'] = $uri;
 		}
 
-		return [ 'content' => $source, 'transforms' => $transforms ];
+		return [
+			'content'    => $source,
+			'transforms' => $transforms,
+		];
 	}
 
 	private function next_version( string $source ): string {
@@ -80,11 +83,11 @@ final class Theme_Header_Transformer {
 		if ( ! preg_match( $this->header_pattern( 'Theme Name' ), $header, $match, PREG_OFFSET_CAPTURE ) ) {
 			throw new \InvalidArgumentException( __( 'The theme stylesheet does not contain a Theme Name header.', 'wp-autoplugin' ) );
 		}
-		$line       = $match[0][0];
-		$line_end   = $match[0][1] + strlen( $line );
-		$prefix     = preg_match( '/^([ \t\/*#@]*)Theme Name/i', $line, $prefix_match ) ? $prefix_match[1] : ' * ';
-		$newline    = str_contains( $header, "\r\n" ) ? "\r\n" : "\n";
-		$insert     = str_contains( $match[1][0], '/*' ) && str_contains( $match[3][0], '*/' )
+		$line     = $match[0][0];
+		$line_end = $match[0][1] + strlen( $line );
+		$prefix   = preg_match( '/^([ \t\/*#@]*)Theme Name/i', $line, $prefix_match ) ? $prefix_match[1] : ' * ';
+		$newline  = str_contains( $header, "\r\n" ) ? "\r\n" : "\n";
+		$insert   = str_contains( $match[1][0], '/*' ) && str_contains( $match[3][0], '*/' )
 			? $newline . '/* ' . $header_name . ': ' . $value . ' */'
 			: $newline . $prefix . $header_name . ': ' . $value;
 		return substr( $source, 0, $line_end ) . $insert . substr( $source, $line_end );

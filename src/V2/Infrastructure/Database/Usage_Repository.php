@@ -13,13 +13,13 @@ final class Usage_Repository extends Repository {
 		$this->wpdb->insert(
 			Installer::table( 'usage' ),
 			[
-				'job_id'       => $job_id,
-				'provider'     => sanitize_key( $provider ),
-				'model'        => sanitize_text_field( $model ),
-				'task'         => sanitize_key( $task ),
-				'input_tokens' => max( 0, (int) ( $usage['input_tokens'] ?? 0 ) ),
-				'output_tokens'=> max( 0, (int) ( $usage['output_tokens'] ?? 0 ) ),
-				'created_at'   => $this->now(),
+				'job_id'        => $job_id,
+				'provider'      => sanitize_key( $provider ),
+				'model'         => sanitize_text_field( $model ),
+				'task'          => sanitize_key( $task ),
+				'input_tokens'  => max( 0, (int) ( $usage['input_tokens'] ?? 0 ) ),
+				'output_tokens' => max( 0, (int) ( $usage['output_tokens'] ?? 0 ) ),
+				'created_at'    => $this->now(),
 			]
 		);
 	}
@@ -52,7 +52,7 @@ final class Usage_Repository extends Repository {
 			), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Tables are allow-listed internal names.
 			ARRAY_A
 		);
-		$job_rows = $this->wpdb->get_results(
+		$job_rows   = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				"SELECT j.id, j.task, j.status, j.payload, j.created_at, j.started_at, j.finished_at,
 					u.task AS usage_task, u.provider, u.model,
@@ -75,14 +75,14 @@ final class Usage_Repository extends Repository {
 			'output_tokens' => 0,
 		];
 		foreach ( (array) $model_rows as $row ) {
-			$model = [
+			$model                   = [
 				'provider'      => (string) $row['provider'],
 				'model'         => (string) $row['model'],
 				'job_count'     => (int) $row['job_count'],
 				'input_tokens'  => (int) $row['input_tokens'],
 				'output_tokens' => (int) $row['output_tokens'],
 			];
-			$models[]               = $model;
+			$models[]                = $model;
 			$total['input_tokens']  += $model['input_tokens'];
 			$total['output_tokens'] += $model['output_tokens'];
 		}
@@ -91,7 +91,7 @@ final class Usage_Repository extends Repository {
 		foreach ( (array) $job_rows as $row ) {
 			$job_id = (int) $row['id'];
 			if ( ! isset( $executed_jobs[ $job_id ] ) ) {
-				$payload = $this->decode( $row['payload'] );
+				$payload                  = $this->decode( $row['payload'] );
 				$executed_jobs[ $job_id ] = [
 					'id'            => $job_id,
 					'task'          => (string) $row['task'],
@@ -118,8 +118,8 @@ final class Usage_Repository extends Repository {
 					'output_tokens' => 0,
 				];
 			}
-			$executed_jobs[ $job_id ]['input_tokens']                        += $input_tokens;
-			$executed_jobs[ $job_id ]['output_tokens']                       += $output_tokens;
+			$executed_jobs[ $job_id ]['input_tokens']                          += $input_tokens;
+			$executed_jobs[ $job_id ]['output_tokens']                         += $output_tokens;
 			$executed_jobs[ $job_id ]['models'][ $model_key ]['input_tokens']  += $input_tokens;
 			$executed_jobs[ $job_id ]['models'][ $model_key ]['output_tokens'] += $output_tokens;
 		}

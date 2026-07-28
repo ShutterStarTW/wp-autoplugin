@@ -20,9 +20,9 @@ final class Capability_Matrix {
 	 * @return array<string, bool|int|string>
 	 */
 	public function for_model( string $provider, string $model ): array {
-		$provider = sanitize_key( $provider );
+		$provider      = sanitize_key( $provider );
 		$image_pattern = self::IMAGE_MODEL_PATTERNS[ $provider ] ?? '';
-		$capabilities = [
+		$capabilities  = [
 			'provider'            => $provider,
 			'model'               => sanitize_text_field( $model ),
 			'direct_mode'         => true,

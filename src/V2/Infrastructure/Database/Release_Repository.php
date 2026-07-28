@@ -10,11 +10,20 @@ final class Release_Repository extends Repository {
 		$this->wpdb->insert(
 			Installer::table( 'release_packages' ),
 			[
-				'job_id' => (int) $job['id'], 'workspace_id' => (int) $job['workspace_id'], 'revision_id' => (int) $revision['id'],
-				'review_report_id' => absint( $job['payload']['review_report_id'] ?? 0 ) ?: null, 'mode' => $mode, 'status' => 'building',
-				'artifact_kind' => $artifact_kind, 'target_ref' => $target_ref, 'slug' => $slug,
-				'plugin_file' => 'plugin' === $artifact_kind ? $target_ref : null, 'review_override' => $override ? 1 : 0,
-				'created_by' => (int) $job['created_by'], 'created_at' => $now, 'updated_at' => $now,
+				'job_id'           => (int) $job['id'],
+				'workspace_id'     => (int) $job['workspace_id'],
+				'revision_id'      => (int) $revision['id'],
+				'review_report_id' => absint( $job['payload']['review_report_id'] ?? 0 ) ?: null,
+				'mode'             => $mode,
+				'status'           => 'building',
+				'artifact_kind'    => $artifact_kind,
+				'target_ref'       => $target_ref,
+				'slug'             => $slug,
+				'plugin_file'      => 'plugin' === $artifact_kind ? $target_ref : null,
+				'review_override'  => $override ? 1 : 0,
+				'created_by'       => (int) $job['created_by'],
+				'created_at'       => $now,
+				'updated_at'       => $now,
 			]
 		);
 		if ( ! $this->wpdb->insert_id ) {
@@ -27,24 +36,48 @@ final class Release_Repository extends Repository {
 		return false !== $this->wpdb->update(
 			Installer::table( 'release_packages' ),
 			[
-				'status' => 'ready', 'temp_path' => $path, 'sha256' => $hash, 'size' => $size,
-				'artifact_kind' => (string) ( $metadata['artifact_kind'] ?? 'plugin' ),
-				'target_ref' => (string) ( $metadata['target_ref'] ?? $metadata['plugin_file'] ?? '' ),
-				'slug' => (string) ( $metadata['slug'] ?? '' ), 'plugin_file' => isset( $metadata['plugin_file'] ) ? (string) $metadata['plugin_file'] : null,
-				'source_fingerprint' => $metadata['source_tree_fingerprint'] ?? null, 'artifact_fingerprint' => $metadata['tree_fingerprint'] ?? null,
-				'header_transforms' => $this->json( (array) ( $metadata['header_transforms'] ?? [] ) ),
-				'expires_at' => gmdate( 'Y-m-d H:i:s', time() + HOUR_IN_SECONDS ), 'updated_at' => $this->now(),
+				'status'               => 'ready',
+				'temp_path'            => $path,
+				'sha256'               => $hash,
+				'size'                 => $size,
+				'artifact_kind'        => (string) ( $metadata['artifact_kind'] ?? 'plugin' ),
+				'target_ref'           => (string) ( $metadata['target_ref'] ?? $metadata['plugin_file'] ?? '' ),
+				'slug'                 => (string) ( $metadata['slug'] ?? '' ),
+				'plugin_file'          => isset( $metadata['plugin_file'] ) ? (string) $metadata['plugin_file'] : null,
+				'source_fingerprint'   => $metadata['source_tree_fingerprint'] ?? null,
+				'artifact_fingerprint' => $metadata['tree_fingerprint'] ?? null,
+				'header_transforms'    => $this->json( (array) ( $metadata['header_transforms'] ?? [] ) ),
+				'expires_at'           => gmdate( 'Y-m-d H:i:s', time() + HOUR_IN_SECONDS ),
+				'updated_at'           => $this->now(),
 			],
 			[ 'id' => $id ]
 		);
 	}
 
 	public function fail_package( int $id, string $message ): void {
-		$this->wpdb->update( Installer::table( 'release_packages' ), [ 'status' => 'failed', 'error_message' => substr( $message, 0, 2000 ), 'temp_path' => null, 'updated_at' => $this->now() ], [ 'id' => $id ] );
+		$this->wpdb->update(
+			Installer::table( 'release_packages' ),
+			[
+				'status'        => 'failed',
+				'error_message' => substr( $message, 0, 2000 ),
+				'temp_path'     => null,
+				'updated_at'    => $this->now(),
+			],
+			[ 'id' => $id ]
+		);
 	}
 
 	public function cancel_package( int $id ): void {
-		$this->wpdb->update( Installer::table( 'release_packages' ), [ 'status' => 'cancelled', 'error_message' => null, 'temp_path' => null, 'updated_at' => $this->now() ], [ 'id' => $id ] );
+		$this->wpdb->update(
+			Installer::table( 'release_packages' ),
+			[
+				'status'        => 'cancelled',
+				'error_message' => null,
+				'temp_path'     => null,
+				'updated_at'    => $this->now(),
+			],
+			[ 'id' => $id ]
+		);
 	}
 
 	/** @return array<string,mixed>|null */
@@ -67,7 +100,15 @@ final class Release_Repository extends Repository {
 			if ( '' !== $path && is_file( $path ) ) {
 				wp_delete_file( $path );
 			}
-			$this->wpdb->update( Installer::table( 'release_packages' ), [ 'status' => 'expired', 'temp_path' => null, 'updated_at' => $this->now() ], [ 'id' => (int) $row['id'] ] );
+			$this->wpdb->update(
+				Installer::table( 'release_packages' ),
+				[
+					'status'     => 'expired',
+					'temp_path'  => null,
+					'updated_at' => $this->now(),
+				],
+				[ 'id' => (int) $row['id'] ]
+			);
 		}
 	}
 
@@ -77,12 +118,22 @@ final class Release_Repository extends Repository {
 		$this->wpdb->insert(
 			Installer::table( 'promotions' ),
 			[
-				'job_id' => (int) $job['id'], 'workspace_id' => (int) $job['workspace_id'], 'revision_id' => (int) $revision['id'],
-				'review_report_id' => absint( $job['payload']['review_report_id'] ?? 0 ) ?: null, 'mode' => $mode, 'status' => 'running',
-				'artifact_kind' => $artifact_kind, 'source_target_ref' => $source_ref, 'destination_target_ref' => $destination_ref,
-				'source_plugin_file' => 'plugin' === $artifact_kind ? $source_ref : null,
-				'destination_plugin_file' => 'plugin' === $artifact_kind ? $destination_ref : null, 'destination_slug' => $slug,
-				'review_override' => $override ? 1 : 0, 'created_by' => (int) $job['created_by'], 'created_at' => $now, 'updated_at' => $now,
+				'job_id'                  => (int) $job['id'],
+				'workspace_id'            => (int) $job['workspace_id'],
+				'revision_id'             => (int) $revision['id'],
+				'review_report_id'        => absint( $job['payload']['review_report_id'] ?? 0 ) ?: null,
+				'mode'                    => $mode,
+				'status'                  => 'running',
+				'artifact_kind'           => $artifact_kind,
+				'source_target_ref'       => $source_ref,
+				'destination_target_ref'  => $destination_ref,
+				'source_plugin_file'      => 'plugin' === $artifact_kind ? $source_ref : null,
+				'destination_plugin_file' => 'plugin' === $artifact_kind ? $destination_ref : null,
+				'destination_slug'        => $slug,
+				'review_override'         => $override ? 1 : 0,
+				'created_by'              => (int) $job['created_by'],
+				'created_at'              => $now,
+				'updated_at'              => $now,
 			]
 		);
 		if ( ! $this->wpdb->insert_id ) {
@@ -94,7 +145,7 @@ final class Release_Repository extends Repository {
 	/** @param array<string,mixed> $fields */
 	public function update_promotion( int $id, array $fields ): bool {
 		$allowed = [ 'status', 'artifact_kind', 'source_target_ref', 'destination_target_ref', 'destination_plugin_file', 'destination_slug', 'target_fingerprint', 'header_transforms', 'created_directories', 'active_before', 'active_after', 'error_message', 'finished_at' ];
-		$data = [ 'updated_at' => $this->now() ];
+		$data    = [ 'updated_at' => $this->now() ];
 		foreach ( $fields as $field => $value ) {
 			if ( in_array( $field, $allowed, true ) ) {
 				$data[ $field ] = in_array( $field, [ 'header_transforms', 'created_directories' ], true ) ? $this->json( $value ) : $value;
@@ -112,10 +163,10 @@ final class Release_Repository extends Repository {
 		foreach ( [ 'id', 'job_id', 'workspace_id', 'revision_id', 'review_report_id', 'active_before', 'active_after', 'review_override', 'created_by' ] as $field ) {
 			$row[ $field ] = null === $row[ $field ] ? null : (int) $row[ $field ];
 		}
-		$row['header_transforms']  = $this->decode( $row['header_transforms'] );
-		$row['created_directories'] = $this->decode( $row['created_directories'] );
-		$row['artifact_kind'] = (string) ( ( $row['artifact_kind'] ?? '' ) ?: 'plugin' );
-		$row['source_target_ref'] = ( $row['source_target_ref'] ?? null ) ?: ( $row['source_plugin_file'] ?? null );
+		$row['header_transforms']      = $this->decode( $row['header_transforms'] );
+		$row['created_directories']    = $this->decode( $row['created_directories'] );
+		$row['artifact_kind']          = (string) ( ( $row['artifact_kind'] ?? '' ) ?: 'plugin' );
+		$row['source_target_ref']      = ( $row['source_target_ref'] ?? null ) ?: ( $row['source_plugin_file'] ?? null );
 		$row['destination_target_ref'] = ( $row['destination_target_ref'] ?? null ) ?: ( $row['destination_plugin_file'] ?? null );
 		return $row;
 	}
@@ -134,9 +185,16 @@ final class Release_Repository extends Repository {
 				$inserted = $this->wpdb->insert(
 					Installer::table( 'promotion_files' ),
 					[
-						'promotion_id' => $promotion_id, 'path' => $file['path'], 'operation' => $file['operation'],
-						'base_exists' => $file['base_exists'] ? 1 : 0, 'base_content' => $file['base_content'], 'base_hash' => $file['base_hash'],
-						'promoted_exists' => $file['promoted_exists'] ? 1 : 0, 'promoted_content' => $file['promoted_content'], 'promoted_hash' => $file['promoted_hash'], 'created_at' => $this->now(),
+						'promotion_id'     => $promotion_id,
+						'path'             => $file['path'],
+						'operation'        => $file['operation'],
+						'base_exists'      => $file['base_exists'] ? 1 : 0,
+						'base_content'     => $file['base_content'],
+						'base_hash'        => $file['base_hash'],
+						'promoted_exists'  => $file['promoted_exists'] ? 1 : 0,
+						'promoted_content' => $file['promoted_content'],
+						'promoted_hash'    => $file['promoted_hash'],
+						'created_at'       => $this->now(),
 					]
 				);
 				if ( false === $inserted ) {
@@ -166,7 +224,7 @@ final class Release_Repository extends Repository {
 
 	public function is_latest_in_place( int $promotion_id, string $destination_ref, string $artifact_kind = 'plugin' ): bool {
 		$modes = 'theme' === $artifact_kind ? [ 'modify_theme_original' ] : [ 'modify_original' ];
-		$id = $this->wpdb->get_var(
+		$id    = $this->wpdb->get_var(
 			$this->wpdb->prepare(
 				'SELECT id FROM ' . Installer::table( 'promotions' ) . ' WHERE mode = %s AND artifact_kind = %s AND COALESCE(destination_target_ref,destination_plugin_file) = %s AND status IN (%s,%s) ORDER BY id DESC LIMIT 1',
 				$modes[0],
@@ -185,8 +243,8 @@ final class Release_Repository extends Repository {
 			$row[ $field ] = null === $row[ $field ] ? null : (int) $row[ $field ];
 		}
 		$row['header_transforms'] = $this->decode( $row['header_transforms'] ?? null );
-		$row['artifact_kind'] = (string) ( ( $row['artifact_kind'] ?? '' ) ?: 'plugin' );
-		$row['target_ref'] = ( $row['target_ref'] ?? null ) ?: ( $row['plugin_file'] ?? null );
+		$row['artifact_kind']     = (string) ( ( $row['artifact_kind'] ?? '' ) ?: 'plugin' );
+		$row['target_ref']        = ( $row['target_ref'] ?? null ) ?: ( $row['plugin_file'] ?? null );
 		return $row;
 	}
 }

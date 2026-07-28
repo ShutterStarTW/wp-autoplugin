@@ -21,17 +21,17 @@ PROMPT;
 	}
 
 	/**
-	 * @param array<string, mixed>             $manifest  Normalized complete file manifest.
+	 * @param array<string, mixed>              $manifest  Normalized complete file manifest.
 	 * @param array<int, array<string, string>> $generated Previously generated files.
 	 * @param array<int, array<string, mixed>>  $issues    Bounded validation feedback.
 	 */
 	public function input( string $request, string $plan, array $manifest, array $current, array $generated, array $issues = [] ): string {
 		$sections = [
 			'Original administrator request' => $request,
-			'Approved Plan Markdown'          => $plan,
-			'Normalized project manifest'     => (string) wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
-			'Current file to generate'         => (string) wp_json_encode( $current, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
-			'Previously generated files'      => (string) wp_json_encode( $generated, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			'Approved Plan Markdown'         => $plan,
+			'Normalized project manifest'    => (string) wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			'Current file to generate'       => (string) wp_json_encode( $current, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			'Previously generated files'     => (string) wp_json_encode( $generated, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
 		];
 		if ( $issues ) {
 			$sections['Validation errors from the previous attempt; correct only these while returning the complete file'] = (string) wp_json_encode( array_slice( $issues, 0, 5 ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );

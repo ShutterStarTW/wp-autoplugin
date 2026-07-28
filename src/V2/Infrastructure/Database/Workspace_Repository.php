@@ -17,7 +17,7 @@ final class Workspace_Repository extends Repository {
 		$this->wpdb->query( 'START TRANSACTION' );
 
 		try {
-			$table = Installer::table( 'targets' );
+			$table         = Installer::table( 'targets' );
 			$target_result = $this->wpdb->query(
 				$this->wpdb->prepare(
 					"INSERT INTO $table (kind, ref, name, metadata, created_at, updated_at)
@@ -54,7 +54,7 @@ final class Workspace_Repository extends Repository {
 				],
 				[ '%d', '%s', '%s', '%d', '%s', '%s' ]
 			);
-			$project_id = (int) $this->wpdb->insert_id;
+			$project_id     = (int) $this->wpdb->insert_id;
 			if ( false === $project_result || ! $project_id ) {
 				throw new \RuntimeException( $this->persistence_error( 'project' ) );
 			}
@@ -72,7 +72,7 @@ final class Workspace_Repository extends Repository {
 				],
 				[ '%d', '%s', '%s', '%s', '%d', '%s', '%s' ]
 			);
-			$workspace_id = (int) $this->wpdb->insert_id;
+			$workspace_id     = (int) $this->wpdb->insert_id;
 
 			if ( false === $workspace_result || ! $workspace_id ) {
 				throw new \RuntimeException( $this->persistence_error( 'workspace' ) );
@@ -166,17 +166,17 @@ final class Workspace_Repository extends Repository {
 			return [];
 		}
 
-		$workspace_ids   = array_map( 'intval', array_column( $workspaces, 'id' ) );
-		$placeholders    = implode( ',', array_fill( 0, count( $workspace_ids ), '%d' ) );
-		$jobs_table      = Installer::table( 'jobs' );
-		$events_table    = Installer::table( 'job_events' );
-		$revisions_table = Installer::table( 'revisions' );
-		$summaries       = [];
-		$stage_flags     = [];
+		$workspace_ids    = array_map( 'intval', array_column( $workspaces, 'id' ) );
+		$placeholders     = implode( ',', array_fill( 0, count( $workspace_ids ), '%d' ) );
+		$jobs_table       = Installer::table( 'jobs' );
+		$events_table     = Installer::table( 'job_events' );
+		$revisions_table  = Installer::table( 'revisions' );
+		$summaries        = [];
+		$stage_flags      = [];
 		$latest_revisions = [];
 
 		foreach ( $workspace_ids as $workspace_id ) {
-			$summaries[ $workspace_id ] = [
+			$summaries[ $workspace_id ]   = [
 				'total_jobs'     => 0,
 				'follow_up_jobs' => 0,
 				'retry_count'    => 0,
@@ -250,7 +250,7 @@ final class Workspace_Repository extends Repository {
 			$workspace_id = (int) $row['workspace_id'];
 			if ( isset( $stage_flags[ $workspace_id ] ) && (int) $row['revision_count'] > 0 ) {
 				$stage_flags[ $workspace_id ]['code']['complete'] = true;
-				$latest_revisions[ $workspace_id ] = (int) $row['latest_revision_id'];
+				$latest_revisions[ $workspace_id ]                = (int) $row['latest_revision_id'];
 			}
 		}
 
@@ -355,8 +355,8 @@ final class Workspace_Repository extends Repository {
 		$where_args = [ $user_id ];
 
 		if ( '' !== $search ) {
-			$like        = '%' . $this->wpdb->esc_like( $search ) . '%';
-			$where      .= ' AND (p.name LIKE %s OR w.request LIKE %s OR t.name LIKE %s OR t.ref LIKE %s)';
+			$like       = '%' . $this->wpdb->esc_like( $search ) . '%';
+			$where     .= ' AND (p.name LIKE %s OR w.request LIKE %s OR t.name LIKE %s OR t.ref LIKE %s)';
 			$where_args = array_merge( $where_args, [ $like, $like, $like, $like ] );
 		}
 
@@ -403,7 +403,11 @@ final class Workspace_Repository extends Repository {
 				'closed_at'  => $now,
 				'updated_at' => $now,
 			],
-			[ 'id' => $id, 'created_by' => $user_id, 'is_closed' => 0 ],
+			[
+				'id'         => $id,
+				'created_by' => $user_id,
+				'is_closed'  => 0,
+			],
 			[ '%d', '%s', '%s' ],
 			[ '%d', '%d', '%d' ]
 		);
@@ -424,7 +428,11 @@ final class Workspace_Repository extends Repository {
 				'closed_at'  => null,
 				'updated_at' => $this->now(),
 			],
-			[ 'id' => $id, 'created_by' => $user_id, 'is_closed' => 1 ],
+			[
+				'id'         => $id,
+				'created_by' => $user_id,
+				'is_closed'  => 1,
+			],
 			[ '%d', '%s', '%s' ],
 			[ '%d', '%d', '%d' ]
 		);
@@ -451,7 +459,10 @@ final class Workspace_Repository extends Repository {
 
 		return false !== $this->wpdb->update(
 			Installer::table( 'projects' ),
-			[ 'name' => wp_html_excerpt( $name, 255, '' ), 'updated_at' => $this->now() ],
+			[
+				'name'       => wp_html_excerpt( $name, 255, '' ),
+				'updated_at' => $this->now(),
+			],
 			[ 'id' => $project_id ],
 			[ '%s', '%s' ],
 			[ '%d' ]

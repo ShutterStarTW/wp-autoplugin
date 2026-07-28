@@ -17,10 +17,10 @@ final class Job_Runner {
 	}
 
 	public function run( int $job_id, int $generation = 0 ): void {
-		$jobs       = new Job_Repository();
-		$workspaces = new Workspace_Repository();
-		$job        = $jobs->find( $job_id );
-		$workspace   = $job ? $workspaces->find( (int) $job['workspace_id'] ) : null;
+		$jobs         = new Job_Repository();
+		$workspaces   = new Workspace_Repository();
+		$job          = $jobs->find( $job_id );
+		$workspace    = $job ? $workspaces->find( (int) $job['workspace_id'] ) : null;
 		$is_agent_job = $job && $workspace && Agent_Task::uses_source_tools( $job, $workspace );
 		$is_resumable = $is_agent_job || ( $job && Job_Repository::is_code_work( $job ) );
 
@@ -31,13 +31,26 @@ final class Job_Runner {
 		if ( $job['cancel_requested'] ) {
 			( new Agent_Run_Repository() )->terminate_by_job( $job_id, 'cancelled' );
 			( new Code_Run_Repository() )->terminate_by_job( $job_id, 'cancelled' );
-			$jobs->update( $job_id, [ 'status' => 'cancelled', 'finished_at' => current_time( 'mysql', true ) ] );
+			$jobs->update(
+				$job_id,
+				[
+					'status'      => 'cancelled',
+					'finished_at' => current_time( 'mysql', true ),
+				]
+			);
 			$jobs->event( $job_id, 'cancelled', __( 'Job cancelled before execution.', 'wp-autoplugin' ) );
 			return;
 		}
 
 		if ( 'queued' === $job['status'] ) {
-			$jobs->update( $job_id, [ 'status' => 'running', 'progress' => 5, 'started_at' => current_time( 'mysql', true ) ] );
+			$jobs->update(
+				$job_id,
+				[
+					'status'     => 'running',
+					'progress'   => 5,
+					'started_at' => current_time( 'mysql', true ),
+				]
+			);
 			$jobs->event( $job_id, 'started', __( 'Background processing started.', 'wp-autoplugin' ) );
 		} else {
 			$jobs->update( $job_id, [ 'status' => 'running' ] );
@@ -58,7 +71,14 @@ final class Job_Runner {
 					return;
 				}
 				$message = __( 'Background processing stopped because PHP encountered a fatal error. Check the PHP error log for details.', 'wp-autoplugin' );
-				$repository->update( $job_id, [ 'status' => 'failed', 'error_message' => $message, 'finished_at' => current_time( 'mysql', true ) ] );
+				$repository->update(
+					$job_id,
+					[
+						'status'        => 'failed',
+						'error_message' => $message,
+						'finished_at'   => current_time( 'mysql', true ),
+					]
+				);
 				$repository->event( $job_id, 'failed', $message, [], 'error' );
 			}
 		);
@@ -89,7 +109,13 @@ final class Job_Runner {
 			if ( $latest && $latest['cancel_requested'] && empty( $result['revision_id'] ) ) {
 				( new Agent_Run_Repository() )->terminate_by_job( $job_id, 'cancelled' );
 				( new Code_Run_Repository() )->terminate_by_job( $job_id, 'cancelled' );
-				$jobs->update( $job_id, [ 'status' => 'cancelled', 'finished_at' => current_time( 'mysql', true ) ] );
+				$jobs->update(
+					$job_id,
+					[
+						'status'      => 'cancelled',
+						'finished_at' => current_time( 'mysql', true ),
+					]
+				);
 				$jobs->event( $job_id, 'cancelled', __( 'Job cancelled.', 'wp-autoplugin' ) );
 				$fatal_guard = false;
 				return;

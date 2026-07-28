@@ -56,13 +56,25 @@ final class Promotion_Service {
 			( new Release_Repository() )->update_promotion(
 				(int) $promotion['id'],
 				[
-					'status' => 'installed', 'artifact_kind' => 'plugin', 'destination_target_ref' => $plugin_file,
-					'destination_plugin_file' => $plugin_file, 'destination_slug' => $built['slug'],
-					'target_fingerprint' => $built['tree_fingerprint'], 'header_transforms' => $built['header_transforms'],
-					'active_before' => 0, 'active_after' => 0, 'finished_at' => current_time( 'mysql', true ),
+					'status'                  => 'installed',
+					'artifact_kind'           => 'plugin',
+					'destination_target_ref'  => $plugin_file,
+					'destination_plugin_file' => $plugin_file,
+					'destination_slug'        => $built['slug'],
+					'target_fingerprint'      => $built['tree_fingerprint'],
+					'header_transforms'       => $built['header_transforms'],
+					'active_before'           => 0,
+					'active_after'            => 0,
+					'finished_at'             => current_time( 'mysql', true ),
 				]
 			);
-			return [ 'status' => 'installed', 'plugin_file' => $plugin_file, 'slug' => $built['slug'], 'active' => false, 'header_transforms' => $built['header_transforms'] ];
+			return [
+				'status'            => 'installed',
+				'plugin_file'       => $plugin_file,
+				'slug'              => $built['slug'],
+				'active'            => false,
+				'header_transforms' => $built['header_transforms'],
+			];
 		} finally {
 			if ( file_exists( $temp ) ) {
 				$filesystem->delete( $temp, true );
@@ -82,10 +94,10 @@ final class Promotion_Service {
 			return new \WP_Error( 'promotion_activation_state', __( 'This promotion is not waiting for activation.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		$destination = (string) $promotion['destination_plugin_file'];
-		$source      = (string) $promotion['source_plugin_file'];
+		$destination     = (string) $promotion['destination_plugin_file'];
+		$source          = (string) $promotion['source_plugin_file'];
 		$original_active = '' !== $source && is_plugin_active( $source );
-		$valid = validate_plugin( $destination );
+		$valid           = validate_plugin( $destination );
 		if ( is_wp_error( $valid ) ) {
 			return $this->activation_failed( $promotion, $valid->get_error_message(), $original_active );
 		}
@@ -117,8 +129,24 @@ final class Promotion_Service {
 			return $this->activation_failed( $promotion, $message, $original_active );
 		}
 		$status = 'install_fork' === $promotion['mode'] ? 'switched' : 'activated';
-		( new Release_Repository() )->update_promotion( (int) $promotion['id'], [ 'status' => $status, 'error_message' => null, 'active_before' => $original_active ? 1 : 0, 'active_after' => 1, 'finished_at' => current_time( 'mysql', true ) ] );
-		return [ 'status' => $status, 'plugin_file' => $destination, 'active' => true, 'original_plugin_file' => $source ?: null, 'original_active' => false, 'side_effect_warning' => __( 'Activation and deactivation may have database or runtime side effects that file rollback cannot undo.', 'wp-autoplugin' ) ];
+		( new Release_Repository() )->update_promotion(
+			(int) $promotion['id'],
+			[
+				'status'        => $status,
+				'error_message' => null,
+				'active_before' => $original_active ? 1 : 0,
+				'active_after'  => 1,
+				'finished_at'   => current_time( 'mysql', true ),
+			]
+		);
+		return [
+			'status'               => $status,
+			'plugin_file'          => $destination,
+			'active'               => true,
+			'original_plugin_file' => $source ?: null,
+			'original_active'      => false,
+			'side_effect_warning'  => __( 'Activation and deactivation may have database or runtime side effects that file rollback cannot undo.', 'wp-autoplugin' ),
+		];
 	}
 
 	/** @return \WP_Error */
@@ -188,11 +216,11 @@ final class Promotion_Service {
 			if ( ( 'add' === $operation && $exists ) || ( in_array( $operation, [ 'update', 'delete' ], true ) && ( ! $exists || false === $before || ! hash_equals( (string) $file['base_content_hash'], hash( 'sha256', $before ) ) ) ) ) {
 				return new \WP_Error( 'promotion_file_drift', sprintf( __( '%s no longer matches the staged baseline.', 'wp-autoplugin' ), $path ) );
 			}
-			$after = 'delete' === $operation ? null : (string) $file['content'];
+			$after            = 'delete' === $operation ? null : (string) $file['content'];
 			$records[ $path ] = $this->record( $path, $operation, $before, $after );
 		}
-		$main = basename( (string) $workspace['target_ref'] );
-		$main_path = $this->target_path( $root, $main );
+		$main        = basename( (string) $workspace['target_ref'] );
+		$main_path   = $this->target_path( $root, $main );
 		$main_before = file_get_contents( $main_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Conflict-checked local plugin snapshot.
 		if ( false === $main_before ) {
 			return new \WP_Error( 'promotion_main_file', __( 'The target main plugin file could not be read.', 'wp-autoplugin' ) );
@@ -204,13 +232,19 @@ final class Promotion_Service {
 			return new \WP_Error( 'promotion_version', $error->getMessage() );
 		}
 		$records[ $main ] = $this->record( $main, 'update', $main_before, $main_after );
-		$records = array_values( $records );
-		$repository = new Release_Repository();
+		$records          = array_values( $records );
+		$repository       = new Release_Repository();
 		$repository->replace_promotion_files( (int) $promotion['id'], $records );
-		$repository->update_promotion( (int) $promotion['id'], [ 'target_fingerprint' => $tree['fingerprint'], 'header_transforms' => [ 'version' => 'semantic_patch' ] ] );
+		$repository->update_promotion(
+			(int) $promotion['id'],
+			[
+				'target_fingerprint' => $tree['fingerprint'],
+				'header_transforms'  => [ 'version' => 'semantic_patch' ],
+			]
+		);
 
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		$active = is_plugin_active( (string) $workspace['target_ref'] );
+		$active      = is_plugin_active( (string) $workspace['target_ref'] );
 		$directories = [];
 		$this->maintenance( $active, true );
 		try {
@@ -236,14 +270,39 @@ final class Promotion_Service {
 			$this->verify( $root, $records, true );
 		} catch ( \Throwable $error ) {
 			$restored = $this->restore_records( $root, $records, $filesystem, $directories, true );
-			$repository->update_promotion( (int) $promotion['id'], [ 'status' => $restored ? 'failed' : 'rollback_failed', 'error_message' => $error->getMessage(), 'created_directories' => $directories, 'active_before' => $active ? 1 : 0, 'active_after' => $active ? 1 : 0, 'finished_at' => current_time( 'mysql', true ) ] );
+			$repository->update_promotion(
+				(int) $promotion['id'],
+				[
+					'status'              => $restored ? 'failed' : 'rollback_failed',
+					'error_message'       => $error->getMessage(),
+					'created_directories' => $directories,
+					'active_before'       => $active ? 1 : 0,
+					'active_after'        => $active ? 1 : 0,
+					'finished_at'         => current_time( 'mysql', true ),
+				]
+			);
 			return new \WP_Error( $restored ? 'promotion_write_failed' : 'promotion_rollback_failed', $error->getMessage() );
 		} finally {
 			$this->maintenance( $active, false );
 		}
 		$this->invalidate( $root, $records );
-		$repository->update_promotion( (int) $promotion['id'], [ 'status' => 'completed', 'created_directories' => $directories, 'active_before' => $active ? 1 : 0, 'active_after' => $active ? 1 : 0, 'finished_at' => current_time( 'mysql', true ) ] );
-		return [ 'status' => 'completed', 'plugin_file' => (string) $workspace['target_ref'], 'active' => $active, 'rollback_available' => true, 'warning' => __( 'Upstream updates remain enabled and may overwrite these changes. Rollback restores files only.', 'wp-autoplugin' ) ];
+		$repository->update_promotion(
+			(int) $promotion['id'],
+			[
+				'status'              => 'completed',
+				'created_directories' => $directories,
+				'active_before'       => $active ? 1 : 0,
+				'active_after'        => $active ? 1 : 0,
+				'finished_at'         => current_time( 'mysql', true ),
+			]
+		);
+		return [
+			'status'             => 'completed',
+			'plugin_file'        => (string) $workspace['target_ref'],
+			'active'             => $active,
+			'rollback_available' => true,
+			'warning'            => __( 'Upstream updates remain enabled and may overwrite these changes. Rollback restores files only.', 'wp-autoplugin' ),
+		];
 	}
 
 	/** @return array<string,mixed>|\WP_Error */
@@ -278,14 +337,33 @@ final class Promotion_Service {
 				throw new \RuntimeException( __( 'One or more promoted files could not be restored.', 'wp-autoplugin' ) );
 			}
 		} catch ( \Throwable $error ) {
-			$repository->update_promotion( (int) $promotion['id'], [ 'status' => 'rollback_failed', 'error_message' => $error->getMessage(), 'finished_at' => current_time( 'mysql', true ) ] );
+			$repository->update_promotion(
+				(int) $promotion['id'],
+				[
+					'status'        => 'rollback_failed',
+					'error_message' => $error->getMessage(),
+					'finished_at'   => current_time( 'mysql', true ),
+				]
+			);
 			return new \WP_Error( 'promotion_rollback_failed', $error->getMessage() );
 		} finally {
 			$this->maintenance( $active, false );
 		}
 		$this->invalidate( $root, $records );
-		$repository->update_promotion( (int) $promotion['id'], [ 'status' => 'rolled_back', 'active_after' => $active ? 1 : 0, 'finished_at' => current_time( 'mysql', true ) ] );
-		return [ 'status' => 'rolled_back', 'plugin_file' => $promotion['destination_plugin_file'], 'active' => $active, 'warning' => __( 'Files were restored. Database and runtime side effects were not reverted.', 'wp-autoplugin' ) ];
+		$repository->update_promotion(
+			(int) $promotion['id'],
+			[
+				'status'       => 'rolled_back',
+				'active_after' => $active ? 1 : 0,
+				'finished_at'  => current_time( 'mysql', true ),
+			]
+		);
+		return [
+			'status'      => 'rolled_back',
+			'plugin_file' => $promotion['destination_plugin_file'],
+			'active'      => $active,
+			'warning'     => __( 'Files were restored. Database and runtime side effects were not reverted.', 'wp-autoplugin' ),
+		];
 	}
 
 	private function filesystem() {
@@ -304,7 +382,16 @@ final class Promotion_Service {
 	}
 
 	private function record( string $path, string $operation, ?string $before, ?string $after ): array {
-		return [ 'path' => $path, 'operation' => $operation, 'base_exists' => null !== $before, 'base_content' => $before, 'base_hash' => null === $before ? null : hash( 'sha256', $before ), 'promoted_exists' => null !== $after, 'promoted_content' => $after, 'promoted_hash' => null === $after ? null : hash( 'sha256', $after ) ];
+		return [
+			'path'             => $path,
+			'operation'        => $operation,
+			'base_exists'      => null !== $before,
+			'base_content'     => $before,
+			'base_hash'        => null === $before ? null : hash( 'sha256', $before ),
+			'promoted_exists'  => null !== $after,
+			'promoted_content' => $after,
+			'promoted_hash'    => null === $after ? null : hash( 'sha256', $after ),
+		];
 	}
 
 	private function target_path( string $root, string $relative ): string {

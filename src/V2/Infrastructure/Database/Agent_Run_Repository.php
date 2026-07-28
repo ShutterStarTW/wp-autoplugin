@@ -8,7 +8,7 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
 final class Agent_Run_Repository extends Repository {
 	/**
 	 * @param array<int, array<string, mixed>> $transcript Canonical provider-neutral messages.
-	 * @param array<string, string>             $inspected  Relative paths keyed to source hashes.
+	 * @param array<string, string>            $inspected  Relative paths keyed to source hashes.
 	 * @return array<string, mixed>
 	 */
 	public function create( int $job_id, string $provider, string $model, string $effort, array $transcript, string $tree_fingerprint, array $inspected, int $source_bytes = 0 ): array {
@@ -50,7 +50,7 @@ final class Agent_Run_Repository extends Repository {
 	/** @return array<int, array<string, mixed>> */
 	public function recoverable(): array {
 		$before = gmdate( 'Y-m-d H:i:s', time() - 2 * MINUTE_IN_SECONDS );
-		$rows = $this->wpdb->get_results(
+		$rows   = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT r.* FROM ' . Installer::table( 'agent_runs' ) . ' r INNER JOIN ' . Installer::table( 'jobs' ) . ' j ON j.id = r.job_id WHERE r.status = %s AND r.updated_at <= %s AND (r.lease_token IS NULL OR r.lease_expires_at < %s) AND j.status IN (%s,%s)',
 				'active',
@@ -88,20 +88,38 @@ final class Agent_Run_Repository extends Repository {
 	 */
 	public function checkpoint( int $run_id, string $token, array $state ): bool {
 		$allowed = [ 'generation', 'model_turns', 'tool_calls', 'source_bytes', 'input_tokens', 'output_tokens', 'transcript', 'inspected_files', 'retry_count', 'last_error' ];
-		$data    = [ 'updated_at' => $this->now(), 'lease_token' => null, 'lease_expires_at' => null ];
+		$data    = [
+			'updated_at'       => $this->now(),
+			'lease_token'      => null,
+			'lease_expires_at' => null,
+		];
 		foreach ( $state as $field => $value ) {
 			if ( in_array( $field, $allowed, true ) ) {
 				$data[ $field ] = in_array( $field, [ 'transcript', 'inspected_files' ], true ) ? $this->json( $value ) : $value;
 			}
 		}
-		return false !== $this->wpdb->update( Installer::table( 'agent_runs' ), $data, [ 'id' => $run_id, 'lease_token' => $token ] );
+		return false !== $this->wpdb->update(
+			Installer::table( 'agent_runs' ),
+			$data,
+			[
+				'id'          => $run_id,
+				'lease_token' => $token,
+			]
+		);
 	}
 
 	public function release( int $run_id, string $token ): void {
 		$this->wpdb->update(
 			Installer::table( 'agent_runs' ),
-			[ 'lease_token' => null, 'lease_expires_at' => null, 'updated_at' => $this->now() ],
-			[ 'id' => $run_id, 'lease_token' => $token ]
+			[
+				'lease_token'      => null,
+				'lease_expires_at' => null,
+				'updated_at'       => $this->now(),
+			],
+			[
+				'id'          => $run_id,
+				'lease_token' => $token,
+			]
 		);
 	}
 
@@ -118,7 +136,10 @@ final class Agent_Run_Repository extends Repository {
 				'lease_expires_at' => null,
 				'updated_at'       => $this->now(),
 			],
-			[ 'id' => $run_id, 'lease_token' => $token ]
+			[
+				'id'          => $run_id,
+				'lease_token' => $token,
+			]
 		);
 		$this->scrub_step_payloads( $run_id, $status );
 	}
@@ -130,7 +151,13 @@ final class Agent_Run_Repository extends Repository {
 		}
 		$this->wpdb->update(
 			Installer::table( 'agent_runs' ),
-			[ 'status' => sanitize_key( $status ), 'transcript' => $this->json( [] ), 'lease_token' => null, 'lease_expires_at' => null, 'updated_at' => $this->now() ],
+			[
+				'status'           => sanitize_key( $status ),
+				'transcript'       => $this->json( [] ),
+				'lease_token'      => null,
+				'lease_expires_at' => null,
+				'updated_at'       => $this->now(),
+			],
 			[ 'id' => $run['id'] ]
 		);
 		$this->scrub_step_payloads( (int) $run['id'], $status );
@@ -158,13 +185,13 @@ final class Agent_Run_Repository extends Repository {
 		$this->wpdb->insert(
 			$table,
 			[
-				'run_id'    => $run_id,
-				'sequence'  => $sequence,
-				'kind'      => sanitize_key( $kind ),
-				'tool_name' => $tool_name ? sanitize_key( $tool_name ) : null,
-				'path'      => $path ? sanitize_text_field( $path ) : null,
-				'payload'   => $this->json( $payload ),
-				'created_at'=> $this->now(),
+				'run_id'     => $run_id,
+				'sequence'   => $sequence,
+				'kind'       => sanitize_key( $kind ),
+				'tool_name'  => $tool_name ? sanitize_key( $tool_name ) : null,
+				'path'       => $path ? sanitize_text_field( $path ) : null,
+				'payload'    => $this->json( $payload ),
+				'created_at' => $this->now(),
 			]
 		);
 	}

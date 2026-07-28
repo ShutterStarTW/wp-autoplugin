@@ -32,7 +32,10 @@ final class Code_Follow_Up_Response {
 			return $this->error( 'code_follow_up_content', __( 'The Code follow-up response requires bounded non-empty Markdown content.', 'wp-autoplugin' ) );
 		}
 		if ( 'answer' === $outcome ) {
-			return [ 'outcome' => 'answer', 'content' => $content ];
+			return [
+				'outcome' => 'answer',
+				'content' => $content,
+			];
 		}
 		if ( 'changes' !== $outcome || ! is_array( $decoded['manifest'] ?? null ) || ! is_array( $decoded['changes'] ?? null ) ) {
 			return $this->error( 'code_follow_up_shape', __( 'The Code follow-up response must classify as answer or provide a complete changes manifest.', 'wp-autoplugin' ) );
@@ -87,7 +90,7 @@ final class Code_Follow_Up_Response {
 			if ( ! in_array( $target_paths[ $path ]['type'], Code_Validator::GENERATED_TYPES, true ) ) {
 				return $this->error( 'code_follow_up_target_type', __( 'AI Code follow-ups can generate only PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, and plain-text files.', 'wp-autoplugin' ) );
 			}
-			$total_bytes += strlen( $instruction );
+			$total_bytes          += strlen( $instruction );
 			$instructions[ $path ] = $instruction;
 		}
 		if ( $total_bytes > self::MAX_INSTRUCTIONS_BYTES ) {
@@ -135,8 +138,8 @@ final class Code_Follow_Up_Response {
 			];
 		}
 		if ( isset( $instructions[ $manifest['main_file'] ] ) ) {
-			$main  = $files[ array_search( $manifest['main_file'], array_column( $files, 'path' ), true ) ];
-			$files = array_values( array_filter( $files, static fn( array $file ): bool => $manifest['main_file'] !== $file['path'] ) );
+			$main    = $files[ array_search( $manifest['main_file'], array_column( $files, 'path' ), true ) ];
+			$files   = array_values( array_filter( $files, static fn( array $file ): bool => $manifest['main_file'] !== $file['path'] ) );
 			$files[] = $main;
 		}
 
@@ -159,8 +162,8 @@ final class Code_Follow_Up_Response {
 	 * Normalize a target-relative successor. Omitted rows are unstaged; only an
 	 * explicit delete action stages deletion of a live target file.
 	 *
-	 * @param array<string, mixed> $base
-	 * @param array<string, mixed> $manifest
+	 * @param array<string, mixed>  $base
+	 * @param array<string, mixed>  $manifest
 	 * @param array<string, string> $instructions
 	 * @return array<string, mixed>|\WP_Error
 	 */
@@ -201,7 +204,11 @@ final class Code_Follow_Up_Response {
 			return $this->error( 'code_follow_up_noop', __( 'The proposed Code follow-up does not contain a material change.', 'wp-autoplugin' ) );
 		}
 
-		$change_set = [ 'added_paths' => [], 'updated_paths' => [], 'deleted_paths' => [] ];
+		$change_set = [
+			'added_paths'   => [],
+			'updated_paths' => [],
+			'deleted_paths' => [],
+		];
 		foreach ( $manifest['files'] as $file ) {
 			$key = match ( $file['operation'] ) {
 				'add'    => 'added_paths',
@@ -223,6 +230,13 @@ final class Code_Follow_Up_Response {
 	}
 
 	private function error( string $code, string $message ): \WP_Error {
-		return new \WP_Error( $code, $message, [ 'retryable' => true, 'ambiguous' => false ] );
+		return new \WP_Error(
+			$code,
+			$message,
+			[
+				'retryable' => true,
+				'ambiguous' => false,
+			]
+		);
 	}
 }

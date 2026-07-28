@@ -19,7 +19,10 @@ final class Plan_Response {
 			return new \WP_Error( 'plan_agent_response_invalid', __( 'The provider returned an invalid Plan response. No Plan artifact was changed.', 'wp-autoplugin' ) );
 		}
 		if ( 'answer' === $outcome ) {
-			return [ 'content' => $content, 'outcome' => 'answer' ];
+			return [
+				'content' => $content,
+				'outcome' => 'answer',
+			];
 		}
 
 		$structure = $this->structure( $decoded['structured']['project_structure'] ?? null );
@@ -29,11 +32,11 @@ final class Plan_Response {
 		$raw_structured = is_array( $decoded['structured'] ?? null ) ? $decoded['structured'] : [];
 		if ( in_array( $operation, [ 'create', 'hook_extension' ], true ) ) {
 			$has_explicit_main = is_string( $raw_structured['main_file'] ?? null ) && '' !== trim( $raw_structured['main_file'] );
-			$root      = ( new Project_Root_Normalizer() )->normalize(
+			$root              = ( new Project_Root_Normalizer() )->normalize(
 				$structure,
 				$has_explicit_main ? $raw_structured['main_file'] : ''
 			);
-			$structure = $root['structure'];
+			$structure         = $root['structure'];
 			if ( 'hook_extension' === $operation || $has_explicit_main ) {
 				$raw_structured['main_file'] = $root['main_file'];
 			}
@@ -89,11 +92,14 @@ final class Plan_Response {
 			if ( 'add' !== $file['action'] ) {
 				return $this->creation_error();
 			}
-			$has_php = $has_php || 'php' === $file['type'];
+			$has_php    = $has_php || 'php' === $file['type'];
 			$main_found = $main_found || ( $main_file === $file['path'] && 'php' === $file['type'] );
 		}
 
-		return $has_php && $main_found ? [ 'plugin_name' => $plugin_name, 'main_file' => $main_file ] : $this->creation_error();
+		return $has_php && $main_found ? [
+			'plugin_name' => $plugin_name,
+			'main_file'   => $main_file,
+		] : $this->creation_error();
 	}
 
 	private function creation_error(): \WP_Error {
@@ -112,7 +118,7 @@ final class Plan_Response {
 			return $this->extension_error();
 		}
 
-		$feasible   = $value['technically_feasible'];
+		$feasible    = $value['technically_feasible'];
 		$plugin_name = is_string( $value['plugin_name'] ?? null ) ? trim( $value['plugin_name'] ) : '';
 		$main_file   = is_string( $value['main_file'] ?? null ) ? $this->relative_path( $value['main_file'] ) : '';
 		$hooks       = [];
@@ -147,9 +153,9 @@ final class Plan_Response {
 
 		return [
 			'technically_feasible' => $feasible,
-			'plugin_name'           => $plugin_name,
-			'main_file'             => $main_file,
-			'hooks'                 => array_values( array_unique( $hooks ) ),
+			'plugin_name'          => $plugin_name,
+			'main_file'            => $main_file,
+			'hooks'                => array_values( array_unique( $hooks ) ),
 		];
 	}
 
@@ -189,7 +195,7 @@ final class Plan_Response {
 				return new \WP_Error( 'plan_agent_structure_invalid', __( 'The provider returned an invalid Plan file map. No Plan artifact was changed.', 'wp-autoplugin' ) );
 			}
 			$paths[ $path ] = true;
-			$files[] = compact( 'path', 'type', 'description', 'action' );
+			$files[]        = compact( 'path', 'type', 'description', 'action' );
 		}
 
 		return [

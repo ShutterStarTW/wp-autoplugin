@@ -47,7 +47,7 @@ final class Package_Builder {
 			if ( ! wp_mkdir_p( $root ) ) {
 				return new \WP_Error( 'release_temp_unavailable', __( 'The private package tree could not be created.', 'wp-autoplugin' ) );
 			}
-			$headers = [];
+			$headers            = [];
 			$source_fingerprint = null;
 			if ( 'project' === $mode ) {
 				foreach ( (array) $revision['files'] as $file ) {
@@ -71,13 +71,13 @@ final class Package_Builder {
 					return new \WP_Error( 'release_target_changed', __( 'The installed plugin changed after this revision was staged.', 'wp-autoplugin' ) );
 				}
 					$complete_source = $this->fingerprint_target( (string) $workspace['target_ref'] );
-					if ( is_wp_error( $complete_source ) ) {
-						return $complete_source;
-					}
+				if ( is_wp_error( $complete_source ) ) {
+					return $complete_source;
+				}
 					$expected_complete = (string) ( $manifest['complete_target_fingerprint'] ?? '' );
-					if ( '' !== $expected_complete && ! hash_equals( $expected_complete, $complete_source['fingerprint'] ) ) {
-						return new \WP_Error( 'release_complete_target_changed', __( 'The complete installed plugin tree changed after this revision was staged.', 'wp-autoplugin' ) );
-					}
+				if ( '' !== $expected_complete && ! hash_equals( $expected_complete, $complete_source['fingerprint'] ) ) {
+					return new \WP_Error( 'release_complete_target_changed', __( 'The complete installed plugin tree changed after this revision was staged.', 'wp-autoplugin' ) );
+				}
 					$baseline = $this->verify_overlay_baseline( $source, (array) $revision['files'] );
 				if ( is_wp_error( $baseline ) ) {
 					return $baseline;
@@ -90,9 +90,9 @@ final class Package_Builder {
 				if ( is_wp_error( $copied ) ) {
 					return $copied;
 				}
-					if ( ! hash_equals( $complete_source['fingerprint'], $copied['fingerprint'] ) ) {
-						return new \WP_Error( 'release_copy_drift', __( 'The installed plugin changed while its package tree was being copied.', 'wp-autoplugin' ) );
-					}
+				if ( ! hash_equals( $complete_source['fingerprint'], $copied['fingerprint'] ) ) {
+					return new \WP_Error( 'release_copy_drift', __( 'The installed plugin changed while its package tree was being copied.', 'wp-autoplugin' ) );
+				}
 					$source_fingerprint = $complete_source['fingerprint'];
 				foreach ( (array) $revision['files'] as $file ) {
 					$path = (string) $file['path'];
@@ -111,7 +111,10 @@ final class Package_Builder {
 				if ( 'fork' === $mode ) {
 					$transformed = $this->fork_headers( $main, (string) ( $workspace['target_metadata']['name'] ?? $workspace['project_name'] ?? '' ), $slug );
 				} else {
-					$transformed = [ 'content' => ( new Version_Bumper() )->bump( $main ), 'transforms' => [ 'version' => 'semantic_patch' ] ];
+					$transformed = [
+						'content'    => ( new Version_Bumper() )->bump( $main ),
+						'transforms' => [ 'version' => 'semantic_patch' ],
+					];
 				}
 				$this->write( $root, $main_relative, $transformed['content'] );
 				$headers = $transformed['transforms'];
@@ -137,10 +140,16 @@ final class Package_Builder {
 				return new \WP_Error( 'release_package_verify', __( 'The completed package could not be verified.', 'wp-autoplugin' ) );
 			}
 			return [
-				'path' => $archive, 'sha256' => $hash, 'size' => (int) $size, 'slug' => $slug,
-				'artifact_kind' => 'plugin', 'target_ref' => $slug . '/' . $main_relative,
-				'plugin_file' => $slug . '/' . $main_relative, 'source_tree_fingerprint' => $source_fingerprint,
-				'tree_fingerprint' => $tree['fingerprint'], 'header_transforms' => $headers,
+				'path'                    => $archive,
+				'sha256'                  => $hash,
+				'size'                    => (int) $size,
+				'slug'                    => $slug,
+				'artifact_kind'           => 'plugin',
+				'target_ref'              => $slug . '/' . $main_relative,
+				'plugin_file'             => $slug . '/' . $main_relative,
+				'source_tree_fingerprint' => $source_fingerprint,
+				'tree_fingerprint'        => $tree['fingerprint'],
+				'header_transforms'       => $headers,
 			];
 		} catch ( \Throwable $error ) {
 			if ( is_file( $archive ) ) {
@@ -176,7 +185,7 @@ final class Package_Builder {
 				continue;
 			}
 			$this->relative( $relative );
-			$size = (int) $file->getSize();
+			$size   = (int) $file->getSize();
 			$total += $size;
 			if ( $enforce_limits && ( count( $rows ) + 1 > $max_files || $size > $max_file || $total > $max_total ) ) {
 				return new \WP_Error( 'release_tree_limit', __( 'The release tree exceeds the configured package file or size limit.', 'wp-autoplugin' ) );
@@ -188,7 +197,11 @@ final class Package_Builder {
 			$rows[] = $relative . "\0" . $hash . "\0" . $size;
 		}
 		sort( $rows, SORT_STRING );
-		return [ 'fingerprint' => hash( 'sha256', implode( "\n", $rows ) ), 'files' => count( $rows ), 'size' => $total ];
+		return [
+			'fingerprint' => hash( 'sha256', implode( "\n", $rows ) ),
+			'files'       => count( $rows ),
+			'size'        => $total,
+		];
 	}
 
 	/** Fingerprint the complete bounded installed plugin or theme tree, excluding only VCS metadata. */
@@ -200,10 +213,10 @@ final class Package_Builder {
 		if ( is_dir( $root ) ) {
 			return $this->scan_tree( $root, true, $enforce_limits );
 		}
-		$size     = filesize( $root );
-		$max_file = max( 1, (int) apply_filters( 'wp_autoplugin_v2_release_max_file_bytes', 67108864 ) );
+		$size      = filesize( $root );
+		$max_file  = max( 1, (int) apply_filters( 'wp_autoplugin_v2_release_max_file_bytes', 67108864 ) );
 		$max_total = max( 1, (int) apply_filters( 'wp_autoplugin_v2_release_max_bytes', 268435456 ) );
-		$hash     = hash_file( 'sha256', $root );
+		$hash      = hash_file( 'sha256', $root );
 		if ( false === $size || false === $hash ) {
 			return new \WP_Error( 'release_tree_read', __( 'The single-file plugin could not be fingerprinted.', 'wp-autoplugin' ) );
 		}
@@ -211,7 +224,11 @@ final class Package_Builder {
 			return new \WP_Error( 'release_tree_limit', __( 'The plugin tree exceeds the configured package file or size limit.', 'wp-autoplugin' ) );
 		}
 		$row = basename( $root ) . "\0" . $hash . "\0" . (int) $size;
-		return [ 'fingerprint' => hash( 'sha256', $row ), 'files' => 1, 'size' => (int) $size ];
+		return [
+			'fingerprint' => hash( 'sha256', $row ),
+			'files'       => 1,
+			'size'        => (int) $size,
+		];
 	}
 
 	/** @return string|\WP_Error */
@@ -222,8 +239,8 @@ final class Package_Builder {
 		}
 
 		if ( 'theme' === $artifact_kind ) {
-			$theme = wp_get_theme( $target_ref );
-			$path  = $theme->exists() ? $theme->get_stylesheet_directory() : '';
+			$theme    = wp_get_theme( $target_ref );
+			$path     = $theme->exists() ? $theme->get_stylesheet_directory() : '';
 			$boundary = $theme->exists() ? $theme->get_theme_root() : '';
 		} else {
 			$directory = dirname( $target_ref );
@@ -266,7 +283,7 @@ final class Package_Builder {
 			}
 			return copy( $source, $destination . '/' . basename( $source ) ) ? true : new \WP_Error( 'release_copy', __( 'The installed plugin could not be copied.', 'wp-autoplugin' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy -- Private bounded package staging.
 		}
-		$root = trailingslashit( wp_normalize_path( $source ) );
+		$root     = trailingslashit( wp_normalize_path( $source ) );
 		$iterator = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $source, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::SELF_FIRST );
 		foreach ( $iterator as $item ) {
 			$relative = ltrim( substr( wp_normalize_path( $item->getPathname() ), strlen( $root ) ), '/' );
@@ -293,9 +310,9 @@ final class Package_Builder {
 
 	private function verify_overlay_baseline( string $root, array $files ) {
 		foreach ( $files as $file ) {
-			$relative = $this->relative( (string) ( $file['path'] ?? '' ) );
-			$path     = is_file( $root ) ? ( basename( $root ) === $relative ? $root : '' ) : $this->safe_destination( $root, $relative );
-			$exists   = '' !== $path && is_file( $path );
+			$relative  = $this->relative( (string) ( $file['path'] ?? '' ) );
+			$path      = is_file( $root ) ? ( basename( $root ) === $relative ? $root : '' ) : $this->safe_destination( $root, $relative );
+			$exists    = '' !== $path && is_file( $path );
 			$operation = (string) ( $file['change_type'] ?? '' );
 			if ( 'add' === $operation ) {
 				if ( $exists ) {
@@ -312,9 +329,9 @@ final class Package_Builder {
 	}
 
 	private function fork_headers( string $source, string $name, string $slug ): array {
-		$next = ( new Version_Bumper() )->bump( $source );
+		$next      = ( new Version_Bumper() )->bump( $source );
 		$fork_name = trim( $name ) . ' — ' . __( 'WP-Autoplugin Fork', 'wp-autoplugin' );
-		$next = preg_replace_callback( '/^(\s*\*?\s*Plugin Name:\s*).+$/mi', static fn( array $match ): string => $match[1] . $fork_name, $next, 1, $name_count );
+		$next      = preg_replace_callback( '/^(\s*\*?\s*Plugin Name:\s*).+$/mi', static fn( array $match ): string => $match[1] . $fork_name, $next, 1, $name_count );
 		if ( ! $name_count || ! is_string( $next ) ) {
 			throw new \RuntimeException( __( 'The original Plugin Name header could not be transformed.', 'wp-autoplugin' ) );
 		}
@@ -324,7 +341,14 @@ final class Package_Builder {
 		} else {
 			$next = (string) preg_replace( '/^(\s*\*?\s*Plugin Name:\s*.+)$/mi', "$1\n * Update URI: $uri", $next, 1 );
 		}
-		return [ 'content' => $next, 'transforms' => [ 'plugin_name' => $fork_name, 'update_uri' => $uri, 'version' => 'semantic_patch' ] ];
+		return [
+			'content'    => $next,
+			'transforms' => [
+				'plugin_name' => $fork_name,
+				'update_uri'  => $uri,
+				'version'     => 'semantic_patch',
+			],
+		];
 	}
 
 	private function valid_plugin_header( string $path ): bool {
@@ -351,7 +375,7 @@ final class Package_Builder {
 			return $zip->close() ? true : new \WP_Error( 'release_zip_close', __( 'The ZIP archive could not be finalized.', 'wp-autoplugin' ) );
 		}
 		require_once ABSPATH . 'wp-admin/includes/class-pclzip.php';
-		$zip = new \PclZip( $archive );
+		$zip     = new \PclZip( $archive );
 		$entries = array_values( array_filter( (array) scandir( $work ), static fn( string $entry ): bool => ! in_array( $entry, [ '.', '..' ], true ) ) );
 		if ( 1 !== count( $entries ) ) {
 			return new \WP_Error( 'release_zip_tree', __( 'The package must contain exactly one plugin root.', 'wp-autoplugin' ) );
@@ -377,7 +401,7 @@ final class Package_Builder {
 
 	private function safe_destination( string $root, string $relative ): string {
 		$relative = $this->relative( $relative );
-		$path = wp_normalize_path( $root . '/' . $relative );
+		$path     = wp_normalize_path( $root . '/' . $relative );
 		if ( ! str_starts_with( $path, trailingslashit( wp_normalize_path( $root ) ) ) ) {
 			throw new \RuntimeException( __( 'A package path escaped its plugin root.', 'wp-autoplugin' ) );
 		}
@@ -385,7 +409,7 @@ final class Package_Builder {
 	}
 
 	private function relative( string $path ): string {
-		$path = str_replace( '\\', '/', trim( $path ) );
+		$path  = str_replace( '\\', '/', trim( $path ) );
 		$parts = explode( '/', $path );
 		if ( '' === $path || strlen( $path ) > 1024 || str_starts_with( $path, '/' ) || preg_match( '/^[A-Za-z]:/', $path ) || preg_match( '/[\x00-\x1F]/', $path ) || array_intersect( [ '', '.', '..' ], $parts ) ) {
 			throw new \RuntimeException( __( 'A package contains an unsafe relative path.', 'wp-autoplugin' ) );
@@ -408,7 +432,7 @@ final class Package_Builder {
 
 	/** @return string|\WP_Error */
 	private function private_root() {
-		$base = wp_normalize_path( sys_get_temp_dir() . '/wp-autoplugin-v2-release' );
+		$base   = wp_normalize_path( sys_get_temp_dir() . '/wp-autoplugin-v2-release' );
 		$public = trailingslashit( wp_normalize_path( realpath( ABSPATH ) ?: ABSPATH ) );
 		if ( str_starts_with( trailingslashit( $base ), $public ) || ( ! is_dir( $base ) && ! wp_mkdir_p( $base ) ) ) {
 			return new \WP_Error( 'release_private_temp', __( 'A private temporary release directory is unavailable.', 'wp-autoplugin' ) );

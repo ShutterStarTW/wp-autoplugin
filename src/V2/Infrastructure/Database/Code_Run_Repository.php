@@ -40,16 +40,16 @@ final class Code_Run_Repository extends Repository {
 				$inserted  = $this->wpdb->insert(
 					Installer::table( 'code_run_files' ),
 					[
-						'run_id'          => $run_id,
-						'sequence'        => $sequence,
-						'path'            => $file['path'],
-						'type'            => $file['type'],
-						'description'     => $file['description'],
-						'operation'       => $operation,
-						'status'          => 'delete' === $operation ? 'completed' : 'pending',
-						'error_metadata'  => $this->json( [] ),
-						'created_at'      => $now,
-						'updated_at'      => $now,
+						'run_id'         => $run_id,
+						'sequence'       => $sequence,
+						'path'           => $file['path'],
+						'type'           => $file['type'],
+						'description'    => $file['description'],
+						'operation'      => $operation,
+						'status'         => 'delete' === $operation ? 'completed' : 'pending',
+						'error_metadata' => $this->json( [] ),
+						'created_at'     => $now,
+						'updated_at'     => $now,
 					]
 				);
 				if ( false === $inserted ) {
@@ -71,7 +71,7 @@ final class Code_Run_Repository extends Repository {
 
 	/** Initialize a durable Code follow-up at its analysis phase. */
 	public function create_follow_up( int $job_id, int $plan_job_id, int $parent_revision_id, string $provider, string $model, string $effort, string $prompt_slug, int $prompt_version ): array {
-		$now = $this->now();
+		$now      = $this->now();
 		$inserted = $this->wpdb->insert(
 			Installer::table( 'code_runs' ),
 			[
@@ -130,7 +130,7 @@ final class Code_Run_Repository extends Repository {
 		if ( ! $run ) {
 			return null;
 		}
-		$files = array_map(
+		$files     = array_map(
 			static fn( array $file ): array => [
 				'path'      => $file['path'],
 				'type'      => $file['type'],
@@ -143,26 +143,26 @@ final class Code_Run_Repository extends Repository {
 		$completed = count( array_filter( $files, static fn( array $file ): bool => 'completed' === $file['status'] ) );
 
 		return [
-			'mode'         => $run['mode'],
-			'phase'        => $run['phase'],
-			'outcome'      => $run['outcome'],
-			'total'        => count( $files ),
-			'completed'    => $completed,
-			'current'      => min( (int) $run['next_file_index'] + 1, count( $files ) ),
-			'provider'     => $run['provider'],
-			'model'        => $run['model'],
-			'effort'       => $run['effort'],
-			'input_tokens' => (int) $run['input_tokens'],
-			'output_tokens'=> (int) $run['output_tokens'],
-			'deleted_paths'=> array_values( (array) ( $run['change_instructions']['deleted_paths'] ?? [] ) ),
-			'files'        => $files,
+			'mode'          => $run['mode'],
+			'phase'         => $run['phase'],
+			'outcome'       => $run['outcome'],
+			'total'         => count( $files ),
+			'completed'     => $completed,
+			'current'       => min( (int) $run['next_file_index'] + 1, count( $files ) ),
+			'provider'      => $run['provider'],
+			'model'         => $run['model'],
+			'effort'        => $run['effort'],
+			'input_tokens'  => (int) $run['input_tokens'],
+			'output_tokens' => (int) $run['output_tokens'],
+			'deleted_paths' => array_values( (array) ( $run['change_instructions']['deleted_paths'] ?? [] ) ),
+			'files'         => $files,
 		];
 	}
 
 	/** @return array<int, array<string, mixed>> */
 	public function recoverable(): array {
 		$before = gmdate( 'Y-m-d H:i:s', time() - 2 * MINUTE_IN_SECONDS );
-		$rows = $this->wpdb->get_results(
+		$rows   = $this->wpdb->get_results(
 			$this->wpdb->prepare(
 				'SELECT r.* FROM ' . Installer::table( 'code_runs' ) . ' r INNER JOIN ' . Installer::table( 'jobs' ) . ' j ON j.id = r.job_id WHERE ((r.status = %s AND (r.lease_token IS NULL OR r.lease_expires_at < %s)) OR (r.status = %s AND r.outcome IS NOT NULL)) AND r.updated_at <= %s AND j.status IN (%s,%s)',
 				'active',
@@ -200,7 +200,12 @@ final class Code_Run_Repository extends Repository {
 		$query = $this->wpdb->prepare(
 			"UPDATE $files f INNER JOIN $runs r ON r.id = f.run_id SET f.status = %s, f.error_metadata = %s, f.updated_at = %s WHERE f.run_id = %d AND f.sequence = %d AND r.lease_token = %s",
 			'generating',
-			$this->json( $issues ? [ 'issues' => $issues, 'message' => (string) ( $issues[0]['message'] ?? '' ) ] : [] ),
+			$this->json(
+				$issues ? [
+					'issues'  => $issues,
+					'message' => (string) ( $issues[0]['message'] ?? '' ),
+				] : []
+			),
 			$this->now(),
 			$run_id,
 			$sequence,
@@ -224,7 +229,10 @@ final class Code_Run_Repository extends Repository {
 					'error_metadata' => $this->json( [] ),
 					'updated_at'     => $this->now(),
 				],
-				[ 'run_id' => $run_id, 'sequence' => $sequence ]
+				[
+					'run_id'   => $run_id,
+					'sequence' => $sequence,
+				]
 			);
 			if ( false === $file_updated ) {
 				throw new \RuntimeException( __( 'Could not save the generated Code file.', 'wp-autoplugin' ) );
@@ -332,7 +340,12 @@ final class Code_Run_Repository extends Repository {
 			$query = $this->wpdb->prepare(
 				"UPDATE $files SET status = %s, content = NULL, content_hash = NULL, error_metadata = %s, updated_at = %s WHERE run_id = %d AND sequence >= %d",
 				'pending',
-				$this->json( [ 'message' => substr( $message, 0, 500 ), 'issues' => $issues ] ),
+				$this->json(
+					[
+						'message' => substr( $message, 0, 500 ),
+						'issues'  => $issues,
+					]
+				),
 				$this->now(),
 				$run_id,
 				$from_sequence
@@ -404,8 +417,20 @@ final class Code_Run_Repository extends Repository {
 		try {
 			$file_updated = $this->wpdb->update(
 				Installer::table( 'code_run_files' ),
-				[ 'status' => 'pending', 'error_metadata' => $this->json( [ 'message' => $message, 'issues' => $issues ] ), 'updated_at' => $this->now() ],
-				[ 'run_id' => $run_id, 'sequence' => $sequence ]
+				[
+					'status'         => 'pending',
+					'error_metadata' => $this->json(
+						[
+							'message' => $message,
+							'issues'  => $issues,
+						]
+					),
+					'updated_at'     => $this->now(),
+				],
+				[
+					'run_id'   => $run_id,
+					'sequence' => $sequence,
+				]
 			);
 			if ( false === $file_updated ) {
 				throw new \RuntimeException( __( 'Could not save Code retry state.', 'wp-autoplugin' ) );
@@ -443,8 +468,15 @@ final class Code_Run_Repository extends Repository {
 	public function release( int $run_id, string $token ): void {
 		$this->wpdb->update(
 			Installer::table( 'code_runs' ),
-			[ 'lease_token' => null, 'lease_expires_at' => null, 'updated_at' => $this->now() ],
-			[ 'id' => $run_id, 'lease_token' => $token ]
+			[
+				'lease_token'      => null,
+				'lease_expires_at' => null,
+				'updated_at'       => $this->now(),
+			],
+			[
+				'id'          => $run_id,
+				'lease_token' => $token,
+			]
 		);
 	}
 
@@ -456,7 +488,14 @@ final class Code_Run_Repository extends Repository {
 		}
 		$this->wpdb->update(
 			Installer::table( 'code_runs' ),
-			[ 'status' => sanitize_key( $status ), 'phase' => sanitize_key( $status ), 'last_error' => $message ?: null, 'lease_token' => null, 'lease_expires_at' => null, 'updated_at' => $this->now() ],
+			[
+				'status'           => sanitize_key( $status ),
+				'phase'            => sanitize_key( $status ),
+				'last_error'       => $message ?: null,
+				'lease_token'      => null,
+				'lease_expires_at' => null,
+				'updated_at'       => $this->now(),
+			],
 			[ 'id' => $run['id'] ]
 		);
 		if ( 'failed' === $status ) {

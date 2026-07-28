@@ -31,20 +31,20 @@ PROMPT;
 	}
 
 	/**
-	 * @param array<string, mixed>             $manifest Normalized current manifest.
+	 * @param array<string, mixed>              $manifest Normalized current manifest.
 	 * @param array<int, array<string, string>> $source   Complete current source.
-	 * @param array<int, array<string, mixed>> $history  Recent Code messages/results.
+	 * @param array<int, array<string, mixed>>  $history  Recent Code messages/results.
 	 */
 	public function analysis_input( string $workspace_request, array $manifest, array $source, array $history, string $message, string $feedback = '' ): string {
 		return wp_json_encode(
 			[
-				'json_contract'                  => 'Return one JSON object with outcome answer or changes.',
-				'original_workspace_request'     => $workspace_request,
-				'current_manifest'               => $manifest,
-				'current_source'                 => $source,
-				'recent_code_conversation'       => $history,
-				'retry_feedback'                 => $feedback,
-				'authoritative_latest_request'   => $message,
+				'json_contract'                => 'Return one JSON object with outcome answer or changes.',
+				'original_workspace_request'   => $workspace_request,
+				'current_manifest'             => $manifest,
+				'current_source'               => $source,
+				'recent_code_conversation'     => $history,
+				'retry_feedback'               => $feedback,
+				'authoritative_latest_request' => $message,
 			],
 			JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
 		) ?: '{}';

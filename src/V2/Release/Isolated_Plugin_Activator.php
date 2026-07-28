@@ -71,7 +71,7 @@ final class Isolated_Plugin_Activator {
 			if ( null !== $nonce_action ) {
 				$url = add_query_arg( '_wpnonce', $this->nonce( $user_id, $logged_in, $nonce_action ), $url );
 			}
-			$timeout = (int) apply_filters( 'wp_autoplugin_v2_activation_loopback_timeout', 120 );
+			$timeout  = (int) apply_filters( 'wp_autoplugin_v2_activation_loopback_timeout', 120 );
 			$response = wp_remote_get(
 				$url,
 				[

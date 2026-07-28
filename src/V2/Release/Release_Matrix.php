@@ -6,7 +6,7 @@ namespace WP_Autoplugin\V2\Release;
 final class Release_Matrix {
 	public static function allows( string $resource, string $scope, string $artifact_kind, string $mode ): bool {
 		$matrix = [
-			'package' => [
+			'package'   => [
 				'project:plugin' => [ 'project' ],
 				'changes:plugin' => [ 'fork', 'replacement' ],
 				'changes:theme'  => [ 'theme_replacement' ],

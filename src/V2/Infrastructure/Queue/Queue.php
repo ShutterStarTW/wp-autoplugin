@@ -12,10 +12,10 @@ use WP_Autoplugin\V2\Infrastructure\Database\Workspace_Repository;
  * Enqueues short job-runner callbacks outside the originating request.
  */
 final class Queue {
-	public const HOOK = 'wp_autoplugin_v2_run_job';
-	public const GROUP = 'wp-autoplugin';
+	public const HOOK           = 'wp_autoplugin_v2_run_job';
+	public const GROUP          = 'wp-autoplugin';
 	private const RECOVERY_HOOK = 'wp_autoplugin_v2_recover_agent_jobs';
-	private const STALE_AFTER = 5 * MINUTE_IN_SECONDS;
+	private const STALE_AFTER   = 5 * MINUTE_IN_SECONDS;
 
 	public function register(): void {
 		add_action( self::RECOVERY_HOOK, [ $this, 'recover_agent_jobs' ] );
@@ -71,7 +71,14 @@ final class Queue {
 		}
 		$message = __( 'Background processing stopped unexpectedly. The operation did not complete and can be retried.', 'wp-autoplugin' );
 		$jobs    = new Job_Repository();
-		$jobs->update( (int) $job['id'], [ 'status' => 'failed', 'error_message' => $message, 'finished_at' => current_time( 'mysql', true ) ] );
+		$jobs->update(
+			(int) $job['id'],
+			[
+				'status'        => 'failed',
+				'error_message' => $message,
+				'finished_at'   => current_time( 'mysql', true ),
+			]
+		);
 		$jobs->event( (int) $job['id'], 'failed', $message, [], 'error' );
 		return $jobs->find( (int) $job['id'] ) ?? $job;
 	}

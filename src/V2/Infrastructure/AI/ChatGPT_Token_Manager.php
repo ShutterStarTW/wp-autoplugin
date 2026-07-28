@@ -4,11 +4,11 @@ namespace WP_Autoplugin\V2\Infrastructure\AI;
 
 /** Supplies current OAuth credentials and serializes refreshes. */
 final class ChatGPT_Token_Manager {
-	public const LOCK_OPTION = '_wp_autoplugin_chatgpt_oauth_lock';
+	public const LOCK_OPTION   = '_wp_autoplugin_chatgpt_oauth_lock';
 	private const REFRESH_SKEW = 120;
 
 	public function __construct( private ?ChatGPT_Token_Store $store = null, private ?ChatGPT_OAuth_Client $client = null ) {
-		$this->store ??= new ChatGPT_Token_Store();
+		$this->store  ??= new ChatGPT_Token_Store();
 		$this->client ??= new ChatGPT_OAuth_Client();
 	}
 
@@ -19,27 +19,39 @@ final class ChatGPT_Token_Manager {
 			return $tokens;
 		}
 		if ( ! is_array( $tokens ) ) {
-			return new \WP_Error( 'chatgpt_oauth_missing', __( 'Connect a ChatGPT subscription before using this model.', 'wp-autoplugin' ), [ 'status' => 401, 'reconnect_required' => true ] );
+			return new \WP_Error(
+				'chatgpt_oauth_missing',
+				__( 'Connect a ChatGPT subscription before using this model.', 'wp-autoplugin' ),
+				[
+					'status'             => 401,
+					'reconnect_required' => true,
+				]
+			);
 		}
 		return $this->needs_refresh( $tokens ) ? $this->refresh() : $tokens;
 	}
 
 	/** @return array<string, mixed>|null|\WP_Error */
-	public function stored() { return $this->store->get(); }
+	public function stored() {
+		return $this->store->get(); }
 
 	/** @param array<string, mixed> $tokens */
-	public function needs_refresh( array $tokens ): bool { return (int) ( $tokens['expires_at'] ?? 0 ) <= time() + self::REFRESH_SKEW; }
+	public function needs_refresh( array $tokens ): bool {
+		return (int) ( $tokens['expires_at'] ?? 0 ) <= time() + self::REFRESH_SKEW; }
 
 	/** @return true|\WP_Error */
-	public function save( array $tokens ) { return $this->store->save( $tokens ); }
+	public function save( array $tokens ) {
+		return $this->store->save( $tokens ); }
 
-	public function delete(): void { $this->store->delete(); }
+	public function delete(): void {
+		$this->store->delete(); }
 
-	public function lock(): ChatGPT_Option_Lock { return new ChatGPT_Option_Lock( self::LOCK_OPTION, 30 ); }
+	public function lock(): ChatGPT_Option_Lock {
+		return new ChatGPT_Option_Lock( self::LOCK_OPTION, 30 ); }
 
 	/** @return array<string, mixed>|\WP_Error */
 	private function refresh() {
-		$lock = $this->lock();
+		$lock  = $this->lock();
 		$owner = $lock->acquire();
 		if ( is_wp_error( $owner ) ) {
 			for ( $attempt = 0; $attempt < 20; $attempt++ ) {

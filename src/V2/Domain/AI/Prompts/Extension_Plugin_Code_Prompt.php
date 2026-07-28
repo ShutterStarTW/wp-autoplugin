@@ -28,12 +28,12 @@ PROMPT;
 	/** @param array<string, mixed> $target @param array<string, mixed> $manifest @param array<string, mixed> $current @param array<int, array<string, string>> $generated @param array<int, array<string, mixed>> $issues */
 	public function input( string $request, string $plan, array $target, array $manifest, array $current, array $generated, array $issues = [] ): string {
 		$sections = [
-			'Original administrator request' => $request,
+			'Original administrator request'         => $request,
 			'Approved source-verified Plan Markdown' => $plan,
-			'Inspected target metadata'       => (string) wp_json_encode( $target, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
-			'Normalized extension-plugin manifest' => (string) wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
-			'Current extension file to generate' => (string) wp_json_encode( $current, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
-			'Previously generated extension files' => (string) wp_json_encode( $generated, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			'Inspected target metadata'              => (string) wp_json_encode( $target, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			'Normalized extension-plugin manifest'   => (string) wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			'Current extension file to generate'     => (string) wp_json_encode( $current, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			'Previously generated extension files'   => (string) wp_json_encode( $generated, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
 		];
 		if ( $issues ) {
 			$sections['Validation errors from the previous attempt; correct only these while returning the complete file'] = (string) wp_json_encode( array_slice( $issues, 0, 5 ), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );

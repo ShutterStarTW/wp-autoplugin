@@ -4,10 +4,10 @@ namespace WP_Autoplugin\V2\Domain\AI;
 
 /** Validates one complete, revision-anchored Review response. */
 final class Review_Response {
-	private const PRIORITIES = [ 'P0', 'P1', 'P2', 'P3' ];
-	private const CATEGORIES = [ 'security', 'correctness', 'compatibility', 'performance', 'maintainability' ];
-	private const DISPOSITIONS = [ 'open', 'resolved', 'retracted' ];
-	private const MAX_FINDINGS = 20;
+	private const PRIORITIES     = [ 'P0', 'P1', 'P2', 'P3' ];
+	private const CATEGORIES     = [ 'security', 'correctness', 'compatibility', 'performance', 'maintainability' ];
+	private const DISPOSITIONS   = [ 'open', 'resolved', 'retracted' ];
+	private const MAX_FINDINGS   = 20;
 	private const MAX_TEXT_BYTES = 32768;
 
 	/**
@@ -32,7 +32,10 @@ final class Review_Response {
 			if ( '' === $content || strlen( $content ) > self::MAX_TEXT_BYTES ) {
 				return $this->error( 'review_answer_size', __( 'The Review answer is empty or too large.', 'wp-autoplugin' ) );
 			}
-			return [ 'outcome' => 'answer', 'content' => $content ];
+			return [
+				'outcome' => 'answer',
+				'content' => $content,
+			];
 		}
 		if ( 'report' !== $outcome || array_diff( array_keys( $decoded ), [ 'outcome', 'content', 'summary', 'prior_findings', 'new_findings', 'tests' ] ) ) {
 			return $this->error( 'review_report_shape', __( 'The reviewer must return an answer or a complete Review report.', 'wp-autoplugin' ) );
@@ -60,7 +63,10 @@ final class Review_Response {
 			if ( ! isset( $expected[ $id ] ) || isset( $prior[ $id ] ) || ! in_array( $disposition, self::DISPOSITIONS, true ) || ( $same_revision && 'resolved' === $disposition ) ) {
 				return $this->error( 'review_prior_invalid', __( 'Every prior open finding must be accounted for exactly once.', 'wp-autoplugin' ) );
 			}
-			$normalized = [ 'finding_id' => $id, 'disposition' => $disposition ];
+			$normalized = [
+				'finding_id'  => $id,
+				'disposition' => $disposition,
+			];
 			if ( 'open' === $disposition ) {
 				$finding = $this->finding( $item, $revision, [ 'finding_id', 'disposition' ] );
 				if ( is_wp_error( $finding ) ) {
@@ -84,8 +90,8 @@ final class Review_Response {
 			if ( 'open' !== $item['disposition'] ) {
 				continue;
 			}
-			$finding = $item['finding'];
-			$key      = strtolower( (string) $finding['path'] . '|' . (string) $finding['side'] . '|' . (string) $finding['start_line'] . '|' . $finding['title'] );
+			$finding      = $item['finding'];
+			$key          = strtolower( (string) $finding['path'] . '|' . (string) $finding['side'] . '|' . (string) $finding['start_line'] . '|' . $finding['title'] );
 			$seen[ $key ] = true;
 		}
 		foreach ( $decoded['new_findings'] as $item ) {
@@ -112,12 +118,12 @@ final class Review_Response {
 			return $tests;
 		}
 		return [
-			'outcome'       => 'report',
-			'content'       => $content,
-			'summary'       => $summary,
-			'prior_findings'=> array_values( $prior ),
-			'new_findings'  => $new,
-			'tests'         => $tests,
+			'outcome'        => 'report',
+			'content'        => $content,
+			'summary'        => $summary,
+			'prior_findings' => array_values( $prior ),
+			'new_findings'   => $new,
+			'tests'          => $tests,
 		];
 	}
 
@@ -141,7 +147,18 @@ final class Review_Response {
 			if ( null !== $raw['path'] || null !== $raw['side'] || null !== $raw['start_line'] || null !== $raw['end_line'] ) {
 				return $this->error( 'review_finding_project_location', __( 'A project-level Review finding must use null source location fields.', 'wp-autoplugin' ) );
 			}
-			return [ 'priority' => $priority, 'category' => $category, 'title' => $title, 'body' => $body, 'suggested_fix' => $fix, 'path' => null, 'side' => null, 'start_line' => null, 'end_line' => null, 'anchor_hash' => null ];
+			return [
+				'priority'      => $priority,
+				'category'      => $category,
+				'title'         => $title,
+				'body'          => $body,
+				'suggested_fix' => $fix,
+				'path'          => null,
+				'side'          => null,
+				'start_line'    => null,
+				'end_line'      => null,
+				'anchor_hash'   => null,
+			];
 		}
 		$file = null;
 		foreach ( (array) ( $revision['files'] ?? [] ) as $candidate ) {
@@ -168,16 +185,16 @@ final class Review_Response {
 		}
 		$slice = array_slice( (array) $lines, $start - 1, $end - $start + 1 );
 		return [
-			'priority'     => $priority,
-			'category'     => $category,
-			'title'        => $title,
-			'body'         => $body,
-			'suggested_fix'=> $fix,
-			'path'         => $path,
-			'side'         => $side,
-			'start_line'   => $start,
-			'end_line'     => $end,
-			'anchor_hash'  => hash( 'sha256', implode( "\n", $slice ) ),
+			'priority'      => $priority,
+			'category'      => $category,
+			'title'         => $title,
+			'body'          => $body,
+			'suggested_fix' => $fix,
+			'path'          => $path,
+			'side'          => $side,
+			'start_line'    => $start,
+			'end_line'      => $end,
+			'anchor_hash'   => hash( 'sha256', implode( "\n", $slice ) ),
 		];
 	}
 
@@ -209,6 +226,13 @@ final class Review_Response {
 	}
 
 	private function error( string $code, string $message ): \WP_Error {
-		return new \WP_Error( $code, $message, [ 'retryable' => true, 'ambiguous' => false ] );
+		return new \WP_Error(
+			$code,
+			$message,
+			[
+				'retryable' => true,
+				'ambiguous' => false,
+			]
+		);
 	}
 }

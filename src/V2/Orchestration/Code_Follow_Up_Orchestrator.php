@@ -80,7 +80,12 @@ final class Code_Follow_Up_Orchestrator {
 				(int) $job['id'],
 				'code_follow_up_initialized',
 				__( 'Analyzing the Code follow-up against the latest staged revision.', 'wp-autoplugin' ),
-				[ 'revision_id' => $base_id, 'phase' => 'analysis', 'provider' => $run['provider'], 'model' => $run['model'] ]
+				[
+					'revision_id' => $base_id,
+					'phase'       => 'analysis',
+					'provider'    => $run['provider'],
+					'model'       => $run['model'],
+				]
 			);
 		}
 		if ( 'completed' === $run['status'] && $run['outcome'] ) {
@@ -127,11 +132,23 @@ final class Code_Follow_Up_Orchestrator {
 			$runs->release( (int) $run['id'], $token );
 			return $transport;
 		}
-		$jobs->event( (int) $job['id'], 'code_follow_up_analysis_started', __( 'Analyzing whether the message is a question or a Code change.', 'wp-autoplugin' ), [ 'phase' => 'analysis', 'revision_id' => (int) $base['id'] ] );
+		$jobs->event(
+			(int) $job['id'],
+			'code_follow_up_analysis_started',
+			__( 'Analyzing whether the message is a question or a Code change.', 'wp-autoplugin' ),
+			[
+				'phase'       => 'analysis',
+				'revision_id' => (int) $base['id'],
+			]
+		);
 		$response = $transport->complete(
 			Global_Instructions::apply( $prompt['instructions'], $jobs->global_instructions( (int) $job['id'] ) ),
 			$prompt['input'],
-			[ 'max_output_tokens' => 8192, 'json' => true, 'prompt_images' => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ) ]
+			[
+				'max_output_tokens' => 8192,
+				'json'              => true,
+				'prompt_images'     => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ),
+			]
 		);
 
 		$latest = $jobs->find( (int) $job['id'] );
@@ -173,7 +190,15 @@ final class Code_Follow_Up_Orchestrator {
 			if ( ! $runs->complete_answer( (int) $run['id'], $token, $parsed['content'], $usage ) ) {
 				return new \WP_Error( 'code_follow_up_answer_save', __( 'Could not persist the Code answer.', 'wp-autoplugin' ) );
 			}
-			$jobs->event( (int) $job['id'], 'code_follow_up_answered', __( 'Answered without changing the staged revision.', 'wp-autoplugin' ), [ 'phase' => 'completed', 'revision_id' => (int) $base['id'] ] );
+			$jobs->event(
+				(int) $job['id'],
+				'code_follow_up_answered',
+				__( 'Answered without changing the staged revision.', 'wp-autoplugin' ),
+				[
+					'phase'       => 'completed',
+					'revision_id' => (int) $base['id'],
+				]
+			);
 			$completed = $runs->find_by_job( (int) $job['id'] );
 			return $completed ? $this->completed_result( $completed ) : new \WP_Error( 'code_follow_up_state', __( 'Could not reload the completed Code answer.', 'wp-autoplugin' ) );
 		}
@@ -200,7 +225,13 @@ final class Code_Follow_Up_Orchestrator {
 			(int) $job['id'],
 			'code_follow_up_changes_planned',
 			$parsed['files'] ? __( 'The change was validated and file generation is starting.', 'wp-autoplugin' ) : __( 'The change was validated and is ready to stage without file generation.', 'wp-autoplugin' ),
-			array_merge( [ 'phase' => 'files', 'files_count' => count( $parsed['files'] ) ], $parsed['change_set'] )
+			array_merge(
+				[
+					'phase'       => 'files',
+					'files_count' => count( $parsed['files'] ),
+				],
+				$parsed['change_set']
+			)
 		);
 		$run = $runs->find_by_job( (int) $job['id'] );
 		if ( ! $run ) {
@@ -232,7 +263,13 @@ final class Code_Follow_Up_Orchestrator {
 			(int) $job['id'],
 			'code_follow_up_file_started',
 			sprintf( __( 'Generating %1$d of %2$d: %3$s', 'wp-autoplugin' ), $index + 1, count( $files ), $current['path'] ),
-			[ 'phase' => 'files', 'path' => $current['path'], 'operation' => $current['operation'], 'index' => $index + 1, 'total' => count( $files ) ]
+			[
+				'phase'     => 'files',
+				'path'      => $current['path'],
+				'operation' => $current['operation'],
+				'index'     => $index + 1,
+				'total'     => count( $files ),
+			]
 		);
 
 		$prompt = $this->file_prompt( $job, $workspace, $base, $run, $files, $current, $feedback );
@@ -248,7 +285,11 @@ final class Code_Follow_Up_Orchestrator {
 		$response = $transport->complete(
 			Global_Instructions::apply( $prompt['instructions'], $jobs->global_instructions( (int) $job['id'] ) ),
 			$prompt['input'],
-			[ 'max_output_tokens' => 16384, 'json' => true, 'prompt_images' => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ) ]
+			[
+				'max_output_tokens' => 16384,
+				'json'              => true,
+				'prompt_images'     => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ),
+			]
 		);
 
 		$latest = $jobs->find( (int) $job['id'] );
@@ -289,7 +330,18 @@ final class Code_Follow_Up_Orchestrator {
 		$runs->complete_file( (int) $run['id'], $index, $token, $parsed['content'], $usage );
 		$completed = $index + 1;
 		$jobs->update( (int) $job['id'], [ 'progress' => min( 95, 15 + (int) floor( 80 * $completed / count( $files ) ) ) ] );
-		$jobs->event( (int) $job['id'], 'code_follow_up_file_completed', sprintf( __( 'Completed %s.', 'wp-autoplugin' ), $current['path'] ), [ 'phase' => 'files', 'path' => $current['path'], 'operation' => $current['operation'], 'completed' => $completed, 'total' => count( $files ) ] );
+		$jobs->event(
+			(int) $job['id'],
+			'code_follow_up_file_completed',
+			sprintf( __( 'Completed %s.', 'wp-autoplugin' ), $current['path'] ),
+			[
+				'phase'     => 'files',
+				'path'      => $current['path'],
+				'operation' => $current['operation'],
+				'completed' => $completed,
+				'total'     => count( $files ),
+			]
+		);
 
 		$next_generation = (int) $run['generation'] + 1;
 		$run             = $runs->find_by_job( (int) $job['id'] );
@@ -311,9 +363,9 @@ final class Code_Follow_Up_Orchestrator {
 			return $target;
 		}
 
-		$metadata = (array) $run['change_instructions'];
-		$prompt   = new Code_Follow_Up_Compliance_Prompt();
-		$source   = array_map(
+		$metadata  = (array) $run['change_instructions'];
+		$prompt    = new Code_Follow_Up_Compliance_Prompt();
+		$source    = array_map(
 			static fn( array $file ): array => [
 				'path'      => (string) $file['path'],
 				'type'      => (string) $file['type'],
@@ -340,7 +392,11 @@ final class Code_Follow_Up_Orchestrator {
 				(array) $run['target_manifest'],
 				$source
 			),
-			[ 'max_output_tokens' => 4096, 'json' => true, 'prompt_images' => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ) ]
+			[
+				'max_output_tokens' => 4096,
+				'json'              => true,
+				'prompt_images'     => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ),
+			]
 		);
 
 		$latest = $jobs->find( (int) $job['id'] );
@@ -378,8 +434,8 @@ final class Code_Follow_Up_Orchestrator {
 			return $run ? $this->stage( $job, $base, $run ) : new \WP_Error( 'code_follow_up_state', __( 'Could not reload the verified Code follow-up.', 'wp-autoplugin' ) );
 		}
 
-		$run_files = $runs->files( (int) $run['id'] );
-		$sequences = array_column( $run_files, 'sequence', 'path' );
+		$run_files  = $runs->files( (int) $run['id'] );
+		$sequences  = array_column( $run_files, 'sequence', 'path' );
 		$repairable = (int) ( $metadata['compliance_attempts'] ?? 0 ) < 1;
 		$from       = null;
 		foreach ( $parsed['issues'] as $issue ) {
@@ -394,7 +450,13 @@ final class Code_Follow_Up_Orchestrator {
 			$metadata['compliance_attempts'] = (int) ( $metadata['compliance_attempts'] ?? 0 ) + 1;
 			$next_generation                 = (int) $run['generation'] + 1;
 			$runs->retry_compliance( (int) $run['id'], $token, $from, $metadata, $parsed['issues'], $usage, $parsed['content'] );
-			$jobs->update( (int) $job['id'], [ 'status' => 'retrying', 'progress' => 15 ] );
+			$jobs->update(
+				(int) $job['id'],
+				[
+					'status'   => 'retrying',
+					'progress' => 15,
+				]
+			);
 			$jobs->event(
 				(int) $job['id'],
 				'code_follow_up_compliance_retry',
@@ -427,7 +489,13 @@ final class Code_Follow_Up_Orchestrator {
 		$latest = $jobs->find( (int) $job['id'] );
 		if ( ! $latest || $latest['cancel_requested'] ) {
 			( new Code_Run_Repository() )->terminate_by_job( (int) $job['id'], 'cancelled' );
-			$jobs->update( (int) $job['id'], [ 'status' => 'cancelled', 'finished_at' => current_time( 'mysql', true ) ] );
+			$jobs->update(
+				(int) $job['id'],
+				[
+					'status'      => 'cancelled',
+					'finished_at' => current_time( 'mysql', true ),
+				]
+			);
 			$jobs->event( (int) $job['id'], 'cancelled', __( 'Code follow-up cancelled before staging. No partial revision was created.', 'wp-autoplugin' ) );
 			return [ '_continuation' => true ];
 		}
@@ -470,7 +538,13 @@ final class Code_Follow_Up_Orchestrator {
 			(int) $job['id'],
 			'code_follow_up_staged',
 			sprintf( __( 'Created staged revision %d.', 'wp-autoplugin' ), $revision['revision_number'] ),
-			array_merge( [ 'phase' => 'completed', 'revision_id' => (int) $revision['id'] ], (array) $run['change_instructions'] )
+			array_merge(
+				[
+					'phase'       => 'completed',
+					'revision_id' => (int) $revision['id'],
+				],
+				(array) $run['change_instructions']
+			)
 		);
 		$run['revision_id'] = (int) $revision['id'];
 		$run['outcome']     = 'revision';
@@ -600,8 +674,8 @@ final class Code_Follow_Up_Orchestrator {
 		$staged = [];
 		$total  = 0;
 		foreach ( $base['files'] as $file ) {
-			$content = 'delete' === $file['change_type'] ? (string) ( $file['base_content'] ?? '' ) : (string) $file['content'];
-			$total  += strlen( $content );
+			$content  = 'delete' === $file['change_type'] ? (string) ( $file['base_content'] ?? '' ) : (string) $file['content'];
+			$total   += strlen( $content );
 			$staged[] = [
 				'path'      => (string) $file['path'],
 				'type'      => strtolower( (string) pathinfo( $file['path'], PATHINFO_EXTENSION ) ),
@@ -636,7 +710,11 @@ final class Code_Follow_Up_Orchestrator {
 		}
 
 		unset( $tree['tree_fingerprint'] );
-		return [ 'staged' => $staged, 'tree' => $tree, 'focused' => $focused ];
+		return [
+			'staged'  => $staged,
+			'tree'    => $tree,
+			'focused' => $focused,
+		];
 	}
 
 	/** @return array<string, mixed>|\WP_Error */
@@ -651,13 +729,27 @@ final class Code_Follow_Up_Orchestrator {
 		}
 		$snapshot = $tools->code_snapshot( $manifest['files'] );
 		if ( is_wp_error( $snapshot ) ) {
-			return new \WP_Error( $snapshot->get_error_code(), $snapshot->get_error_message(), [ 'retryable' => true, 'ambiguous' => false ] );
+			return new \WP_Error(
+				$snapshot->get_error_code(),
+				$snapshot->get_error_message(),
+				[
+					'retryable' => true,
+					'ambiguous' => false,
+				]
+			);
 		}
 		$manifest['target_fingerprint'] = $snapshot['target_fingerprint'];
 		$manifest['base_hashes']        = $snapshot['base_hashes'];
-		$manifest = ( new Code_Validator() )->manifest( $manifest );
+		$manifest                       = ( new Code_Validator() )->manifest( $manifest );
 		return is_wp_error( $manifest )
-			? new \WP_Error( 'code_follow_up_manifest', $manifest->get_error_message(), [ 'retryable' => true, 'ambiguous' => false ] )
+			? new \WP_Error(
+				'code_follow_up_manifest',
+				$manifest->get_error_message(),
+				[
+					'retryable' => true,
+					'ambiguous' => false,
+				]
+			)
 			: $manifest;
 	}
 
@@ -681,16 +773,28 @@ final class Code_Follow_Up_Orchestrator {
 		foreach ( $run_files as $file ) {
 			if ( 'completed' === $file['status'] && null !== $file['content'] ) {
 				$content[ $file['path'] ] = (string) $file['content'];
-				$generated[] = [ 'path' => $file['path'], 'operation' => $file['operation'], 'content' => (string) $file['content'] ];
+				$generated[]              = [
+					'path'      => $file['path'],
+					'operation' => $file['operation'],
+					'content'   => (string) $file['content'],
+				];
 			}
 		}
 		$effective = [];
 		foreach ( $run['target_manifest']['files'] as $file ) {
 			if ( 'delete' !== $file['operation'] && array_key_exists( $file['path'], $content ) ) {
-				$effective[] = [ 'path' => $file['path'], 'operation' => $file['operation'], 'content' => $content[ $file['path'] ] ];
+				$effective[] = [
+					'path'      => $file['path'],
+					'operation' => $file['operation'],
+					'content'   => $content[ $file['path'] ],
+				];
 			}
 		}
-		return [ 'effective' => $effective, 'generated' => $generated, 'content' => $content ];
+		return [
+			'effective' => $effective,
+			'generated' => $generated,
+			'content'   => $content,
+		];
 	}
 
 	/** @return array<int,array<string,mixed>> */
@@ -702,7 +806,12 @@ final class Code_Follow_Up_Orchestrator {
 			$content = array_key_exists( $file['path'], $generated ) && null !== $generated[ $file['path'] ]
 				? (string) $generated[ $file['path'] ]
 				: (string) ( $base_map[ $file['path'] ] ?? '' );
-			$files[] = [ 'path' => $file['path'], 'type' => $file['type'], 'change_type' => 'add', 'content' => $content ];
+			$files[] = [
+				'path'        => $file['path'],
+				'type'        => $file['type'],
+				'change_type' => 'add',
+				'content'     => $content,
+			];
 		}
 		return $files;
 	}
@@ -730,7 +839,7 @@ final class Code_Follow_Up_Orchestrator {
 				}
 			}
 			$base_content = in_array( $operation, [ 'update', 'delete' ], true ) ? (string) ( $target[ $file['path'] ] ?? '' ) : null;
-			$files[] = [
+			$files[]      = [
 				'path'              => $file['path'],
 				'type'              => $file['type'],
 				'change_type'       => $operation,
@@ -747,10 +856,24 @@ final class Code_Follow_Up_Orchestrator {
 		try {
 			$snapshot = ( new Source_Tools( (array) $workspace['target_metadata'] ) )->code_snapshot( $manifest['files'] );
 		} catch ( \Throwable $error ) {
-			return new \WP_Error( 'code_follow_up_target_unavailable', __( 'The installed target is unavailable for this Code follow-up.', 'wp-autoplugin' ), [ 'retryable' => false, 'ambiguous' => false ] );
+			return new \WP_Error(
+				'code_follow_up_target_unavailable',
+				__( 'The installed target is unavailable for this Code follow-up.', 'wp-autoplugin' ),
+				[
+					'retryable' => false,
+					'ambiguous' => false,
+				]
+			);
 		}
 		if ( is_wp_error( $snapshot ) ) {
-			return new \WP_Error( $snapshot->get_error_code(), $snapshot->get_error_message(), [ 'retryable' => false, 'ambiguous' => false ] );
+			return new \WP_Error(
+				$snapshot->get_error_code(),
+				$snapshot->get_error_message(),
+				[
+					'retryable' => false,
+					'ambiguous' => false,
+				]
+			);
 		}
 		if ( (string) ( $manifest['target_fingerprint'] ?? '' ) !== (string) $snapshot['target_fingerprint'] || (array) ( $manifest['base_hashes'] ?? [] ) !== (array) $snapshot['base_hashes'] ) {
 			return $this->target_changed();
@@ -793,10 +916,20 @@ final class Code_Follow_Up_Orchestrator {
 			}
 			$instructions = 'plugin' === ( $workspace['target_kind'] ?? '' ) ? $tools->plugin_instructions() : null;
 		} catch ( \Throwable $error ) {
-			return new \WP_Error( 'code_target_context_unavailable', $error->getMessage(), [ 'retryable' => false, 'ambiguous' => false ] );
+			return new \WP_Error(
+				'code_target_context_unavailable',
+				$error->getMessage(),
+				[
+					'retryable' => false,
+					'ambiguous' => false,
+				]
+			);
 		}
 		if ( $instructions ) {
-			$target['root_plugin_instructions'] = [ 'path' => $instructions['path'], 'content' => $instructions['content'] ];
+			$target['root_plugin_instructions'] = [
+				'path'    => $instructions['path'],
+				'content' => $instructions['content'],
+			];
 		}
 		return $target;
 	}
@@ -804,12 +937,21 @@ final class Code_Follow_Up_Orchestrator {
 	/** @return array{slug:string,version:int} */
 	private function prompt_metadata( array $workspace, array $manifest ): array {
 		if ( 'changes' === ( $manifest['scope'] ?? '' ) ) {
-			return [ 'slug' => Existing_Target_Code_Follow_Up_Prompt::SLUG, 'version' => Existing_Target_Code_Follow_Up_Prompt::VERSION ];
+			return [
+				'slug'    => Existing_Target_Code_Follow_Up_Prompt::SLUG,
+				'version' => Existing_Target_Code_Follow_Up_Prompt::VERSION,
+			];
 		}
 		if ( 'hook_extension' === ( $workspace['operation'] ?? '' ) ) {
-			return [ 'slug' => Extension_Plugin_Code_Follow_Up_Prompt::SLUG, 'version' => Extension_Plugin_Code_Follow_Up_Prompt::VERSION ];
+			return [
+				'slug'    => Extension_Plugin_Code_Follow_Up_Prompt::SLUG,
+				'version' => Extension_Plugin_Code_Follow_Up_Prompt::VERSION,
+			];
 		}
-		return [ 'slug' => New_Plugin_Code_Follow_Up_Prompt::SLUG, 'version' => New_Plugin_Code_Follow_Up_Prompt::VERSION ];
+		return [
+			'slug'    => New_Plugin_Code_Follow_Up_Prompt::SLUG,
+			'version' => New_Plugin_Code_Follow_Up_Prompt::VERSION,
+		];
 	}
 
 	private function supports( array $workspace ): bool {
@@ -821,11 +963,21 @@ final class Code_Follow_Up_Orchestrator {
 	}
 
 	private function target_changed(): \WP_Error {
-		return new \WP_Error( 'code_target_changed', __( 'The installed target changed after this revision was staged. Regenerate Code before sending another follow-up.', 'wp-autoplugin' ), [ 'retryable' => false, 'ambiguous' => false ] );
+		return new \WP_Error(
+			'code_target_changed',
+			__( 'The installed target changed after this revision was staged. Regenerate Code before sending another follow-up.', 'wp-autoplugin' ),
+			[
+				'retryable' => false,
+				'ambiguous' => false,
+			]
+		);
 	}
 
 	private function completed_result( array $run ): array {
-		$usage = [ 'input_tokens' => (int) $run['input_tokens'], 'output_tokens' => (int) $run['output_tokens'] ];
+		$usage = [
+			'input_tokens'  => (int) $run['input_tokens'],
+			'output_tokens' => (int) $run['output_tokens'],
+		];
 		$base  = (int) $run['parent_revision_id'];
 		$job   = ( new Job_Repository() )->find( (int) $run['job_id'] );
 		if ( 'answer' === $run['outcome'] ) {
@@ -839,13 +991,13 @@ final class Code_Follow_Up_Orchestrator {
 				'usage'            => $usage,
 			];
 			if ( $job && 'review_fix' === $job['task'] ) {
-				$result['finding_ids']     = array_values( array_map( 'absint', (array) ( $job['payload']['finding_ids'] ?? [] ) ) );
+				$result['finding_ids']      = array_values( array_map( 'absint', (array) ( $job['payload']['finding_ids'] ?? [] ) ) );
 				$result['review_report_id'] = (int) ( $job['payload']['review_report_id'] ?? 0 );
 			}
 			return $result;
 		}
 		$changes = (array) $run['change_instructions'];
-		$result = [
+		$result  = [
 			'outcome'          => 'revision',
 			'content'          => (string) $run['change_summary'],
 			'base_revision_id' => $base,
@@ -857,18 +1009,21 @@ final class Code_Follow_Up_Orchestrator {
 			'model'            => $run['model'],
 			'effort'           => $run['effort'],
 			'usage'            => $usage,
-			'prompt'           => [ 'slug' => $run['prompt_slug'], 'version' => (int) $run['prompt_version'] ],
+			'prompt'           => [
+				'slug'    => $run['prompt_slug'],
+				'version' => (int) $run['prompt_version'],
+			],
 		];
 		if ( $job && 'review_fix' === $job['task'] ) {
-			$result['finding_ids']    = array_values( array_map( 'absint', (array) ( $job['payload']['finding_ids'] ?? [] ) ) );
+			$result['finding_ids']      = array_values( array_map( 'absint', (array) ( $job['payload']['finding_ids'] ?? [] ) ) );
 			$result['review_report_id'] = (int) ( $job['payload']['review_report_id'] ?? 0 );
-			$result['auto_re_review'] = ! empty( $job['payload']['auto_re_review'] );
+			$result['auto_re_review']   = ! empty( $job['payload']['auto_re_review'] );
 		}
 		return $result;
 	}
 
 	private function retry_analysis_or_fail( \WP_Error $error, array $job, array $run, string $token, Job_Repository $jobs, Code_Run_Repository $runs ) {
-		$data      = (array) $error->get_error_data();
+		$data = (array) $error->get_error_data();
 		if ( ! empty( $data['ambiguous'] ) ) {
 			$runs->release( (int) $run['id'], $token );
 			return $this->timeout_error();
@@ -877,7 +1032,16 @@ final class Code_Follow_Up_Orchestrator {
 		if ( $retryable && (int) $run['retry_count'] < 2 ) {
 			$runs->retry_analysis( (int) $run['id'], $token, $error->get_error_message() );
 			$jobs->update( (int) $job['id'], [ 'status' => 'retrying' ] );
-			$jobs->event( (int) $job['id'], 'code_follow_up_analysis_retry', __( 'Retrying the Code follow-up analysis with bounded feedback.', 'wp-autoplugin' ), [ 'phase' => 'analysis', 'attempt' => (int) $run['retry_count'] + 2 ], 'warning' );
+			$jobs->event(
+				(int) $job['id'],
+				'code_follow_up_analysis_retry',
+				__( 'Retrying the Code follow-up analysis with bounded feedback.', 'wp-autoplugin' ),
+				[
+					'phase'   => 'analysis',
+					'attempt' => (int) $run['retry_count'] + 2,
+				],
+				'warning'
+			);
 			( new Queue() )->schedule( (int) $job['id'], (int) $run['generation'] + 1, 2 ** (int) $run['retry_count'] );
 			return [ '_continuation' => true ];
 		}
@@ -895,7 +1059,16 @@ final class Code_Follow_Up_Orchestrator {
 		if ( $retryable && (int) $run['retry_count'] < 2 ) {
 			$runs->retry_analysis( (int) $run['id'], $token, $error->get_error_message() );
 			$jobs->update( (int) $job['id'], [ 'status' => 'retrying' ] );
-			$jobs->event( (int) $job['id'], 'code_follow_up_compliance_response_retry', __( 'Retrying the Code request-compliance check with bounded format feedback.', 'wp-autoplugin' ), [ 'phase' => 'compliance', 'attempt' => (int) $run['retry_count'] + 2 ], 'warning' );
+			$jobs->event(
+				(int) $job['id'],
+				'code_follow_up_compliance_response_retry',
+				__( 'Retrying the Code request-compliance check with bounded format feedback.', 'wp-autoplugin' ),
+				[
+					'phase'   => 'compliance',
+					'attempt' => (int) $run['retry_count'] + 2,
+				],
+				'warning'
+			);
 			( new Queue() )->schedule( (int) $job['id'], (int) $run['generation'] + 1, 2 ** (int) $run['retry_count'] );
 			return [ '_continuation' => true ];
 		}
@@ -904,7 +1077,7 @@ final class Code_Follow_Up_Orchestrator {
 	}
 
 	private function retry_file_or_fail( \WP_Error $error, array $job, array $run, array $current, int $index, string $token, Job_Repository $jobs, Code_Run_Repository $runs ) {
-		$data      = (array) $error->get_error_data();
+		$data = (array) $error->get_error_data();
 		if ( ! empty( $data['ambiguous'] ) ) {
 			$runs->release( (int) $run['id'], $token );
 			return $this->timeout_error();
@@ -912,12 +1085,28 @@ final class Code_Follow_Up_Orchestrator {
 		$retryable = empty( $data['ambiguous'] ) && ( ! array_key_exists( 'retryable', $data ) || ! empty( $data['retryable'] ) );
 		$issues    = array_slice( (array) ( $data['issues'] ?? [] ), 0, 5 );
 		if ( $retryable && ! $issues ) {
-			$issues[] = [ 'path' => $current['path'], 'line' => 0, 'code' => sanitize_key( $error->get_error_code() ), 'message' => substr( $error->get_error_message(), 0, 500 ) ];
+			$issues[] = [
+				'path'    => $current['path'],
+				'line'    => 0,
+				'code'    => sanitize_key( $error->get_error_code() ),
+				'message' => substr( $error->get_error_message(), 0, 500 ),
+			];
 		}
 		if ( $retryable && (int) $run['retry_count'] < 2 ) {
 			$runs->retry_file( (int) $run['id'], $index, $token, $error->get_error_message(), $issues );
 			$jobs->update( (int) $job['id'], [ 'status' => 'retrying' ] );
-			$jobs->event( (int) $job['id'], 'code_follow_up_file_retry', sprintf( __( 'Retrying %s.', 'wp-autoplugin' ), $current['path'] ), [ 'phase' => 'files', 'path' => $current['path'], 'operation' => $current['operation'], 'attempt' => (int) $run['retry_count'] + 2 ], 'warning' );
+			$jobs->event(
+				(int) $job['id'],
+				'code_follow_up_file_retry',
+				sprintf( __( 'Retrying %s.', 'wp-autoplugin' ), $current['path'] ),
+				[
+					'phase'     => 'files',
+					'path'      => $current['path'],
+					'operation' => $current['operation'],
+					'attempt'   => (int) $run['retry_count'] + 2,
+				],
+				'warning'
+			);
 			( new Queue() )->schedule( (int) $job['id'], (int) $run['generation'] + 1, 2 ** (int) $run['retry_count'] );
 			return [ '_continuation' => true ];
 		}
@@ -928,7 +1117,13 @@ final class Code_Follow_Up_Orchestrator {
 	private function cancel( array $run, string $token, Job_Repository $jobs, Code_Run_Repository $runs ): array {
 		$runs->release( (int) $run['id'], $token );
 		$runs->terminate_by_job( (int) $run['job_id'], 'cancelled' );
-		$jobs->update( (int) $run['job_id'], [ 'status' => 'cancelled', 'finished_at' => current_time( 'mysql', true ) ] );
+		$jobs->update(
+			(int) $run['job_id'],
+			[
+				'status'      => 'cancelled',
+				'finished_at' => current_time( 'mysql', true ),
+			]
+		);
 		$jobs->event( (int) $run['job_id'], 'cancelled', __( 'Code follow-up cancelled. No partial revision was created.', 'wp-autoplugin' ) );
 		return [ '_continuation' => true ];
 	}
@@ -938,9 +1133,12 @@ final class Code_Follow_Up_Orchestrator {
 		$source = [];
 		$total  = 0;
 		foreach ( $files as $file ) {
-			$content = (string) ( $file['content'] ?? '' );
-			$total  += strlen( $content );
-			$source[] = [ 'path' => (string) $file['path'], 'content' => $content ];
+			$content  = (string) ( $file['content'] ?? '' );
+			$total   += strlen( $content );
+			$source[] = [
+				'path'    => (string) $file['path'],
+				'content' => $content,
+			];
 		}
 		if ( $total > Code_Validator::MAX_PROJECT_BYTES ) {
 			return new \WP_Error( 'code_follow_up_source_large', __( 'The current staged project exceeds the Code follow-up context limit.', 'wp-autoplugin' ) );
@@ -959,7 +1157,10 @@ final class Code_Follow_Up_Orchestrator {
 		$effective = [];
 		foreach ( $manifest['files'] as $file ) {
 			if ( array_key_exists( $file['path'], $content ) ) {
-				$effective[] = [ 'path' => $file['path'], 'content' => $content[ $file['path'] ] ];
+				$effective[] = [
+					'path'    => $file['path'],
+					'content' => $content[ $file['path'] ],
+				];
 			}
 		}
 		return $effective;
@@ -973,12 +1174,12 @@ final class Code_Follow_Up_Orchestrator {
 				continue;
 			}
 			$history[] = [
-				'revision_id' => (int) ( $previous['payload']['revision_id'] ?? 0 ),
+				'revision_id'  => (int) ( $previous['payload']['revision_id'] ?? 0 ),
 				'focused_path' => substr( (string) ( $previous['payload']['focused_path'] ?? '' ), 0, 1024 ),
-				'message'     => substr( (string) ( $previous['payload']['message'] ?? '' ), 0, 4096 ),
-				'status'      => $previous['status'],
-				'outcome'     => $previous['result']['outcome'] ?? null,
-				'content'     => substr( (string) ( $previous['result']['content'] ?? $previous['error_message'] ?? '' ), 0, 4096 ),
+				'message'      => substr( (string) ( $previous['payload']['message'] ?? '' ), 0, 4096 ),
+				'status'       => $previous['status'],
+				'outcome'      => $previous['result']['outcome'] ?? null,
+				'content'      => substr( (string) ( $previous['result']['content'] ?? $previous['error_message'] ?? '' ), 0, 4096 ),
 			];
 			if ( 8 === count( $history ) ) {
 				break;

@@ -48,11 +48,11 @@ PROMPT;
 	 */
 	public function input( string $request, string $plan, array $target, array $manifest, array $current, array $source, array $generated, array $issues = [] ): string {
 		$sections = [
-			'Original administrator request' => $request,
-			'Approved Plan Markdown'          => $plan,
-			'Target metadata'                 => (string) wp_json_encode( $target, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
-			'Normalized planned change set'   => (string) wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
-			'Current file action'              => (string) wp_json_encode( $current, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			'Original administrator request'    => $request,
+			'Approved Plan Markdown'            => $plan,
+			'Target metadata'                   => (string) wp_json_encode( $target, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			'Normalized planned change set'     => (string) wp_json_encode( $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
+			'Current file action'               => (string) wp_json_encode( $current, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
 			'Current read-only target source for planned existing files' => (string) wp_json_encode( $source, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
 			'Previously generated staged files' => (string) wp_json_encode( $generated, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ),
 		];

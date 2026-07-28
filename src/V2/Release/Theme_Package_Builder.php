@@ -33,7 +33,7 @@ final class Theme_Package_Builder {
 
 		try {
 			$source_slug = (string) ( $workspace['target_metadata']['stylesheet'] ?? $workspace['target_ref'] ?? '' );
-			$slug = 'copy' === $mode ? $this->slug( $destination_slug ) : $this->installed_slug( $source_slug );
+			$slug        = 'copy' === $mode ? $this->slug( $destination_slug ) : $this->installed_slug( $source_slug );
 			if ( is_wp_error( $slug ) ) {
 				return $slug;
 			}
@@ -150,7 +150,7 @@ final class Theme_Package_Builder {
 		if ( ! is_file( $style ) ) {
 			return new \WP_Error( 'release_theme_stylesheet', __( 'The package does not contain a root style.css file.', 'wp-autoplugin' ) );
 		}
-		$data  = get_file_data(
+		$data = get_file_data(
 			$style,
 			[
 				'Name'        => 'Theme Name',
@@ -209,7 +209,7 @@ final class Theme_Package_Builder {
 	}
 
 	private function copy_target( string $source, string $destination ) {
-		$root = trailingslashit( wp_normalize_path( $source ) );
+		$root     = trailingslashit( wp_normalize_path( $source ) );
 		$iterator = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $source, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::SELF_FIRST );
 		foreach ( $iterator as $item ) {
 			$relative = ltrim( substr( wp_normalize_path( $item->getPathname() ), strlen( $root ) ), '/' );
@@ -276,7 +276,7 @@ final class Theme_Package_Builder {
 
 	private function safe_destination( string $root, string $relative ): string {
 		$relative = $this->relative( $relative );
-		$path = wp_normalize_path( $root . '/' . $relative );
+		$path     = wp_normalize_path( $root . '/' . $relative );
 		if ( ! str_starts_with( $path, trailingslashit( wp_normalize_path( $root ) ) ) ) {
 			throw new \RuntimeException( __( 'A package path escaped its theme root.', 'wp-autoplugin' ) );
 		}

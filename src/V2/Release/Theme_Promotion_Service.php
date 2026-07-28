@@ -39,7 +39,7 @@ final class Theme_Promotion_Service {
 			}
 			require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
 			require_once ABSPATH . 'wp-admin/includes/class-theme-upgrader.php';
-			$upgrader = new \Theme_Upgrader( new \Automatic_Upgrader_Skin() );
+			$upgrader     = new \Theme_Upgrader( new \Automatic_Upgrader_Skin() );
 			$parent_guard = static function ( $install_result, $_hook_extra, $_child_result ) use ( $upgrader, $built ) {
 				remove_filter( 'upgrader_post_install', [ $upgrader, 'check_parent_theme_filter' ], 10 );
 				if ( '' === $built['template'] ) {
@@ -52,7 +52,13 @@ final class Theme_Promotion_Service {
 			};
 			add_filter( 'upgrader_post_install', $parent_guard, 9, 3 );
 			try {
-				$installed = $upgrader->install( $built['path'], [ 'clear_update_cache' => true, 'overwrite_package' => false ] );
+				$installed = $upgrader->install(
+					$built['path'],
+					[
+						'clear_update_cache' => true,
+						'overwrite_package'  => false,
+					]
+				);
 			} finally {
 				remove_filter( 'upgrader_post_install', $parent_guard, 9 );
 				remove_filter( 'upgrader_post_install', [ $upgrader, 'check_parent_theme_filter' ], 10 );
@@ -88,19 +94,29 @@ final class Theme_Promotion_Service {
 			if ( ! ( new Release_Repository() )->update_promotion(
 				(int) $promotion['id'],
 				[
-					'status' => 'installed', 'artifact_kind' => 'theme', 'destination_target_ref' => $built['slug'],
-					'destination_slug' => $built['slug'], 'target_fingerprint' => $built['tree_fingerprint'],
-					'header_transforms' => $built['header_transforms'], 'active_before' => 0, 'active_after' => 0,
-					'finished_at' => current_time( 'mysql', true ),
+					'status'                 => 'installed',
+					'artifact_kind'          => 'theme',
+					'destination_target_ref' => $built['slug'],
+					'destination_slug'       => $built['slug'],
+					'target_fingerprint'     => $built['tree_fingerprint'],
+					'header_transforms'      => $built['header_transforms'],
+					'active_before'          => 0,
+					'active_after'           => 0,
+					'finished_at'            => current_time( 'mysql', true ),
 				]
 			) ) {
 				$this->remove_failed_install( $filesystem, $destination );
 				return new \WP_Error( 'theme_promotion_save', __( 'The installed theme copy could not be recorded and was removed.', 'wp-autoplugin' ) );
 			}
 			return [
-				'status' => 'installed', 'artifact_kind' => 'theme', 'target_ref' => $built['slug'],
-				'slug' => $built['slug'], 'active' => false, 'template' => $built['template'],
-				'is_child' => $built['is_child'], 'header_transforms' => $built['header_transforms'],
+				'status'            => 'installed',
+				'artifact_kind'     => 'theme',
+				'target_ref'        => $built['slug'],
+				'slug'              => $built['slug'],
+				'active'            => false,
+				'template'          => $built['template'],
+				'is_child'          => $built['is_child'],
+				'header_transforms' => $built['header_transforms'],
 			];
 		} catch ( \Throwable $error ) {
 			if ( $installed_destination && ! $preexisting && is_dir( $destination ) ) {
@@ -172,7 +188,7 @@ final class Theme_Promotion_Service {
 			if ( ( 'add' === $operation && $exists ) || ( in_array( $operation, [ 'update', 'delete' ], true ) && ( ! $exists || false === $before || ! hash_equals( (string) $file['base_content_hash'], hash( 'sha256', $before ) ) ) ) ) {
 				return new \WP_Error( 'theme_promotion_file_drift', sprintf( __( '%s no longer matches the staged baseline.', 'wp-autoplugin' ), $path ) );
 			}
-			$after = 'delete' === $operation ? null : (string) $file['content'];
+			$after            = 'delete' === $operation ? null : (string) $file['content'];
 			$records[ $path ] = $this->record( $path, $operation, $before, $after );
 		}
 
@@ -188,15 +204,18 @@ final class Theme_Promotion_Service {
 			return new \WP_Error( 'theme_promotion_version', $error->getMessage() );
 		}
 		$records['style.css'] = $this->record( 'style.css', 'update', $style_before, $transformed['content'] );
-		$records = array_values( $records );
+		$records              = array_values( $records );
 
 		$repository = new Release_Repository();
 		$repository->replace_promotion_files( (int) $promotion['id'], $records );
 		if ( ! $repository->update_promotion(
 			(int) $promotion['id'],
 			[
-				'artifact_kind' => 'theme', 'source_target_ref' => $target_ref, 'destination_target_ref' => $target_ref,
-				'target_fingerprint' => $tree['fingerprint'], 'header_transforms' => $transformed['transforms'],
+				'artifact_kind'          => 'theme',
+				'source_target_ref'      => $target_ref,
+				'destination_target_ref' => $target_ref,
+				'target_fingerprint'     => $tree['fingerprint'],
+				'header_transforms'      => $transformed['transforms'],
 			]
 		) ) {
 			return new \WP_Error( 'theme_promotion_save', __( 'The rollback record could not be finalized, so no theme files were changed.', 'wp-autoplugin' ) );
@@ -238,12 +257,29 @@ final class Theme_Promotion_Service {
 		} catch ( \Throwable $error ) {
 			$restored = $this->restore_records( $root, $records, $filesystem, $directories, true );
 			$this->invalidate( $root, $records );
-			$repository->update_promotion( (int) $promotion['id'], [ 'status' => $restored ? 'failed' : 'rollback_failed', 'error_message' => $error->getMessage(), 'created_directories' => $directories, 'finished_at' => current_time( 'mysql', true ) ] );
+			$repository->update_promotion(
+				(int) $promotion['id'],
+				[
+					'status'              => $restored ? 'failed' : 'rollback_failed',
+					'error_message'       => $error->getMessage(),
+					'created_directories' => $directories,
+					'finished_at'         => current_time( 'mysql', true ),
+				]
+			);
 			return new \WP_Error( $restored ? 'theme_promotion_write_failed' : 'theme_promotion_restore_failed', $error->getMessage() );
 		}
 
 		$this->invalidate( $root, $records );
-		if ( ! $repository->update_promotion( (int) $promotion['id'], [ 'status' => 'completed', 'created_directories' => $directories, 'active_before' => 0, 'active_after' => 0, 'finished_at' => current_time( 'mysql', true ) ] ) ) {
+		if ( ! $repository->update_promotion(
+			(int) $promotion['id'],
+			[
+				'status'              => 'completed',
+				'created_directories' => $directories,
+				'active_before'       => 0,
+				'active_after'        => 0,
+				'finished_at'         => current_time( 'mysql', true ),
+			]
+		) ) {
 			$restored = $this->restore_records( $root, $records, $filesystem, $directories, true );
 			$this->invalidate( $root, $records );
 			return new \WP_Error(
@@ -254,9 +290,12 @@ final class Theme_Promotion_Service {
 			);
 		}
 		return [
-			'status' => 'completed', 'artifact_kind' => 'theme', 'target_ref' => $target_ref,
-			'active' => false, 'rollback_available' => true,
-			'warning' => __( 'Upstream updates remain enabled and may overwrite these changes. Rollback restores files only.', 'wp-autoplugin' ),
+			'status'             => 'completed',
+			'artifact_kind'      => 'theme',
+			'target_ref'         => $target_ref,
+			'active'             => false,
+			'rollback_available' => true,
+			'warning'            => __( 'Upstream updates remain enabled and may overwrite these changes. Rollback restores files only.', 'wp-autoplugin' ),
 		];
 	}
 
@@ -291,12 +330,32 @@ final class Theme_Promotion_Service {
 			return new \WP_Error( 'theme_promotion_rollback_in_use', $this->in_use_reason( $target_ref ), [ 'status' => 409 ] );
 		}
 		if ( ! $this->restore_records( $root, $records, $filesystem, (array) $promotion['created_directories'], true ) ) {
-			$repository->update_promotion( (int) $promotion['id'], [ 'status' => 'rollback_failed', 'error_message' => __( 'One or more promoted theme files could not be restored.', 'wp-autoplugin' ), 'finished_at' => current_time( 'mysql', true ) ] );
+			$repository->update_promotion(
+				(int) $promotion['id'],
+				[
+					'status'        => 'rollback_failed',
+					'error_message' => __( 'One or more promoted theme files could not be restored.', 'wp-autoplugin' ),
+					'finished_at'   => current_time( 'mysql', true ),
+				]
+			);
 			return new \WP_Error( 'theme_promotion_rollback_failed', __( 'One or more promoted theme files could not be restored.', 'wp-autoplugin' ) );
 		}
 		$this->invalidate( $root, $records );
-		$repository->update_promotion( (int) $promotion['id'], [ 'status' => 'rolled_back', 'active_after' => 0, 'finished_at' => current_time( 'mysql', true ) ] );
-		return [ 'status' => 'rolled_back', 'artifact_kind' => 'theme', 'target_ref' => $target_ref, 'active' => false, 'warning' => __( 'Theme files were restored. Database and runtime side effects were not reverted.', 'wp-autoplugin' ) ];
+		$repository->update_promotion(
+			(int) $promotion['id'],
+			[
+				'status'       => 'rolled_back',
+				'active_after' => 0,
+				'finished_at'  => current_time( 'mysql', true ),
+			]
+		);
+		return [
+			'status'        => 'rolled_back',
+			'artifact_kind' => 'theme',
+			'target_ref'    => $target_ref,
+			'active'        => false,
+			'warning'       => __( 'Theme files were restored. Database and runtime side effects were not reverted.', 'wp-autoplugin' ),
+		];
 	}
 
 	public function in_use( string $stylesheet ): bool {
@@ -336,7 +395,16 @@ final class Theme_Promotion_Service {
 	}
 
 	private function record( string $path, string $operation, ?string $before, ?string $after ): array {
-		return [ 'path' => $path, 'operation' => $operation, 'base_exists' => null !== $before, 'base_content' => $before, 'base_hash' => null === $before ? null : hash( 'sha256', $before ), 'promoted_exists' => null !== $after, 'promoted_content' => $after, 'promoted_hash' => null === $after ? null : hash( 'sha256', $after ) ];
+		return [
+			'path'             => $path,
+			'operation'        => $operation,
+			'base_exists'      => null !== $before,
+			'base_content'     => $before,
+			'base_hash'        => null === $before ? null : hash( 'sha256', $before ),
+			'promoted_exists'  => null !== $after,
+			'promoted_content' => $after,
+			'promoted_hash'    => null === $after ? null : hash( 'sha256', $after ),
+		];
 	}
 
 	private function target_path( string $root, string $relative ): string {

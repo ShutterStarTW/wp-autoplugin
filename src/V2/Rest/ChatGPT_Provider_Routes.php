@@ -18,36 +18,60 @@ final class ChatGPT_Provider_Routes {
 
 	public function register_routes(): void {
 		$permission = [ $this, 'can_manage' ];
-		register_rest_route( self::NAMESPACE, '/providers/chatgpt', [
-			'methods'             => \WP_REST_Server::READABLE,
-			'callback'            => [ $this, 'status' ],
-			'permission_callback' => $permission,
-		] );
-		register_rest_route( self::NAMESPACE, '/providers/chatgpt/oauth/start', [
-			'methods'             => \WP_REST_Server::CREATABLE,
-			'callback'            => [ $this, 'start' ],
-			'permission_callback' => $permission,
-		] );
-		foreach ( [ 'poll', 'cancel' ] as $action ) {
-			register_rest_route( self::NAMESPACE, '/providers/chatgpt/oauth/' . $action, [
-				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => [ $this, $action ],
+		register_rest_route(
+			self::NAMESPACE,
+			'/providers/chatgpt',
+			[
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => [ $this, 'status' ],
 				'permission_callback' => $permission,
-				'args'                => [
-					'session_id' => [ 'required' => true, 'type' => 'string', 'pattern' => '^[a-f0-9]{48}$' ],
-				],
-			] );
+			]
+		);
+		register_rest_route(
+			self::NAMESPACE,
+			'/providers/chatgpt/oauth/start',
+			[
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => [ $this, 'start' ],
+				'permission_callback' => $permission,
+			]
+		);
+		foreach ( [ 'poll', 'cancel' ] as $action ) {
+			register_rest_route(
+				self::NAMESPACE,
+				'/providers/chatgpt/oauth/' . $action,
+				[
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => [ $this, $action ],
+					'permission_callback' => $permission,
+					'args'                => [
+						'session_id' => [
+							'required' => true,
+							'type'     => 'string',
+							'pattern'  => '^[a-f0-9]{48}$',
+						],
+					],
+				]
+			);
 		}
-		register_rest_route( self::NAMESPACE, '/providers/chatgpt/connection', [
-			'methods'             => \WP_REST_Server::DELETABLE,
-			'callback'            => [ $this, 'disconnect' ],
-			'permission_callback' => $permission,
-		] );
-		register_rest_route( self::NAMESPACE, '/providers/chatgpt/models/refresh', [
-			'methods'             => \WP_REST_Server::CREATABLE,
-			'callback'            => [ $this, 'refresh_models' ],
-			'permission_callback' => $permission,
-		] );
+		register_rest_route(
+			self::NAMESPACE,
+			'/providers/chatgpt/connection',
+			[
+				'methods'             => \WP_REST_Server::DELETABLE,
+				'callback'            => [ $this, 'disconnect' ],
+				'permission_callback' => $permission,
+			]
+		);
+		register_rest_route(
+			self::NAMESPACE,
+			'/providers/chatgpt/models/refresh',
+			[
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => [ $this, 'refresh_models' ],
+				'permission_callback' => $permission,
+			]
+		);
 	}
 
 	public function can_manage(): bool {

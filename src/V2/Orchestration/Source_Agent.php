@@ -18,11 +18,11 @@ use WP_Autoplugin\V2\Infrastructure\Queue\Queue;
 
 /** Executes one durable, read-only Plan or Explain agent turn per callback. */
 final class Source_Agent {
-	private const MAX_MODEL_TURNS = 8;
-	private const MAX_TOOL_CALLS  = 20;
-	private const MAX_TOOL_BATCH  = 10;
+	private const MAX_MODEL_TURNS  = 8;
+	private const MAX_TOOL_CALLS   = 20;
+	private const MAX_TOOL_BATCH   = 10;
 	private const MAX_SOURCE_BYTES = 500000;
-	private const MAX_RETRIES = 2;
+	private const MAX_RETRIES      = 2;
 
 	public function register(): void {
 		add_filter( 'wp_autoplugin_v2_execute_job', [ $this, 'execute' ], 5, 3 );
@@ -49,7 +49,7 @@ final class Source_Agent {
 		$runs      = new Agent_Run_Repository();
 		$run       = $runs->find_by_job( (int) $job['id'] );
 		$factory   = new Agent_Transport_Factory();
-		$model = (array) ( $job['payload']['prompt_model'] ?? [] );
+		$model     = (array) ( $job['payload']['prompt_model'] ?? [] );
 		$transport = $run
 			? $factory->create_for( (string) $run['provider'], (string) $run['model'], (string) $run['effort'] )
 			: ( ! empty( $model['provider'] ) && ! empty( $model['model'] )
@@ -75,13 +75,20 @@ final class Source_Agent {
 						$hook_sources[] = 'parent_theme';
 					}
 					foreach ( $hook_sources as $hook_source ) {
-						$hooks = $tools->execute( 'list_hooks', [ 'offset' => 0, 'limit' => 25, 'source' => $hook_source ] );
+						$hooks = $tools->execute(
+							'list_hooks',
+							[
+								'offset' => 0,
+								'limit'  => 25,
+								'source' => $hook_source,
+							]
+						);
 						if ( ! empty( $hooks['error'] ) ) {
 							throw new \RuntimeException( __( 'The target hooks could not be inspected.', 'wp-autoplugin' ) );
 						}
-						$label = 'parent_theme' === $hook_source ? 'read-only parent theme' : 'editable target';
-						$bootstrap['content'] .= "\n\nDiscovered {$label} hook contexts (first bounded page):\n" . $hooks['content'];
-						$bootstrap['inspected'] = array_merge( $bootstrap['inspected'], $hooks['inspected'] );
+						$label                                       = 'parent_theme' === $hook_source ? 'read-only parent theme' : 'editable target';
+						$bootstrap['content']                       .= "\n\nDiscovered {$label} hook contexts (first bounded page):\n" . $hooks['content'];
+						$bootstrap['inspected']                      = array_merge( $bootstrap['inspected'], $hooks['inspected'] );
 						$bootstrap['audit']['hooks'][ $hook_source ] = $hooks['audit'];
 					}
 				}
@@ -90,7 +97,12 @@ final class Source_Agent {
 					$transport->provider(),
 					$transport->model(),
 					$transport->effort(),
-					[ [ 'role' => 'user', 'content' => $this->initial_message( $workspace, $job, $bootstrap['content'] ) ] ],
+					[
+						[
+							'role'    => 'user',
+							'content' => $this->initial_message( $workspace, $job, $bootstrap['content'] ),
+						],
+					],
 					$bootstrap['tree_fingerprint'],
 					$bootstrap['inspected'],
 					strlen( $bootstrap['content'] )
@@ -127,7 +139,17 @@ final class Source_Agent {
 				throw new \RuntimeException( sprintf( /* translators: %s: workspace stage. */ __( 'The target changed during inspection. Start %s again to inspect a consistent version.', 'wp-autoplugin' ), $this->label( $stage ) ) );
 			}
 
-			$jobs->event( (int) $job['id'], 'agent_turn', sprintf( /* translators: 1: workspace stage, 2: agent model turn. */ __( 'Running %1$s agent turn %2$d.', 'wp-autoplugin' ), $this->label( $stage ), (int) $run['model_turns'] + 1 ), [ 'turn' => (int) $run['model_turns'] + 1, 'model' => $transport->model(), 'effort' => $transport->effort(), 'stage' => $stage ] );
+			$jobs->event(
+				(int) $job['id'],
+				'agent_turn',
+				sprintf( /* translators: 1: workspace stage, 2: agent model turn. */ __( 'Running %1$s agent turn %2$d.', 'wp-autoplugin' ), $this->label( $stage ), (int) $run['model_turns'] + 1 ),
+				[
+					'turn'   => (int) $run['model_turns'] + 1,
+					'model'  => $transport->model(),
+					'effort' => $transport->effort(),
+					'stage'  => $stage,
+				]
+			);
 			$transcript = (array) $run['transcript'];
 			$images     = ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true );
 			if ( $images && isset( $transcript[0] ) && 'user' === ( $transcript[0]['role'] ?? '' ) ) {
@@ -156,7 +178,16 @@ final class Source_Agent {
 			$model_turns   = (int) $run['model_turns'] + 1;
 			$input_tokens  = (int) $run['input_tokens'] + (int) ( $usage['input_tokens'] ?? 0 );
 			$output_tokens = (int) $run['output_tokens'] + (int) ( $usage['output_tokens'] ?? 0 );
-			$runs->step( (int) $run['id'], 'model', [ 'type' => $response['type'], 'request_id' => (string) ( $response['request_id'] ?? '' ), 'usage' => $usage, 'response' => $response ] );
+			$runs->step(
+				(int) $run['id'],
+				'model',
+				[
+					'type'       => $response['type'],
+					'request_id' => (string) ( $response['request_id'] ?? '' ),
+					'usage'      => $usage,
+					'response'   => $response,
+				]
+			);
 
 			if ( 'final' === ( $response['type'] ?? '' ) ) {
 				if ( 'plan' === $stage ) {
@@ -170,7 +201,7 @@ final class Source_Agent {
 						throw new \RuntimeException( $this->with_debug_response( $task_result->get_error_message(), $response ) );
 					}
 					if ( 'plan_structure' === $job['task'] ) {
-						$artifact = $this->plan_artifact( $workspace, $job );
+						$artifact                = $this->plan_artifact( $workspace, $job );
 						$task_result['content']  = $artifact['content'];
 						$task_result['artifact'] = [
 							'type'          => 'plan',
@@ -179,18 +210,40 @@ final class Source_Agent {
 						];
 					}
 				} else {
-					$task_result = [ 'content' => (string) $response['content'], 'outcome' => 'answer' ];
+					$task_result = [
+						'content' => (string) $response['content'],
+						'outcome' => 'answer',
+					];
 				}
-				$runs->checkpoint( (int) $run['id'], $token, [ 'model_turns' => $model_turns, 'input_tokens' => $input_tokens, 'output_tokens' => $output_tokens, 'last_error' => null ] );
+				$runs->checkpoint(
+					(int) $run['id'],
+					$token,
+					[
+						'model_turns'   => $model_turns,
+						'input_tokens'  => $input_tokens,
+						'output_tokens' => $output_tokens,
+						'last_error'    => null,
+					]
+				);
 				$run = $runs->find_by_job( (int) $job['id'] ) ?: $run;
 				$runs->terminate_by_job( (int) $job['id'], 'completed' );
-				return array_merge( $task_result, [
-					'model'    => $transport->model(),
-					'provider' => $transport->provider(),
-					'effort'   => $transport->effort(),
-					'usage'    => [ 'input_tokens' => $input_tokens, 'output_tokens' => $output_tokens ],
-					'agent'    => [ 'model_turns' => $model_turns, 'tool_calls' => (int) $run['tool_calls'], 'source_bytes' => (int) $run['source_bytes'] ],
-				] );
+				return array_merge(
+					$task_result,
+					[
+						'model'    => $transport->model(),
+						'provider' => $transport->provider(),
+						'effort'   => $transport->effort(),
+						'usage'    => [
+							'input_tokens'  => $input_tokens,
+							'output_tokens' => $output_tokens,
+						],
+						'agent'    => [
+							'model_turns'  => $model_turns,
+							'tool_calls'   => (int) $run['tool_calls'],
+							'source_bytes' => (int) $run['source_bytes'],
+						],
+					]
+				);
 			}
 
 			$calls = (array) ( $response['tool_calls'] ?? [] );
@@ -200,7 +253,7 @@ final class Source_Agent {
 			$requested = count( $calls );
 			$remaining = self::MAX_TOOL_CALLS - (int) $run['tool_calls'];
 			if ( $requested > self::MAX_TOOL_BATCH || $requested > $remaining ) {
-				$names = array_values( array_filter( array_map( static fn( array $call ): string => sanitize_key( (string) ( $call['name'] ?? '' ) ), $calls ) ) );
+				$names   = array_values( array_filter( array_map( static fn( array $call ): string => sanitize_key( (string) ( $call['name'] ?? '' ) ), $calls ) ) );
 				$message = $requested > self::MAX_TOOL_BATCH
 					? sprintf(
 						/* translators: 1: requested tool count, 2: per-turn tool limit. */
@@ -219,34 +272,62 @@ final class Source_Agent {
 					(int) $job['id'],
 					'agent_tool_limit',
 					$message,
-					[ 'requested' => $requested, 'per_turn_limit' => self::MAX_TOOL_BATCH, 'remaining_job_calls' => max( 0, $remaining ), 'tools' => $names ],
+					[
+						'requested'           => $requested,
+						'per_turn_limit'      => self::MAX_TOOL_BATCH,
+						'remaining_job_calls' => max( 0, $remaining ),
+						'tools'               => $names,
+					],
 					'warning'
 				);
 				throw new \RuntimeException( $this->with_debug_response( $message, $response ) );
 			}
 			$transcript   = (array) $run['transcript'];
-			$transcript[] = [ 'role' => 'assistant', 'content' => (string) ( $response['text'] ?? '' ), 'tool_calls' => $calls ];
+			$transcript[] = [
+				'role'       => 'assistant',
+				'content'    => (string) ( $response['text'] ?? '' ),
+				'tool_calls' => $calls,
+			];
 			$inspected    = (array) $run['inspected_files'];
 			$source_bytes = (int) $run['source_bytes'];
 			foreach ( $calls as $call ) {
 				if ( empty( $call['id'] ) || empty( $call['name'] ) || ! is_array( $call['arguments'] ?? null ) ) {
 					throw new \RuntimeException( __( 'The model returned an invalid source-tool request.', 'wp-autoplugin' ) );
 				}
-				$tool_result = $tools->execute( (string) $call['name'], $call['arguments'] );
+				$tool_result   = $tools->execute( (string) $call['name'], $call['arguments'] );
 				$source_bytes += (int) $tool_result['bytes'];
 				if ( $source_bytes > self::MAX_SOURCE_BYTES ) {
 					throw new \RuntimeException( sprintf( /* translators: %s: workspace stage. */ __( '%s stopped after reaching its source-inspection byte limit.', 'wp-autoplugin' ), $this->label( $stage ) ) );
 				}
-				$inspected = array_merge( $inspected, $tool_result['inspected'] );
-				$transcript[] = [ 'role' => 'tool', 'call_id' => (string) $call['id'], 'name' => (string) $call['name'], 'content' => $tool_result['content'] ];
-				$runs->step( (int) $run['id'], 'tool', [ 'arguments' => $call['arguments'], 'content' => $tool_result['content'], 'bytes' => $tool_result['bytes'], 'hashes' => $tool_result['inspected'] ], (string) $call['name'], (string) $tool_result['path'] );
+				$inspected    = array_merge( $inspected, $tool_result['inspected'] );
+				$transcript[] = [
+					'role'    => 'tool',
+					'call_id' => (string) $call['id'],
+					'name'    => (string) $call['name'],
+					'content' => $tool_result['content'],
+				];
+				$runs->step(
+					(int) $run['id'],
+					'tool',
+					[
+						'arguments' => $call['arguments'],
+						'content'   => $tool_result['content'],
+						'bytes'     => $tool_result['bytes'],
+						'hashes'    => $tool_result['inspected'],
+					],
+					(string) $call['name'],
+					(string) $tool_result['path']
+				);
 				$tool_failed = ! empty( $tool_result['error'] );
 				$jobs->event(
 					(int) $job['id'],
 					$tool_failed ? 'agent_tool_error' : 'agent_tool',
 					$tool_failed ? __( 'A source-tool request was rejected; the agent can correct it on the next turn.', 'wp-autoplugin' ) : $this->tool_message( (string) $call['name'], (string) $tool_result['path'] ),
 					array_merge(
-						[ 'tool' => (string) $call['name'], 'call_id' => (string) $call['id'] ],
+						[
+							'tool'    => (string) $call['name'],
+							'call_id' => (string) $call['id'],
+						],
 						(array) $tool_result['audit']
 					),
 					$tool_failed ? 'warning' : 'info'
@@ -284,13 +365,13 @@ final class Source_Agent {
 		$remaining_calls = max( 0, self::MAX_TOOL_CALLS - (int) $run['tool_calls'] );
 		$turn_limit      = min( self::MAX_TOOL_BATCH, $remaining_calls );
 		$remaining_bytes = max( 0, self::MAX_SOURCE_BYTES - (int) $run['source_bytes'] );
-		$budget = Plugin_Instructions::prompt_policy() . ' ' . sprintf(
+		$budget          = Plugin_Instructions::prompt_policy() . ' ' . sprintf(
 			'In this turn you may request at most %1$d tool calls, with %2$d calls and approximately %3$d source-result bytes remaining for the whole job. Never exceed the per-turn tool-call limit; split additional inspection across later turns.',
 			$turn_limit,
 			$remaining_calls,
 			$remaining_bytes
 		);
-		$budget .= ' When the target metadata identifies a child theme and the tools expose source="parent_theme", inspect that source as needed to understand inherited templates, functions, hooks, and APIs. Parent-theme source is strictly read-only context: every proposed modify/fix path must remain relative to the editable child-theme target, and citations must distinguish parent_theme:path from target paths.';
+		$budget         .= ' When the target metadata identifies a child theme and the tools expose source="parent_theme", inspect that source as needed to understand inherited templates, functions, hooks, and APIs. Parent-theme source is strictly read-only context: every proposed modify/fix path must remain relative to the editable child-theme target, and citations must distinguish parent_theme:path from target paths.';
 		if ( 'explain' === $stage ) {
 			return 'You are a read-only WordPress source-code explanation agent. Inspect only what is needed to answer confidently. Use the provided tools to examine relevant files; never claim to write, execute, install, activate, or modify code. Prefer searches and targeted line-range reads. Cite relative file paths and line numbers when they support the answer. When sufficient evidence is available, return a clear Markdown answer instead of requesting more tools. ' . $budget;
 		}
@@ -304,7 +385,7 @@ final class Source_Agent {
 			return 'You are regenerating the validated file map for an administrator-edited implementation Plan for an existing WordPress plugin or theme. This is read-only planning work. Preserve the supplied Plan Markdown exactly. ' . $runtime_constraints . ' Inspect the target only as needed to identify the minimal files that must be added, updated, or deleted to implement the edited Plan consistently with the current architecture. Prefer searches and targeted line-range reads. Never write code, change files, execute code, install, activate, or claim implementation occurred. When inspection is sufficient, return only one valid JSON object with no Markdown fence in this shape: {"outcome":"artifact","content":"the complete administrator-edited Plan in Markdown, unchanged","structured":{"project_structure":{"directories":["relative/directory/"],"files":[{"path":"relative/file.php","type":"php","description":"brief purpose","action":"update"}]}}}. Keep the structure minimal. File type must be php, js, css, json, html, svg, xml, md, or txt; action must be add, update, or delete; paths must be relative to the target root and unique. ' . $budget;
 		}
 
-		$outcomes            = $follow_up
+		$outcomes = $follow_up
 			? 'For a question or ambiguity, return {"outcome":"answer","content":"concise Markdown answer"} and omit structured. Only when the administrator clearly requests a Plan change, use outcome "artifact" with the complete replacement Plan and file map.'
 			: 'The initial Plan must use outcome "artifact".';
 		if ( 'hook_extension' === $operation ) {
@@ -335,7 +416,7 @@ final class Source_Agent {
 			return "Question:\n{$message}\n\nRecent Explain conversation:\n{$history}\n\nThe initial target inspection follows. Do not assume unshown file contents.\n\n{$bootstrap}";
 		}
 		if ( 'plan_structure' === $job['task'] ) {
-			$artifact = $this->plan_artifact( $workspace, $job );
+			$artifact  = $this->plan_artifact( $workspace, $job );
 			$request   = trim( (string) $workspace['request'] );
 			$operation = (string) $workspace['operation'];
 			$prior     = (string) wp_json_encode( $artifact['structured'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
@@ -408,9 +489,17 @@ final class Source_Agent {
 	private function provider_failure( \WP_Error $error, array $job, array $run, string $token, Agent_Run_Repository $runs ) {
 		$data = (array) $error->get_error_data();
 		if ( ! empty( $data['retryable'] ) && empty( $data['ambiguous'] ) && (int) $run['retry_count'] < self::MAX_RETRIES ) {
-			$retry = (int) $run['retry_count'] + 1;
+			$retry           = (int) $run['retry_count'] + 1;
 			$next_generation = (int) $run['generation'] + 1;
-			$runs->checkpoint( (int) $run['id'], $token, [ 'generation' => $next_generation, 'retry_count' => $retry, 'last_error' => $error->get_error_message() ] );
+			$runs->checkpoint(
+				(int) $run['id'],
+				$token,
+				[
+					'generation'  => $next_generation,
+					'retry_count' => $retry,
+					'last_error'  => $error->get_error_message(),
+				]
+			);
 			( new Job_Repository() )->update( (int) $job['id'], [ 'status' => 'retrying' ] );
 			( new Job_Repository() )->event( (int) $job['id'], 'agent_retry', sprintf( /* translators: %d: retry number. */ __( 'Provider request will be retried (attempt %d).', 'wp-autoplugin' ), $retry ), [ 'retry' => $retry ], 'warning' );
 			( new Queue() )->schedule( (int) $job['id'], $next_generation, min( 60, 5 * ( 2 ** ( $retry - 1 ) ) ) );

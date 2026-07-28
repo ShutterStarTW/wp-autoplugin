@@ -74,7 +74,7 @@ final class Installer {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		$charset = $wpdb->get_charset_collate();
 
-		$sql = [];
+		$sql   = [];
 		$sql[] = 'CREATE TABLE ' . self::table( 'targets' ) . " (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			kind varchar(20) NOT NULL,
@@ -486,7 +486,7 @@ final class Installer {
 			"ALTER TABLE $agent_runs ADD effort varchar(20) NOT NULL DEFAULT '' AFTER model"
 		);
 
-		$revisions = self::table( 'revisions' );
+		$revisions        = self::table( 'revisions' );
 		$revision_columns = [
 			'origin'                    => "ALTER TABLE $revisions ADD origin varchar(20) NOT NULL DEFAULT 'ai' AFTER summary",
 			'plan_job_id'               => "ALTER TABLE $revisions ADD plan_job_id bigint(20) unsigned NULL AFTER origin",
@@ -499,11 +499,11 @@ final class Installer {
 			maybe_add_column( $revisions, $column, $alter );
 		}
 
-		$revision_ready = ! array_filter(
+		$revision_ready        = ! array_filter(
 			array_keys( $revision_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $revisions, $column )
 		);
-		$revision_files = self::table( 'revision_files' );
+		$revision_files        = self::table( 'revision_files' );
 		$revision_file_columns = [
 			'base_content'      => "ALTER TABLE $revision_files ADD base_content longtext NULL AFTER content_hash",
 			'base_content_hash' => "ALTER TABLE $revision_files ADD base_content_hash char(64) NULL AFTER base_content",
@@ -515,15 +515,15 @@ final class Installer {
 			array_keys( $revision_file_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $revision_files, $column )
 		);
-		$jobs        = self::table( 'jobs' );
-		$job_columns = [
+		$jobs                = self::table( 'jobs' );
+		$job_columns         = [
 			'global_instructions'      => "ALTER TABLE $jobs ADD global_instructions longtext NULL AFTER payload",
 			'global_instructions_hash' => "ALTER TABLE $jobs ADD global_instructions_hash char(64) NULL AFTER global_instructions",
 		];
 		foreach ( $job_columns as $column => $alter ) {
 			maybe_add_column( $jobs, $column, $alter );
 		}
-		$job_ready  = ! array_filter(
+		$job_ready = ! array_filter(
 			array_keys( $job_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $jobs, $column )
 		);
@@ -558,14 +558,14 @@ final class Installer {
 			'operation',
 			"ALTER TABLE $code_run_files ADD operation varchar(10) NOT NULL DEFAULT 'add' AFTER description"
 		);
-		$code_run_ready = ! array_filter(
+		$code_run_ready          = ! array_filter(
 			array_keys( $code_run_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $code_runs, $column )
 		);
 		$release_packages        = self::table( 'release_packages' );
 		$release_package_columns = [
-			'artifact_kind'       => "ALTER TABLE $release_packages ADD artifact_kind varchar(20) NOT NULL DEFAULT 'plugin' AFTER status",
-			'target_ref'          => "ALTER TABLE $release_packages ADD target_ref varchar(500) NULL AFTER artifact_kind",
+			'artifact_kind'        => "ALTER TABLE $release_packages ADD artifact_kind varchar(20) NOT NULL DEFAULT 'plugin' AFTER status",
+			'target_ref'           => "ALTER TABLE $release_packages ADD target_ref varchar(500) NULL AFTER artifact_kind",
 			'source_fingerprint'   => "ALTER TABLE $release_packages ADD source_fingerprint char(64) NULL AFTER size",
 			'artifact_fingerprint' => "ALTER TABLE $release_packages ADD artifact_fingerprint char(64) NULL AFTER source_fingerprint",
 			'header_transforms'    => "ALTER TABLE $release_packages ADD header_transforms longtext NULL AFTER artifact_fingerprint",
@@ -577,8 +577,8 @@ final class Installer {
 			array_keys( $release_package_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $release_packages, $column )
 		);
-		$promotions        = self::table( 'promotions' );
-		$promotion_columns = [
+		$promotions            = self::table( 'promotions' );
+		$promotion_columns     = [
 			'artifact_kind'          => "ALTER TABLE $promotions ADD artifact_kind varchar(20) NOT NULL DEFAULT 'plugin' AFTER status",
 			'source_target_ref'      => "ALTER TABLE $promotions ADD source_target_ref varchar(500) NULL AFTER artifact_kind",
 			'destination_target_ref' => "ALTER TABLE $promotions ADD destination_target_ref varchar(500) NULL AFTER source_target_ref",
@@ -589,12 +589,12 @@ final class Installer {
 		if ( 'varchar(30)' !== self::column_type( $promotions, 'mode' ) ) {
 			$wpdb->query( "ALTER TABLE $promotions MODIFY mode varchar(30) NOT NULL" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
 		}
-		$promotion_ready = ! array_filter(
+		$promotion_ready         = ! array_filter(
 			array_keys( $promotion_columns ),
 			static fn( string $column ): bool => ! self::column_exists( $promotions, $column )
 		) && 'varchar(30)' === self::column_type( $promotions, 'mode' );
-		$review_release_tables = [ 'review_reports', 'review_findings', 'review_finding_events', 'release_packages', 'promotions', 'promotion_files' ];
-		$review_release_ready  = ! array_filter(
+		$review_release_tables   = [ 'review_reports', 'review_findings', 'review_finding_events', 'release_packages', 'promotions', 'promotion_files' ];
+		$review_release_ready    = ! array_filter(
 			$review_release_tables,
 			static fn( string $table ): bool => ! self::table_exists( self::table( $table ) )
 		);
@@ -645,26 +645,26 @@ final class Installer {
 
 		wp_set_option_autoload_values(
 			[
-				'wp_autoplugin_openai_api_key'       => false,
-				'wp_autoplugin_anthropic_api_key'    => false,
-				'wp_autoplugin_google_api_key'       => false,
-				'wp_autoplugin_xai_api_key'          => false,
-				'wp_autoplugin_custom_models'         => false,
-				'wp_autoplugin_custom_instructions'   => false,
-				'wp_autoplugin_default_model_effort'  => false,
-				'wp_autoplugin_planner_model_effort'  => false,
-				'wp_autoplugin_coder_model_effort'    => false,
-				'wp_autoplugin_reviewer_model_effort' => false,
-				'_wp_autoplugin_chatgpt_oauth_tokens' => false,
-				'_wp_autoplugin_chatgpt_oauth_lock' => false,
+				'wp_autoplugin_openai_api_key'           => false,
+				'wp_autoplugin_anthropic_api_key'        => false,
+				'wp_autoplugin_google_api_key'           => false,
+				'wp_autoplugin_xai_api_key'              => false,
+				'wp_autoplugin_custom_models'            => false,
+				'wp_autoplugin_custom_instructions'      => false,
+				'wp_autoplugin_default_model_effort'     => false,
+				'wp_autoplugin_planner_model_effort'     => false,
+				'wp_autoplugin_coder_model_effort'       => false,
+				'wp_autoplugin_reviewer_model_effort'    => false,
+				'_wp_autoplugin_chatgpt_oauth_tokens'    => false,
+				'_wp_autoplugin_chatgpt_oauth_lock'      => false,
 				'_wp_autoplugin_chatgpt_oauth_poll_lock' => false,
-				'_wp_autoplugin_chatgpt_models_lock' => false,
-				'wp_autoplugin_chatgpt_model_cache' => false,
-				'wp_autoplugin_v2_planner_model' => false,
-				'wp_autoplugin_v2_coder_model' => false,
-				'wp_autoplugin_v2_reviewer_model' => false,
-				'wp_autoplugin_v2_planner_model_effort' => false,
-				'wp_autoplugin_v2_coder_model_effort' => false,
+				'_wp_autoplugin_chatgpt_models_lock'     => false,
+				'wp_autoplugin_chatgpt_model_cache'      => false,
+				'wp_autoplugin_v2_planner_model'         => false,
+				'wp_autoplugin_v2_coder_model'           => false,
+				'wp_autoplugin_v2_reviewer_model'        => false,
+				'wp_autoplugin_v2_planner_model_effort'  => false,
+				'wp_autoplugin_v2_coder_model_effort'    => false,
 				'wp_autoplugin_v2_reviewer_model_effort' => false,
 			]
 		);

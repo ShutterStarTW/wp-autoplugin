@@ -32,7 +32,11 @@ final class Code_Follow_Up_Compliance_Response {
 			if ( $issues ) {
 				return $this->error( 'code_follow_up_compliance_pass_issues', __( 'A passing Code compliance response must not include issues.', 'wp-autoplugin' ) );
 			}
-			return [ 'outcome' => 'pass', 'content' => $content, 'issues' => [] ];
+			return [
+				'outcome' => 'pass',
+				'content' => $content,
+				'issues'  => [],
+			];
 		}
 		if ( ! $issues || count( $issues ) > self::MAX_ISSUES ) {
 			return $this->error( 'code_follow_up_compliance_issues', __( 'A failed Code compliance response requires one to five bounded issues.', 'wp-autoplugin' ) );
@@ -46,13 +50,29 @@ final class Code_Follow_Up_Compliance_Response {
 			if ( '' === $message || strlen( $message ) > self::MAX_MESSAGE_BYTES || ( '' !== $path && ! isset( $paths[ $path ] ) ) ) {
 				return $this->error( 'code_follow_up_compliance_issue', __( 'Every Code compliance issue must be bounded and identify a candidate path or the whole change.', 'wp-autoplugin' ) );
 			}
-			$normalized[] = [ 'path' => $path, 'line' => 0, 'code' => 'request_mismatch', 'message' => $message ];
+			$normalized[] = [
+				'path'    => $path,
+				'line'    => 0,
+				'code'    => 'request_mismatch',
+				'message' => $message,
+			];
 		}
 
-		return [ 'outcome' => 'fail', 'content' => $content, 'issues' => $normalized ];
+		return [
+			'outcome' => 'fail',
+			'content' => $content,
+			'issues'  => $normalized,
+		];
 	}
 
 	private function error( string $code, string $message ): \WP_Error {
-		return new \WP_Error( $code, $message, [ 'retryable' => true, 'ambiguous' => false ] );
+		return new \WP_Error(
+			$code,
+			$message,
+			[
+				'retryable' => true,
+				'ambiguous' => false,
+			]
+		);
 	}
 }

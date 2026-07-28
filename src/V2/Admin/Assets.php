@@ -19,14 +19,14 @@ final class Assets {
 
 		wp_enqueue_script( 'wp-autoplugin-marked', WP_AUTOPLUGIN_URL . 'assets/v2/vendor/marked.min.js', [], WP_AUTOPLUGIN_VERSION, true );
 		wp_enqueue_script( 'wp-autoplugin-purify', WP_AUTOPLUGIN_URL . 'assets/v2/vendor/purify.min.js', [], WP_AUTOPLUGIN_VERSION, true );
-		$php_editor  = wp_enqueue_code_editor( [ 'type' => 'text/x-php' ] );
-		$js_editor   = wp_enqueue_code_editor( [ 'type' => 'text/javascript' ] );
-		$css_editor  = wp_enqueue_code_editor( [ 'type' => 'text/css' ] );
-		$json_editor = wp_enqueue_code_editor( [ 'type' => 'application/json' ] );
-		$html_editor = wp_enqueue_code_editor( [ 'type' => 'text/html' ] );
-		$xml_editor  = wp_enqueue_code_editor( [ 'type' => 'application/xml' ] );
-		$text_editor = wp_enqueue_code_editor( [ 'type' => 'text/plain' ] );
-		$editor_settings = [
+		$php_editor          = wp_enqueue_code_editor( [ 'type' => 'text/x-php' ] );
+		$js_editor           = wp_enqueue_code_editor( [ 'type' => 'text/javascript' ] );
+		$css_editor          = wp_enqueue_code_editor( [ 'type' => 'text/css' ] );
+		$json_editor         = wp_enqueue_code_editor( [ 'type' => 'application/json' ] );
+		$html_editor         = wp_enqueue_code_editor( [ 'type' => 'text/html' ] );
+		$xml_editor          = wp_enqueue_code_editor( [ 'type' => 'application/xml' ] );
+		$text_editor         = wp_enqueue_code_editor( [ 'type' => 'text/plain' ] );
+		$editor_settings     = [
 			'php'  => $php_editor,
 			'js'   => $js_editor,
 			'jsx'  => $js_editor,
@@ -41,7 +41,7 @@ final class Assets {
 			'md'   => $text_editor,
 			'txt'  => $text_editor,
 		];
-		$editor_settings = array_filter( $editor_settings, 'is_array' );
+		$editor_settings     = array_filter( $editor_settings, 'is_array' );
 		$editor_dependencies = $editor_settings ? [ 'code-editor' ] : [];
 
 		$asset_file = WP_AUTOPLUGIN_DIR . 'assets/v2/build/index.tsx.asset.php';
@@ -69,8 +69,8 @@ final class Assets {
 			self::HANDLE,
 			'window.wpAutopluginV2 = ' . wp_json_encode(
 				[
-					'restPath'    => '/wp-autoplugin/v2',
-					'settingsUrl' => admin_url( 'admin.php?page=wp-autoplugin-settings' ),
+					'restPath'           => '/wp-autoplugin/v2',
+					'settingsUrl'        => admin_url( 'admin.php?page=wp-autoplugin-settings' ),
 					'codeEditorSettings' => $editor_settings,
 				]
 			) . ';',

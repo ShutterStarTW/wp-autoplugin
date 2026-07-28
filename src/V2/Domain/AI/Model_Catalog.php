@@ -15,11 +15,23 @@ final class Model_Catalog {
 		'coder'    => 'wp_autoplugin_coder_model',
 		'reviewer' => 'wp_autoplugin_reviewer_model',
 	];
-	private const PROVIDERS = [
-		'OpenAI'    => [ 'id' => 'openai', 'key_option' => 'wp_autoplugin_openai_api_key' ],
-		'Anthropic' => [ 'id' => 'anthropic', 'key_option' => 'wp_autoplugin_anthropic_api_key' ],
-		'Google'    => [ 'id' => 'google', 'key_option' => 'wp_autoplugin_google_api_key' ],
-		'xAI'       => [ 'id' => 'xai', 'key_option' => 'wp_autoplugin_xai_api_key' ],
+	private const PROVIDERS    = [
+		'OpenAI'    => [
+			'id'         => 'openai',
+			'key_option' => 'wp_autoplugin_openai_api_key',
+		],
+		'Anthropic' => [
+			'id'         => 'anthropic',
+			'key_option' => 'wp_autoplugin_anthropic_api_key',
+		],
+		'Google'    => [
+			'id'         => 'google',
+			'key_option' => 'wp_autoplugin_google_api_key',
+		],
+		'xAI'       => [
+			'id'         => 'xai',
+			'key_option' => 'wp_autoplugin_xai_api_key',
+		],
 	];
 
 	public static function valid_role( string $role ): bool {
@@ -67,17 +79,17 @@ final class Model_Catalog {
 		$model      = (string) get_option( 'wp_autoplugin_model', '' );
 		$definition = $this->definition( $model );
 		return [
-			'model'             => $model,
-			'label'             => (string) ( $definition['label'] ?? $model ),
-			'provider'          => (string) ( $definition['provider'] ?? '' ),
-			'configured'        => (bool) ( $definition['configured'] ?? false ),
-			'available'         => (bool) ( $definition['available'] ?? false ),
-			'direct'            => (bool) ( $definition['direct'] ?? false ),
-			'native_read_tools' => (bool) ( $definition['native_read_tools'] ?? false ),
-			'images'            => (bool) ( $definition['images'] ?? false ),
-			'effort'            => Model_Effort::for_role( 'default' ),
-			'effort_levels'     => (array) ( $definition['effort_levels'] ?? [] ),
-			'default_effort'    => (string) ( $definition['default_effort'] ?? '' ),
+			'model'                => $model,
+			'label'                => (string) ( $definition['label'] ?? $model ),
+			'provider'             => (string) ( $definition['provider'] ?? '' ),
+			'configured'           => (bool) ( $definition['configured'] ?? false ),
+			'available'            => (bool) ( $definition['available'] ?? false ),
+			'direct'               => (bool) ( $definition['direct'] ?? false ),
+			'native_read_tools'    => (bool) ( $definition['native_read_tools'] ?? false ),
+			'images'               => (bool) ( $definition['images'] ?? false ),
+			'effort'               => Model_Effort::for_role( 'default' ),
+			'effort_levels'        => (array) ( $definition['effort_levels'] ?? [] ),
+			'default_effort'       => (string) ( $definition['default_effort'] ?? '' ),
 			'availability_message' => (string) ( $definition['availability_message'] ?? '' ),
 		];
 	}
@@ -99,20 +111,20 @@ final class Model_Catalog {
 		$effort           = Model_Effort::for_role( $role );
 
 		return [
-			'role'              => $role,
-			'configured_model'  => $configured_model,
-			'inherits_default'  => $inherited,
-			'model'             => $model,
-			'label'             => (string) ( $definition['label'] ?? $model ),
-			'provider'          => (string) ( $definition['provider'] ?? '' ),
-			'configured'        => (bool) ( $definition['configured'] ?? false ),
-			'available'         => (bool) ( $definition['available'] ?? false ),
-			'direct'            => (bool) ( $definition['direct'] ?? false ),
-			'native_read_tools' => (bool) ( $definition['native_read_tools'] ?? false ),
-			'images'            => (bool) ( $definition['images'] ?? false ),
-			'effort'            => $effort,
-			'effort_levels'     => (array) ( $definition['effort_levels'] ?? [] ),
-			'default_effort'    => (string) ( $definition['default_effort'] ?? '' ),
+			'role'                 => $role,
+			'configured_model'     => $configured_model,
+			'inherits_default'     => $inherited,
+			'model'                => $model,
+			'label'                => (string) ( $definition['label'] ?? $model ),
+			'provider'             => (string) ( $definition['provider'] ?? '' ),
+			'configured'           => (bool) ( $definition['configured'] ?? false ),
+			'available'            => (bool) ( $definition['available'] ?? false ),
+			'direct'               => (bool) ( $definition['direct'] ?? false ),
+			'native_read_tools'    => (bool) ( $definition['native_read_tools'] ?? false ),
+			'images'               => (bool) ( $definition['images'] ?? false ),
+			'effort'               => $effort,
+			'effort_levels'        => (array) ( $definition['effort_levels'] ?? [] ),
+			'default_effort'       => (string) ( $definition['default_effort'] ?? '' ),
 			'availability_message' => (string) ( $definition['availability_message'] ?? '' ),
 		];
 	}
@@ -178,10 +190,10 @@ final class Model_Catalog {
 			}
 			$configured = '' !== (string) get_option( $provider['key_option'], '' );
 			foreach ( $models as $model => $label ) {
-				$effort     = $efforts[ $model ] ?? null;
-				$capability = $matrix->for_model( $provider['id'], (string) $model );
-				$direct     = (bool) ( $capability['direct_mode'] ?? false );
-				$native     = (bool) ( $capability['native_read_tools'] ?? false );
+				$effort                         = $efforts[ $model ] ?? null;
+				$capability                     = $matrix->for_model( $provider['id'], (string) $model );
+				$direct                         = (bool) ( $capability['direct_mode'] ?? false );
+				$native                         = (bool) ( $capability['native_read_tools'] ?? false );
 				$definitions[ (string) $model ] = [
 					'id'                => (string) $model,
 					'label'             => (string) $label,
@@ -204,9 +216,9 @@ final class Model_Catalog {
 			if ( '' === $id ) {
 				continue;
 			}
-			$configured = '' !== trim( (string) ( $custom['url'] ?? '' ) ) && '' !== (string) ( $custom['apiKey'] ?? '' );
-			$capability = $matrix->for_model( 'custom', $id );
-			$direct     = (bool) ( $capability['direct_mode'] ?? false );
+			$configured         = '' !== trim( (string) ( $custom['url'] ?? '' ) ) && '' !== (string) ( $custom['apiKey'] ?? '' );
+			$capability         = $matrix->for_model( 'custom', $id );
+			$direct             = (bool) ( $capability['direct_mode'] ?? false );
 			$definitions[ $id ] = [
 				'id'                => $id,
 				'label'             => $id,
@@ -223,17 +235,17 @@ final class Model_Catalog {
 			];
 		}
 
-		$token_state = ( new ChatGPT_Token_Manager() )->stored();
-		$connected = is_array( $token_state );
+		$token_state   = ( new ChatGPT_Token_Manager() )->stored();
+		$connected     = is_array( $token_state );
 		$model_service = new ChatGPT_Model_Service();
-		$verified = $model_service->verified_models();
-		$sync = $model_service->state();
+		$verified      = $model_service->verified_models();
+		$sync          = $model_service->state();
 		foreach ( ChatGPT_Config::models() as $slug => $fallback ) {
-			$id = ChatGPT_Config::catalog_id( $slug );
-			$metadata = is_array( $verified[ $slug ] ?? null ) ? $verified[ $slug ] : [];
-			$available = $connected && empty( $sync['reconnect_required'] ) && [] !== $metadata;
+			$id         = ChatGPT_Config::catalog_id( $slug );
+			$metadata   = is_array( $verified[ $slug ] ?? null ) ? $verified[ $slug ] : [];
+			$available  = $connected && empty( $sync['reconnect_required'] ) && [] !== $metadata;
 			$capability = $matrix->for_model( 'chatgpt', $id );
-			$message = '';
+			$message    = '';
 			if ( ! $connected ) {
 				$message = is_wp_error( $token_state ) ? $token_state->get_error_message() : __( 'Connect a ChatGPT subscription in Settings.', 'wp-autoplugin' );
 			} elseif ( ! $available ) {

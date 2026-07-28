@@ -38,16 +38,16 @@ PROMPT;
 	public function analysis_input( string $workspace_request, string $plan, array $target, array $manifest, array $staged, array $tree, ?array $focused, array $history, string $message, string $feedback = '' ): string {
 		return wp_json_encode(
 			[
-				'json_contract'          => 'Return one JSON object with outcome answer or changes.',
-				'original_workspace_request' => $workspace_request,
-				'reference_plan'         => $plan,
-				'target'                 => $target,
-				'current_manifest'       => $manifest,
-				'current_staged_changes' => $staged,
-				'target_tree'            => $tree,
-				'focused_file'           => $focused,
-				'recent_code_conversation' => $history,
-				'retry_feedback'         => $feedback,
+				'json_contract'                => 'Return one JSON object with outcome answer or changes.',
+				'original_workspace_request'   => $workspace_request,
+				'reference_plan'               => $plan,
+				'target'                       => $target,
+				'current_manifest'             => $manifest,
+				'current_staged_changes'       => $staged,
+				'target_tree'                  => $tree,
+				'focused_file'                 => $focused,
+				'recent_code_conversation'     => $history,
+				'retry_feedback'               => $feedback,
 				'authoritative_latest_request' => $message,
 			],
 			JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE

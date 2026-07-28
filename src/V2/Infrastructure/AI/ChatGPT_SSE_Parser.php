@@ -9,20 +9,20 @@ final class ChatGPT_SSE_Parser {
 		if ( '' === trim( $body ) ) {
 			return new \WP_Error( 'chatgpt_stream_empty', __( 'The ChatGPT response stream was empty.', 'wp-autoplugin' ) );
 		}
-		$output = [];
-		$deltas = [];
-		$phase = '';
-		$saw_tool = false;
+		$output        = [];
+		$deltas        = [];
+		$phase         = '';
+		$saw_tool      = false;
 		$terminal_type = '';
-		$terminal = [];
+		$terminal      = [];
 		foreach ( self::events( $body ) as $event ) {
 			$type = is_string( $event['type'] ?? null ) ? $event['type'] : '';
 			if ( 'error' === $type ) {
 				return self::error( $event );
 			}
 			if ( 'response.output_item.added' === $type ) {
-				$item = is_array( $event['item'] ?? null ) ? $event['item'] : [];
-				$phase = 'message' === ( $item['type'] ?? '' ) ? self::phase( $item['phase'] ?? '' ) : '';
+				$item     = is_array( $event['item'] ?? null ) ? $event['item'] : [];
+				$phase    = 'message' === ( $item['type'] ?? '' ) ? self::phase( $item['phase'] ?? '' ) : '';
 				$saw_tool = $saw_tool || 'function_call' === ( $item['type'] ?? '' );
 				continue;
 			}
@@ -36,10 +36,10 @@ final class ChatGPT_SSE_Parser {
 				continue;
 			}
 			if ( 'response.output_item.done' === $type && is_array( $event['item'] ?? null ) ) {
-				$item = $event['item'];
-				$item_type = is_string( $item['type'] ?? null ) ? $item['type'] : '';
+				$item       = $event['item'];
+				$item_type  = is_string( $item['type'] ?? null ) ? $item['type'] : '';
 				$item_phase = self::phase( $item['phase'] ?? '' );
-				$saw_tool = $saw_tool || 'function_call' === $item_type;
+				$saw_tool   = $saw_tool || 'function_call' === $item_type;
 				if ( in_array( $item_type, [ 'message', 'function_call' ], true ) && ! in_array( $item_phase, [ 'analysis', 'commentary' ], true ) ) {
 					$output[] = $item;
 				}
@@ -47,7 +47,7 @@ final class ChatGPT_SSE_Parser {
 			}
 			if ( in_array( $type, [ 'response.completed', 'response.incomplete', 'response.failed' ], true ) ) {
 				$terminal_type = $type;
-				$terminal = is_array( $event['response'] ?? null ) ? $event['response'] : [];
+				$terminal      = is_array( $event['response'] ?? null ) ? $event['response'] : [];
 				if ( 'response.failed' === $type ) {
 					return self::error( $terminal );
 				}
@@ -58,10 +58,20 @@ final class ChatGPT_SSE_Parser {
 			return new \WP_Error( 'chatgpt_stream_truncated', __( 'The ChatGPT response stream ended before reporting completion.', 'wp-autoplugin' ), [ 'ambiguous' => true ] );
 		}
 		if ( ! $output && $deltas && ! $saw_tool ) {
-			$output[] = [ 'type' => 'message', 'role' => 'assistant', 'status' => 'completed', 'content' => [ [ 'type' => 'output_text', 'text' => implode( '', $deltas ) ] ] ];
+			$output[] = [
+				'type'    => 'message',
+				'role'    => 'assistant',
+				'status'  => 'completed',
+				'content' => [
+					[
+						'type' => 'output_text',
+						'text' => implode( '', $deltas ),
+					],
+				],
+			];
 		}
-		$terminal['output'] = $output;
-		$terminal['status'] = is_string( $terminal['status'] ?? null ) ? $terminal['status'] : ( 'response.incomplete' === $terminal_type ? 'incomplete' : 'completed' );
+		$terminal['output']      = $output;
+		$terminal['status']      = is_string( $terminal['status'] ?? null ) ? $terminal['status'] : ( 'response.incomplete' === $terminal_type ? 'incomplete' : 'completed' );
 		$terminal['output_text'] = implode( '', $deltas );
 		return $terminal;
 	}
@@ -77,7 +87,7 @@ final class ChatGPT_SSE_Parser {
 					$lines[] = ltrim( substr( $line, 5 ), ' ' );
 				}
 			}
-			$json = implode( "\n", $lines );
+			$json  = implode( "\n", $lines );
 			$event = '[DONE]' !== $json ? json_decode( $json, true ) : null;
 			if ( is_array( $event ) && ! array_is_list( $event ) ) {
 				$events[] = $event;
@@ -93,7 +103,7 @@ final class ChatGPT_SSE_Parser {
 
 	/** @param array<string, mixed> $data */
 	private static function error( array $data ): \WP_Error {
-		$error = is_array( $data['error'] ?? null ) ? $data['error'] : $data;
+		$error   = is_array( $data['error'] ?? null ) ? $data['error'] : $data;
 		$message = is_string( $error['message'] ?? null ) ? trim( $error['message'] ) : '';
 		return new \WP_Error( 'chatgpt_stream_failed', '' !== $message ? sanitize_text_field( $message ) : __( 'The ChatGPT response failed.', 'wp-autoplugin' ) );
 	}

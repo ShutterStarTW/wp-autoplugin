@@ -9,7 +9,10 @@ final class ChatGPT_Option_Lock {
 	/** @return string|\WP_Error */
 	public function acquire() {
 		$owner = wp_generate_uuid4();
-		$value = [ 'owner' => $owner, 'expires_at' => time() + max( 3, min( 60, $this->ttl ) ) ];
+		$value = [
+			'owner'      => $owner,
+			'expires_at' => time() + max( 3, min( 60, $this->ttl ) ),
+		];
 		if ( add_option( $this->option, $value, '', false ) ) {
 			return $owner;
 		}
@@ -20,7 +23,14 @@ final class ChatGPT_Option_Lock {
 				return $owner;
 			}
 		}
-		return new \WP_Error( 'chatgpt_oauth_locked', __( 'Another ChatGPT authentication operation is in progress.', 'wp-autoplugin' ), [ 'status' => 409, 'retry_after' => 1 ] );
+		return new \WP_Error(
+			'chatgpt_oauth_locked',
+			__( 'Another ChatGPT authentication operation is in progress.', 'wp-autoplugin' ),
+			[
+				'status'      => 409,
+				'retry_after' => 1,
+			]
+		);
 	}
 
 	public function release( string $owner ): void {

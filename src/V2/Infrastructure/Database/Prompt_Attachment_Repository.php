@@ -33,7 +33,7 @@ final class Prompt_Attachment_Repository extends Repository {
 			if ( ! $record || (int) $record['workspace_id'] !== $workspace_id || (int) $record['created_by'] !== $user_id ) {
 				return new \WP_Error( 'wp_autoplugin_prompt_attachment_invalid', __( 'A reused prompt image is unavailable in this workspace.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 			}
-			$total    += (int) $record['byte_size'];
+			$total += (int) $record['byte_size'];
 			if ( $total > Prompt_Image_Validator::MAX_TOTAL_BYTES ) {
 				return new \WP_Error( 'wp_autoplugin_prompt_images_total', __( 'Prompt images may use at most 20 MiB in total.', 'wp-autoplugin' ), [ 'status' => 400 ] );
 			}
@@ -75,7 +75,11 @@ final class Prompt_Attachment_Repository extends Repository {
 			foreach ( $records as $sequence => $record ) {
 				if ( ! $record || false === $this->wpdb->insert(
 					Installer::table( 'job_prompt_attachments' ),
-					[ 'job_id' => $job_id, 'attachment_id' => (int) $record['id'], 'sequence' => $sequence ],
+					[
+						'job_id'        => $job_id,
+						'attachment_id' => (int) $record['id'],
+						'sequence'      => $sequence,
+					],
 					[ '%d', '%d', '%d' ]
 				) ) {
 					throw new \RuntimeException( __( 'A prompt image could not be linked to its job.', 'wp-autoplugin' ) );
@@ -95,14 +99,14 @@ final class Prompt_Attachment_Repository extends Repository {
 	/** @return array<string, mixed>|null */
 	public function find( int $id, bool $with_content = true ): ?array {
 		$columns = $with_content ? '*' : 'id, workspace_id, created_by, filename, mime_type, byte_size, width, height, sha256, created_at';
-		$row = $this->wpdb->get_row( $this->wpdb->prepare( 'SELECT ' . $columns . ' FROM ' . Installer::table( 'prompt_attachments' ) . ' WHERE id = %d', $id ), ARRAY_A );
+		$row     = $this->wpdb->get_row( $this->wpdb->prepare( 'SELECT ' . $columns . ' FROM ' . Installer::table( 'prompt_attachments' ) . ' WHERE id = %d', $id ), ARRAY_A );
 		return $row ? $this->hydrate( $row ) : null;
 	}
 
 	/** @return array<int, array<string, mixed>> */
 	public function for_job( int $job_id, bool $with_content = false ): array {
 		$columns = $with_content ? 'a.*' : 'a.id, a.workspace_id, a.created_by, a.filename, a.mime_type, a.byte_size, a.width, a.height, a.sha256, a.created_at';
-		$rows = $this->wpdb->get_results(
+		$rows    = $this->wpdb->get_results(
 			$this->wpdb->prepare( 'SELECT ' . $columns . ' FROM ' . Installer::table( 'prompt_attachments' ) . ' a INNER JOIN ' . Installer::table( 'job_prompt_attachments' ) . ' j ON j.attachment_id = a.id WHERE j.job_id = %d ORDER BY j.sequence ASC', $job_id ),
 			ARRAY_A
 		);

@@ -25,7 +25,7 @@ final class ChatGPT_OAuth_Service {
 		if ( ! $this->store->available() ) {
 			return new \WP_Error( 'chatgpt_oauth_encryption_unavailable', __( 'OpenSSL AES-256-GCM support is required to connect ChatGPT.', 'wp-autoplugin' ), [ 'status' => 500 ] );
 		}
-		$lock = new ChatGPT_Option_Lock( self::POLL_LOCK_OPTION, 20 );
+		$lock  = new ChatGPT_Option_Lock( self::POLL_LOCK_OPTION, 20 );
 		$owner = $lock->acquire();
 		if ( is_wp_error( $owner ) ) {
 			return $owner;
@@ -40,7 +40,7 @@ final class ChatGPT_OAuth_Service {
 
 	/** @return array<string, mixed>|\WP_Error */
 	public function poll( int $user_id, string $session_id ) {
-		$poll_lock = new ChatGPT_Option_Lock( self::POLL_LOCK_OPTION, 20 );
+		$poll_lock  = new ChatGPT_Option_Lock( self::POLL_LOCK_OPTION, 20 );
 		$poll_owner = $poll_lock->acquire();
 		if ( is_wp_error( $poll_owner ) ) {
 			return $poll_owner;
@@ -69,7 +69,7 @@ final class ChatGPT_OAuth_Service {
 			}
 			$this->sessions->mark( $user_id, $session_id, 'exchanging' );
 
-			$credential_lock = $this->tokens->lock();
+			$credential_lock  = $this->tokens->lock();
 			$credential_owner = $credential_lock->acquire();
 			if ( is_wp_error( $credential_owner ) ) {
 				$this->sessions->mark( $user_id, $session_id, 'pending' );
@@ -114,7 +114,7 @@ final class ChatGPT_OAuth_Service {
 
 	/** @return array<string, mixed>|\WP_Error */
 	public function cancel( int $user_id, string $session_id ) {
-		$lock = new ChatGPT_Option_Lock( self::POLL_LOCK_OPTION, 20 );
+		$lock  = new ChatGPT_Option_Lock( self::POLL_LOCK_OPTION, 20 );
 		$owner = $lock->acquire();
 		if ( is_wp_error( $owner ) ) {
 			return $owner;
@@ -128,13 +128,13 @@ final class ChatGPT_OAuth_Service {
 
 	/** @return array<string, mixed>|\WP_Error */
 	public function disconnect() {
-		$lock = $this->tokens->lock();
+		$lock  = $this->tokens->lock();
 		$owner = $lock->acquire();
 		if ( is_wp_error( $owner ) ) {
 			return $owner;
 		}
 		try {
-			$model_lock = $this->models->lock();
+			$model_lock  = $this->models->lock();
 			$model_owner = $model_lock->acquire();
 			if ( is_wp_error( $model_owner ) ) {
 				return $model_owner;
@@ -143,7 +143,10 @@ final class ChatGPT_OAuth_Service {
 				$this->tokens->delete();
 				$this->models->delete();
 				$this->sessions->clear();
-				return [ 'connected' => false, 'status' => 'disconnected' ];
+				return [
+					'connected' => false,
+					'status'    => 'disconnected',
+				];
 			} finally {
 				$model_lock->release( $model_owner );
 			}
@@ -159,14 +162,14 @@ final class ChatGPT_OAuth_Service {
 
 	/** @return array<string, mixed> */
 	public function status( int $user_id, bool $refresh_stale = false ): array {
-		$stored = $this->tokens->stored();
-		$connected = is_array( $stored );
-		$error = is_wp_error( $stored ) ? $stored->get_error_message() : '';
-		$error_data = is_wp_error( $stored ) ? (array) $stored->get_error_data() : [];
-		$reconnect = ! empty( $error_data['reconnect_required'] );
+		$stored      = $this->tokens->stored();
+		$connected   = is_array( $stored );
+		$error       = is_wp_error( $stored ) ? $stored->get_error_message() : '';
+		$error_data  = is_wp_error( $stored ) ? (array) $stored->get_error_data() : [];
+		$reconnect   = ! empty( $error_data['reconnect_required'] );
 		$model_state = $this->models->state();
 		if ( $connected && $refresh_stale && ! empty( $model_state['stale'] ) ) {
-			$refreshed = $this->models->refresh();
+			$refreshed   = $this->models->refresh();
 			$model_state = is_wp_error( $refreshed ) ? $this->models->state() : $refreshed;
 		}
 		$reconnect = $reconnect || ! empty( $model_state['reconnect_required'] );

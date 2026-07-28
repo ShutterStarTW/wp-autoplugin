@@ -15,8 +15,18 @@ final class Job_Repository extends Repository {
 	 */
 	public function create( int $workspace_id, string $task, array $payload, int $user_id ): array {
 		$now           = $this->now();
-		$artifact_lock = self::is_artifact_work( [ 'task' => $task, 'payload' => $payload ] );
-		$instructions  = self::is_ai_work( [ 'task' => $task, 'payload' => $payload ] )
+		$artifact_lock = self::is_artifact_work(
+			[
+				'task'    => $task,
+				'payload' => $payload,
+			]
+		);
+		$instructions  = self::is_ai_work(
+			[
+				'task'    => $task,
+				'payload' => $payload,
+			]
+		)
 			? Global_Instructions::snapshot()
 			: null;
 		if ( $artifact_lock ) {
@@ -265,14 +275,23 @@ final class Job_Repository extends Repository {
 	public function request_cancel( int $id ): bool {
 		$job = $this->find( $id );
 		if ( $job && 'queued' === $job['status'] ) {
-			$this->update( $id, [ 'status' => 'cancelled', 'finished_at' => $this->now() ] );
+			$this->update(
+				$id,
+				[
+					'status'      => 'cancelled',
+					'finished_at' => $this->now(),
+				]
+			);
 			$this->event( $id, 'cancelled', __( 'Queued job cancelled.', 'wp-autoplugin' ) );
 			return true;
 		}
 
 		$updated = $this->wpdb->update(
 			Installer::table( 'jobs' ),
-			[ 'cancel_requested' => 1, 'updated_at' => $this->now() ],
+			[
+				'cancel_requested' => 1,
+				'updated_at'       => $this->now(),
+			],
 			[ 'id' => $id ],
 			[ '%d', '%s' ],
 			[ '%d' ]
@@ -408,13 +427,13 @@ final class Job_Repository extends Repository {
 		$this->wpdb->insert(
 			$table,
 			[
-				'job_id'    => $job_id,
-				'sequence'  => $sequence,
-				'level'     => $level,
-				'event'     => sanitize_key( $event ),
-				'message'   => $message,
-				'context'   => $this->json( $context ),
-				'created_at'=> $this->now(),
+				'job_id'     => $job_id,
+				'sequence'   => $sequence,
+				'level'      => $level,
+				'event'      => sanitize_key( $event ),
+				'message'    => $message,
+				'context'    => $this->json( $context ),
+				'created_at' => $this->now(),
 			]
 		);
 	}

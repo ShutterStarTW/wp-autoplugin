@@ -5,7 +5,7 @@ namespace WP_Autoplugin\V2\Infrastructure\AI;
 /** Stores the one active, short-lived site-wide device authorization session. */
 final class ChatGPT_Session_Store {
 	public const TRANSIENT = 'wp_autoplugin_chatgpt_oauth_session';
-	public const TTL = 900;
+	public const TTL       = 900;
 
 	/** @param array<string, mixed> $device @return array<string, mixed>|\WP_Error */
 	public function create( int $user_id, array $device ) {
@@ -19,10 +19,16 @@ final class ChatGPT_Session_Store {
 			return new \WP_Error( 'chatgpt_oauth_session_invalid', __( 'Secure random data is unavailable for device authorization.', 'wp-autoplugin' ), [ 'status' => 500 ] );
 		}
 		$session = [
-			'session_id' => $session_id, 'user_id' => $user_id, 'status' => 'pending',
-			'device_auth_id' => (string) $device['device_auth_id'], 'user_code' => (string) $device['user_code'],
-			'verification_url' => (string) $device['verification_url'], 'interval' => (int) $device['interval'],
-			'expires_at' => $now + self::TTL, 'next_poll_at' => $now + (int) $device['interval'], 'cancelled' => false,
+			'session_id'       => $session_id,
+			'user_id'          => $user_id,
+			'status'           => 'pending',
+			'device_auth_id'   => (string) $device['device_auth_id'],
+			'user_code'        => (string) $device['user_code'],
+			'verification_url' => (string) $device['verification_url'],
+			'interval'         => (int) $device['interval'],
+			'expires_at'       => $now + self::TTL,
+			'next_poll_at'     => $now + (int) $device['interval'],
+			'cancelled'        => false,
 		];
 		set_transient( self::TRANSIENT, $session, self::TTL );
 		return $this->safe( $session );
@@ -38,7 +44,14 @@ final class ChatGPT_Session_Store {
 			return new \WP_Error( 'chatgpt_oauth_session_state', __( 'The device authorization session is no longer pending.', 'wp-autoplugin' ), [ 'status' => 409 ] );
 		}
 		if ( (int) $session['next_poll_at'] > time() ) {
-			return new \WP_Error( 'chatgpt_oauth_poll_early', __( 'Wait before checking authorization again.', 'wp-autoplugin' ), [ 'status' => 429, 'retry_after' => (int) $session['next_poll_at'] - time() ] );
+			return new \WP_Error(
+				'chatgpt_oauth_poll_early',
+				__( 'Wait before checking authorization again.', 'wp-autoplugin' ),
+				[
+					'status'      => 429,
+					'retry_after' => (int) $session['next_poll_at'] - time(),
+				]
+			);
 		}
 		$session['next_poll_at'] = time() + (int) $session['interval'];
 		$this->save( $session );
@@ -62,7 +75,7 @@ final class ChatGPT_Session_Store {
 		$session['status'] = $status;
 		if ( in_array( $status, [ 'approved', 'cancelled', 'error' ], true ) ) {
 			$session['device_auth_id'] = '';
-			$session['user_code'] = '';
+			$session['user_code']      = '';
 		}
 		$session['cancelled'] = 'cancelled' === $status;
 		$this->save( $session );
@@ -71,10 +84,14 @@ final class ChatGPT_Session_Store {
 
 	/** @return array<string, mixed>|\WP_Error */
 	public function cancel( int $user_id, string $session_id ) {
-		return $this->mark( $user_id, $session_id, 'cancelled' ) ? [ 'status' => 'cancelled', 'session_id' => $session_id ] : new \WP_Error( 'chatgpt_oauth_session_missing', __( 'The device authorization session is unavailable.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		return $this->mark( $user_id, $session_id, 'cancelled' ) ? [
+			'status'     => 'cancelled',
+			'session_id' => $session_id,
+		] : new \WP_Error( 'chatgpt_oauth_session_missing', __( 'The device authorization session is unavailable.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 	}
 
-	public function clear(): void { delete_transient( self::TRANSIENT ); }
+	public function clear(): void {
+		delete_transient( self::TRANSIENT ); }
 
 	/** @return array<string, mixed>|null */
 	public function status( int $user_id ): ?array {
@@ -96,10 +113,19 @@ final class ChatGPT_Session_Store {
 	}
 
 	/** @param array<string, mixed> $session */
-	private function save( array $session ): void { set_transient( self::TRANSIENT, $session, max( 1, (int) $session['expires_at'] - time() ) ); }
+	private function save( array $session ): void {
+		set_transient( self::TRANSIENT, $session, max( 1, (int) $session['expires_at'] - time() ) ); }
 
 	/** @param array<string, mixed> $session @return array<string, mixed> */
 	private function safe( array $session ): array {
-		return [ 'session_id' => (string) $session['session_id'], 'status' => (string) $session['status'], 'user_code' => (string) $session['user_code'], 'verification_url' => (string) $session['verification_url'], 'interval' => (int) $session['interval'], 'expires_at' => (int) $session['expires_at'], 'retry_after' => max( 0, (int) $session['next_poll_at'] - time() ) ];
+		return [
+			'session_id'       => (string) $session['session_id'],
+			'status'           => (string) $session['status'],
+			'user_code'        => (string) $session['user_code'],
+			'verification_url' => (string) $session['verification_url'],
+			'interval'         => (int) $session['interval'],
+			'expires_at'       => (int) $session['expires_at'],
+			'retry_after'      => max( 0, (int) $session['next_poll_at'] - time() ),
+		];
 	}
 }

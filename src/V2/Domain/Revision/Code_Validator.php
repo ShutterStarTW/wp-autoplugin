@@ -28,9 +28,9 @@ final class Code_Validator {
 			return new \WP_Error( 'code_extension_infeasible', __( 'This extension Plan is not technically feasible and cannot generate Code.', 'wp-autoplugin' ) );
 		}
 
-		$project = $structured['project_structure'] ?? null;
-		$raw     = is_array( $project ) && is_array( $project['files'] ?? null ) ? $project['files'] : [];
-		$root    = ( new Project_Root_Normalizer() )->normalize(
+		$project   = $structured['project_structure'] ?? null;
+		$raw       = is_array( $project ) && is_array( $project['files'] ?? null ) ? $project['files'] : [];
+		$root      = ( new Project_Root_Normalizer() )->normalize(
 			[
 				'directories' => is_array( $project ) && is_array( $project['directories'] ?? null ) ? $project['directories'] : [],
 				'files'       => $raw,
@@ -83,8 +83,8 @@ final class Code_Validator {
 		if ( is_wp_error( $manifest ) ) {
 			return new \WP_Error( 'code_plan_manifest_invalid', __( 'The Plan file map is invalid. Regenerate the Plan before generating Code.', 'wp-autoplugin' ), $manifest->get_error_data() );
 		}
-		$main = $manifest['files'][ array_search( $manifest['main_file'], array_column( $manifest['files'], 'path' ), true ) ];
-		$manifest['files'] = array_values( array_filter( $manifest['files'], static fn( array $file ): bool => $manifest['main_file'] !== $file['path'] ) );
+		$main                = $manifest['files'][ array_search( $manifest['main_file'], array_column( $manifest['files'], 'path' ), true ) ];
+		$manifest['files']   = array_values( array_filter( $manifest['files'], static fn( array $file ): bool => $manifest['main_file'] !== $file['path'] ) );
 		$manifest['files'][] = $main;
 		return $manifest;
 	}
@@ -180,10 +180,20 @@ final class Code_Validator {
 			$manifest
 		);
 		if ( $issues ) {
-			return new \WP_Error( 'code_validation_failed', $issues[0]['message'], [ 'issues' => $issues, 'retryable' => true ] );
+			return new \WP_Error(
+				'code_validation_failed',
+				$issues[0]['message'],
+				[
+					'issues'    => $issues,
+					'retryable' => true,
+				]
+			);
 		}
 
-		return [ 'path' => $decoded['path'], 'content' => $decoded['content'] ];
+		return [
+			'path'    => $decoded['path'],
+			'content' => $decoded['content'],
+		];
 	}
 
 	/**
@@ -194,7 +204,7 @@ final class Code_Validator {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function update_response( string $response, array $expected, array $manifest, string $original ) {
-		$path = (string) ( $expected['path'] ?? '' );
+		$path    = (string) ( $expected['path'] ?? '' );
 		$decoded = json_decode( trim( $response ), true );
 		if ( ! is_array( $decoded ) && str_contains( $response, '```' ) ) {
 			return $this->error( $path, 0, 'markdown_fence', __( 'The response must be JSON without Markdown code fences.', 'wp-autoplugin' ) );
@@ -231,8 +241,8 @@ final class Code_Validator {
 				$issues[] = $this->issue( $path, 0, 'replacement_shape', __( 'Each replacement must contain only a non-empty search string and a replacement string.', 'wp-autoplugin' ) );
 				continue;
 			}
-			$search  = $replacement['search'];
-			$replace = $replacement['replace'];
+			$search   = $replacement['search'];
+			$replace  = $replacement['replace'];
 			$payload += strlen( $search ) + strlen( $replace );
 			if ( isset( $seen[ $search ] ) ) {
 				$issues[] = $this->issue( $path, 0, 'duplicate_search', __( 'Each search block must be unique within the response.', 'wp-autoplugin' ) );
@@ -253,7 +263,12 @@ final class Code_Validator {
 				continue;
 			}
 			$start   = (int) strpos( $original, $search );
-			$edits[] = [ 'start' => $start, 'end' => $start + strlen( $search ), 'search' => $search, 'replace' => $replace ];
+			$edits[] = [
+				'start'   => $start,
+				'end'     => $start + strlen( $search ),
+				'search'  => $search,
+				'replace' => $replace,
+			];
 		}
 		if ( $payload > self::MAX_PROJECT_BYTES ) {
 			$issues[] = $this->issue( $path, 0, 'replacement_payload_large', __( 'The targeted replacement response exceeds the 256 KiB limit.', 'wp-autoplugin' ) );
@@ -266,7 +281,14 @@ final class Code_Validator {
 			}
 		}
 		if ( $issues ) {
-			return new \WP_Error( 'code_validation_failed', $issues[0]['message'], [ 'issues' => array_slice( $issues, 0, 5 ), 'retryable' => true ] );
+			return new \WP_Error(
+				'code_validation_failed',
+				$issues[0]['message'],
+				[
+					'issues'    => array_slice( $issues, 0, 5 ),
+					'retryable' => true,
+				]
+			);
 		}
 
 		$content = $original;
@@ -284,9 +306,20 @@ final class Code_Validator {
 			$manifest
 		);
 		if ( $issues ) {
-			return new \WP_Error( 'code_validation_failed', $issues[0]['message'], [ 'issues' => array_slice( $issues, 0, 5 ), 'retryable' => true ] );
+			return new \WP_Error(
+				'code_validation_failed',
+				$issues[0]['message'],
+				[
+					'issues'    => array_slice( $issues, 0, 5 ),
+					'retryable' => true,
+				]
+			);
 		}
-		return [ 'path' => $path, 'content' => $content, 'replacements' => count( $edits ) ];
+		return [
+			'path'         => $path,
+			'content'      => $content,
+			'replacements' => count( $edits ),
+		];
 	}
 
 	/**
@@ -319,7 +352,7 @@ final class Code_Validator {
 			}
 			$content = (string) ( $file['content'] ?? '' );
 			$total  += strlen( $content );
-			$issues = array_merge( $issues, $this->file_issues( $file, $expected[ $path ], $manifest, $max_file_bytes ) );
+			$issues  = array_merge( $issues, $this->file_issues( $file, $expected[ $path ], $manifest, $max_file_bytes ) );
 		}
 		foreach ( $expected as $path => $file ) {
 			if ( ! isset( $actual[ $path ] ) ) {
@@ -407,7 +440,7 @@ final class Code_Validator {
 			}
 		}
 
-		$result = [
+		$result      = [
 			'scope'         => 'changes',
 			'artifact_kind' => $kind,
 			'operation'     => sanitize_key( (string) ( $manifest['operation'] ?? '' ) ),
@@ -546,11 +579,23 @@ final class Code_Validator {
 	}
 
 	private function error( string $path, int $line, string $code, string $message ): \WP_Error {
-		return new \WP_Error( 'code_validation_failed', $message, [ 'issues' => [ $this->issue( $path, $line, $code, $message ) ], 'retryable' => true ] );
+		return new \WP_Error(
+			'code_validation_failed',
+			$message,
+			[
+				'issues'    => [ $this->issue( $path, $line, $code, $message ) ],
+				'retryable' => true,
+			]
+		);
 	}
 
 	/** @return array{path:string,line:int,code:string,message:string} */
 	private function issue( string $path, int $line, string $code, string $message ): array {
-		return [ 'path' => $path, 'line' => max( 0, $line ), 'code' => $code, 'message' => $message ];
+		return [
+			'path'    => $path,
+			'line'    => max( 0, $line ),
+			'code'    => $code,
+			'message' => $message,
+		];
 	}
 }

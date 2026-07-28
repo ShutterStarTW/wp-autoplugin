@@ -5,9 +5,9 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
 /** Persists immutable Review reports and stable finding-thread projections. */
 final class Review_Repository extends Repository {
 	/**
-	 * @param array<string, mixed> $job
-	 * @param array<string, mixed> $revision
-	 * @param array<string, mixed> $parsed
+	 * @param array<string, mixed>      $job
+	 * @param array<string, mixed>      $revision
+	 * @param array<string, mixed>      $parsed
 	 * @param array<string, string|int> $model
 	 * @return array<string, mixed>|\WP_Error
 	 */
@@ -50,7 +50,7 @@ final class Review_Repository extends Repository {
 			if ( false === $inserted || ! $this->wpdb->insert_id ) {
 				throw new \RuntimeException( __( 'Could not persist the Review report.', 'wp-autoplugin' ) );
 			}
-			$report_id   = (int) $this->wpdb->insert_id;
+			$report_id    = (int) $this->wpdb->insert_id;
 			$dispositions = [];
 			foreach ( (array) $parsed['prior_findings'] as $item ) {
 				$dispositions[ (int) $item['finding_id'] ] = $item;
@@ -60,20 +60,37 @@ final class Review_Repository extends Repository {
 			foreach ( $current as $finding ) {
 				$event = 'updated';
 				if ( isset( $dispositions[ (int) $finding['id'] ] ) && 'dismissed' !== $finding['status'] ) {
-					$item  = $dispositions[ (int) $finding['id'] ];
+					$item        = $dispositions[ (int) $finding['id'] ];
 					$disposition = (string) $item['disposition'];
 					$event       = 'open' === $disposition ? 'updated' : $disposition;
 					if ( 'open' === $disposition ) {
-						$finding = array_merge( $finding, (array) $item['finding'], [ 'status' => 'open', 'addressed_by_revision_id' => null, 'latest_report_id' => $report_id ] );
+						$finding = array_merge(
+							$finding,
+							(array) $item['finding'],
+							[
+								'status'                   => 'open',
+								'addressed_by_revision_id' => null,
+								'latest_report_id'         => $report_id,
+							]
+						);
 					} else {
-						$finding['status']                     = $disposition;
-						$finding['addressed_by_revision_id']   = null;
-						$finding['latest_report_id']           = $report_id;
+						$finding['status']                   = $disposition;
+						$finding['addressed_by_revision_id'] = null;
+						$finding['latest_report_id']         = $report_id;
 					}
 					$this->update_finding( $finding );
 				} else {
 					$finding['latest_report_id'] = $report_id;
-					$this->wpdb->update( Installer::table( 'review_findings' ), [ 'latest_report_id' => $report_id, 'updated_at' => $now ], [ 'id' => (int) $finding['id'] ], [ '%d', '%s' ], [ '%d' ] );
+					$this->wpdb->update(
+						Installer::table( 'review_findings' ),
+						[
+							'latest_report_id' => $report_id,
+							'updated_at'       => $now,
+						],
+						[ 'id' => (int) $finding['id'] ],
+						[ '%d', '%s' ],
+						[ '%d' ]
+					);
 				}
 				$this->insert_event( $finding, $report_id, (int) $revision['id'], (int) $job['id'], $event, 'ai', '', (int) $job['created_by'] );
 			}
@@ -115,8 +132,8 @@ final class Review_Repository extends Repository {
 		if ( ! $row ) {
 			return null;
 		}
-		$report = $this->hydrate_report( $row );
-		$events = $this->wpdb->get_results(
+		$report   = $this->hydrate_report( $row );
+		$events   = $this->wpdb->get_results(
 			$this->wpdb->prepare( 'SELECT * FROM ' . Installer::table( 'review_finding_events' ) . ' WHERE report_id = %d ORDER BY id ASC', $id ),
 			ARRAY_A
 		);
@@ -127,7 +144,7 @@ final class Review_Repository extends Repository {
 				$findings[ (int) $event['finding_id'] ] = $this->hydrate_finding( $snapshot );
 			}
 		}
-		$report['findings'] = array_values( $findings );
+		$report['findings']         = array_values( $findings );
 		$report['effective_status'] = $this->effective_status_for_report( $report );
 		return $report;
 	}
@@ -232,15 +249,33 @@ final class Review_Repository extends Repository {
 	public function workspace_status( int $workspace_id, ?int $latest_revision_id ): array {
 		$latest = $this->latest_for_workspace( $workspace_id );
 		if ( ! $latest ) {
-			return [ 'status' => 'not_started', 'report_id' => null, 'revision_id' => null, 'open' => 0, 'dismissed' => 0 ];
+			return [
+				'status'      => 'not_started',
+				'report_id'   => null,
+				'revision_id' => null,
+				'open'        => 0,
+				'dismissed'   => 0,
+			];
 		}
 		if ( null === $latest_revision_id || (int) $latest['revision_id'] !== $latest_revision_id ) {
-			return [ 'status' => 'stale', 'report_id' => (int) $latest['id'], 'revision_id' => (int) $latest['revision_id'], 'open' => $this->count_statuses( $workspace_id, [ 'open', 'addressed' ] ), 'dismissed' => $this->count_statuses( $workspace_id, [ 'dismissed' ] ) ];
+			return [
+				'status'      => 'stale',
+				'report_id'   => (int) $latest['id'],
+				'revision_id' => (int) $latest['revision_id'],
+				'open'        => $this->count_statuses( $workspace_id, [ 'open', 'addressed' ] ),
+				'dismissed'   => $this->count_statuses( $workspace_id, [ 'dismissed' ] ),
+			];
 		}
 		$open      = $this->count_statuses( $workspace_id, [ 'open', 'addressed' ] );
 		$dismissed = $this->count_statuses( $workspace_id, [ 'dismissed' ] );
 		$status    = $open ? 'action_required' : ( $dismissed ? 'cleared_with_dismissals' : 'all_clear' );
-		return [ 'status' => $status, 'report_id' => (int) $latest['id'], 'revision_id' => (int) $latest['revision_id'], 'open' => $open, 'dismissed' => $dismissed ];
+		return [
+			'status'      => $status,
+			'report_id'   => (int) $latest['id'],
+			'revision_id' => (int) $latest['revision_id'],
+			'open'        => $open,
+			'dismissed'   => $dismissed,
+		];
 	}
 
 	/** @return array<string, mixed>|\WP_Error */
@@ -280,7 +315,7 @@ final class Review_Repository extends Repository {
 
 	/** @return array<int, array<string, mixed>> */
 	private function current_findings( int $workspace_id, bool $for_update = false ): array {
-		$sql = 'SELECT * FROM ' . Installer::table( 'review_findings' ) . ' WHERE workspace_id = %d ORDER BY id ASC' . ( $for_update ? ' FOR UPDATE' : '' );
+		$sql  = 'SELECT * FROM ' . Installer::table( 'review_findings' ) . ' WHERE workspace_id = %d ORDER BY id ASC' . ( $for_update ? ' FOR UPDATE' : '' );
 		$rows = $this->wpdb->get_results( $this->wpdb->prepare( $sql, $workspace_id ), ARRAY_A );
 		return array_map( [ $this, 'hydrate_finding' ], (array) $rows );
 	}
@@ -300,26 +335,26 @@ final class Review_Repository extends Repository {
 		$inserted = $this->wpdb->insert(
 			Installer::table( 'review_findings' ),
 			[
-				'workspace_id'              => (int) $finding['workspace_id'],
-				'created_report_id'         => (int) $finding['created_report_id'],
-				'latest_report_id'          => (int) $finding['latest_report_id'],
-				'status'                    => (string) $finding['status'],
-				'priority'                  => (string) $finding['priority'],
-				'category'                  => (string) $finding['category'],
-				'title'                     => (string) $finding['title'],
-				'body'                      => (string) $finding['body'],
-				'suggested_fix'             => (string) ( $finding['suggested_fix'] ?? '' ),
-				'path'                      => $finding['path'],
-				'side'                      => $finding['side'],
-				'start_line'                => $finding['start_line'],
-				'end_line'                  => $finding['end_line'],
-				'anchor_hash'               => $finding['anchor_hash'],
-				'addressed_by_revision_id'  => null,
-				'dismissed_by'              => null,
-				'dismissed_at'              => null,
-				'created_by'                => (int) $finding['created_by'],
-				'created_at'                => (string) $finding['created_at'],
-				'updated_at'                => (string) $finding['updated_at'],
+				'workspace_id'             => (int) $finding['workspace_id'],
+				'created_report_id'        => (int) $finding['created_report_id'],
+				'latest_report_id'         => (int) $finding['latest_report_id'],
+				'status'                   => (string) $finding['status'],
+				'priority'                 => (string) $finding['priority'],
+				'category'                 => (string) $finding['category'],
+				'title'                    => (string) $finding['title'],
+				'body'                     => (string) $finding['body'],
+				'suggested_fix'            => (string) ( $finding['suggested_fix'] ?? '' ),
+				'path'                     => $finding['path'],
+				'side'                     => $finding['side'],
+				'start_line'               => $finding['start_line'],
+				'end_line'                 => $finding['end_line'],
+				'anchor_hash'              => $finding['anchor_hash'],
+				'addressed_by_revision_id' => null,
+				'dismissed_by'             => null,
+				'dismissed_at'             => null,
+				'created_by'               => (int) $finding['created_by'],
+				'created_at'               => (string) $finding['created_at'],
+				'updated_at'               => (string) $finding['updated_at'],
 			]
 		);
 		if ( false === $inserted ) {
@@ -357,16 +392,16 @@ final class Review_Repository extends Repository {
 		$inserted = $this->wpdb->insert(
 			Installer::table( 'review_finding_events' ),
 			[
-				'finding_id' => (int) $finding['id'],
-				'report_id'  => $report_id ?: null,
-				'revision_id'=> $revision_id,
-				'job_id'     => $job_id ?: null,
-				'event'      => sanitize_key( $event ),
-				'actor'      => sanitize_key( $actor ),
-				'message'    => wp_html_excerpt( sanitize_textarea_field( $message ), 2000, '' ),
-				'snapshot'   => $this->json( $this->snapshot( $finding ) ),
-				'created_by' => $user_id,
-				'created_at' => $this->now(),
+				'finding_id'  => (int) $finding['id'],
+				'report_id'   => $report_id ?: null,
+				'revision_id' => $revision_id,
+				'job_id'      => $job_id ?: null,
+				'event'       => sanitize_key( $event ),
+				'actor'       => sanitize_key( $actor ),
+				'message'     => wp_html_excerpt( sanitize_textarea_field( $message ), 2000, '' ),
+				'snapshot'    => $this->json( $this->snapshot( $finding ) ),
+				'created_by'  => $user_id,
+				'created_at'  => $this->now(),
 			]
 		);
 		if ( false === $inserted ) {

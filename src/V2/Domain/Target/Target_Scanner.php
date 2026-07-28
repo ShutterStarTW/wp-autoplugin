@@ -196,16 +196,31 @@ final class Target_Scanner {
 	private function source_stats( string $root ): array {
 		$root_real = realpath( $root );
 		if ( false === $root_real ) {
-			return [ 'source_files' => 0, 'lines' => 0, 'tokens' => 0, 'hooks' => 0 ];
+			return [
+				'source_files' => 0,
+				'lines'        => 0,
+				'tokens'       => 0,
+				'hooks'        => 0,
+			];
 		}
 		if ( is_file( $root_real ) ) {
 			$extension = strtolower( pathinfo( $root_real, PATHINFO_EXTENSION ) );
 			if ( ! in_array( $extension, self::SUPPORTED_EXTENSIONS, true ) || filesize( $root_real ) > 1048576 ) {
-				return [ 'source_files' => 0, 'lines' => 0, 'tokens' => 0, 'hooks' => 0 ];
+				return [
+					'source_files' => 0,
+					'lines'        => 0,
+					'tokens'       => 0,
+					'hooks'        => 0,
+				];
 			}
 			$content = file_get_contents( $root_real ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Read-only local source inspection.
 			if ( false === $content ) {
-				return [ 'source_files' => 0, 'lines' => 0, 'tokens' => 0, 'hooks' => 0 ];
+				return [
+					'source_files' => 0,
+					'lines'        => 0,
+					'tokens'       => 0,
+					'hooks'        => 0,
+				];
 			}
 			preg_match_all( '/\b(?:do_action|apply_filters|add_action|add_filter)\s*\(\s*[\'\"]([^\'\"]+)[\'\"]/', $content, $matches );
 			return [
@@ -216,14 +231,24 @@ final class Target_Scanner {
 			];
 		}
 		if ( ! is_dir( $root_real ) ) {
-			return [ 'source_files' => 0, 'lines' => 0, 'tokens' => 0, 'hooks' => 0 ];
+			return [
+				'source_files' => 0,
+				'lines'        => 0,
+				'tokens'       => 0,
+				'hooks'        => 0,
+			];
 		}
 
-		$root_real = trailingslashit( wp_normalize_path( $root_real ) );
-		$stats     = [ 'source_files' => 0, 'lines' => 0, 'tokens' => 0, 'hooks' => 0 ];
+		$root_real  = trailingslashit( wp_normalize_path( $root_real ) );
+		$stats      = [
+			'source_files' => 0,
+			'lines'        => 0,
+			'tokens'       => 0,
+			'hooks'        => 0,
+		];
 		$hook_names = [];
-		$directory = new \RecursiveDirectoryIterator( $root_real, \FilesystemIterator::SKIP_DOTS );
-		$filter    = new \RecursiveCallbackFilterIterator(
+		$directory  = new \RecursiveDirectoryIterator( $root_real, \FilesystemIterator::SKIP_DOTS );
+		$filter     = new \RecursiveCallbackFilterIterator(
 			$directory,
 			static function ( \SplFileInfo $file ): bool {
 				return ! $file->isDir() || ! in_array( $file->getFilename(), self::SKIPPED_DIRECTORIES, true );
@@ -269,17 +294,17 @@ final class Target_Scanner {
 	 */
 	private function new_plugin_target(): array {
 		return [
-			'kind'        => 'new_plugin',
-			'ref'         => 'new',
-			'name'        => __( 'New plugin', 'wp-autoplugin' ),
-			'version'     => '',
-			'author'      => '',
-			'description' => __( 'Start a new local plugin project.', 'wp-autoplugin' ),
-			'active'      => false,
-			'source_files'=> 0,
-			'lines'       => 0,
-			'tokens'      => 0,
-			'hooks'       => 0,
+			'kind'         => 'new_plugin',
+			'ref'          => 'new',
+			'name'         => __( 'New plugin', 'wp-autoplugin' ),
+			'version'      => '',
+			'author'       => '',
+			'description'  => __( 'Start a new local plugin project.', 'wp-autoplugin' ),
+			'active'       => false,
+			'source_files' => 0,
+			'lines'        => 0,
+			'tokens'       => 0,
+			'hooks'        => 0,
 		];
 	}
 }

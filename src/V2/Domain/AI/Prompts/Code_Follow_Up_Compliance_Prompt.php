@@ -32,14 +32,14 @@ PROMPT;
 	public function input( string $message, array $history, string $resolved_request, array $acceptance_criteria, array $target, array $manifest, array $source ): string {
 		return wp_json_encode(
 			[
-				'json_contract'                  => 'Return one JSON object with outcome pass or fail.',
-				'recent_code_conversation'       => $history,
-				'analyzer_resolved_request'      => $resolved_request,
-				'analyzer_acceptance_criteria'   => $acceptance_criteria,
-				'target'                         => $target,
-				'candidate_manifest'             => $manifest,
-				'candidate_staged_source'        => $source,
-				'authoritative_latest_request'   => $message,
+				'json_contract'                => 'Return one JSON object with outcome pass or fail.',
+				'recent_code_conversation'     => $history,
+				'analyzer_resolved_request'    => $resolved_request,
+				'analyzer_acceptance_criteria' => $acceptance_criteria,
+				'target'                       => $target,
+				'candidate_manifest'           => $manifest,
+				'candidate_staged_source'      => $source,
+				'authoritative_latest_request' => $message,
 			],
 			JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
 		) ?: '{}';

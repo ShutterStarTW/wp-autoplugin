@@ -6,26 +6,26 @@ namespace WP_Autoplugin\V2\Domain\Target;
  * Bounded, read-only target source access for agents and revision editing.
  */
 final class Source_Tools {
-	private const EXTENSIONS       = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'html', 'svg', 'xml', 'md', 'txt' ];
-	private const SKIPPED          = [ '.git', 'node_modules', 'vendor', 'tests' ];
-	private const MAX_FILE_BYTES   = 262144;
-	private const MAX_RESULT_BYTES = 65536;
-	private const MAX_TREE_FILES   = 2000;
-	private const MAX_SEARCH_FILES = 200;
-	private const MAX_SEARCH_BYTES = 2097152;
-	private const MAX_SEARCH_HITS  = 50;
-	private const MAX_HOOK_FILES   = 1000;
-	private const MAX_HOOK_BYTES   = 16777216;
-	private const MAX_HOOKS        = 1000;
+	private const EXTENSIONS         = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'html', 'svg', 'xml', 'md', 'txt' ];
+	private const SKIPPED            = [ '.git', 'node_modules', 'vendor', 'tests' ];
+	private const MAX_FILE_BYTES     = 262144;
+	private const MAX_RESULT_BYTES   = 65536;
+	private const MAX_TREE_FILES     = 2000;
+	private const MAX_SEARCH_FILES   = 200;
+	private const MAX_SEARCH_BYTES   = 2097152;
+	private const MAX_SEARCH_HITS    = 50;
+	private const MAX_HOOK_FILES     = 1000;
+	private const MAX_HOOK_BYTES     = 16777216;
+	private const MAX_HOOKS          = 1000;
 	private const HOOK_CONTEXT_LINES = 3;
 
 	/** @var array<string, mixed> */
-	private array $target = [];
-	private string $root = '';
+	private array $target     = [];
+	private string $root      = '';
 	private string $main_file = '';
 	/** @var array<string, mixed> */
-	private array $parent_target = [];
-	private ?string $parent_root = null;
+	private array $parent_target     = [];
+	private ?string $parent_root     = null;
 	private string $parent_main_file = '';
 
 	/** @param array<string, mixed> $target Target metadata snapshot. */
@@ -39,8 +39,8 @@ final class Source_Tools {
 	/** @return array<int, array<string, mixed>> */
 	public function definitions(): array {
 		$source = [
-			'type' => 'string',
-			'enum' => null === $this->parent_root ? [ 'target' ] : [ 'target', 'parent_theme' ],
+			'type'        => 'string',
+			'enum'        => null === $this->parent_root ? [ 'target' ] : [ 'target', 'parent_theme' ],
 			'description' => 'Source codebase to inspect. Omit for the editable target; use parent_theme only for the read-only parent of a child theme.',
 		];
 		return [
@@ -50,8 +50,15 @@ final class Source_Tools {
 				'parameters'  => [
 					'type'                 => 'object',
 					'properties'           => [
-						'offset' => [ 'type' => 'integer', 'minimum' => 0 ],
-						'limit'  => [ 'type' => 'integer', 'minimum' => 1, 'maximum' => 200 ],
+						'offset' => [
+							'type'    => 'integer',
+							'minimum' => 0,
+						],
+						'limit'  => [
+							'type'    => 'integer',
+							'minimum' => 1,
+							'maximum' => 200,
+						],
 						'source' => $source,
 					],
 					'additionalProperties' => false,
@@ -61,11 +68,17 @@ final class Source_Tools {
 				'name'        => 'read_file',
 				'description' => 'Read a source file with line numbers from the selected codebase. Path must be an exact relative file path returned by list_files or search_code for the same source, without a line anchor, wildcard, or directory. Use start_line and end_line for large files.',
 				'parameters'  => [
-					'type'       => 'object',
-					'properties' => [
+					'type'                 => 'object',
+					'properties'           => [
 						'path'       => [ 'type' => 'string' ],
-						'start_line' => [ 'type' => 'integer', 'minimum' => 1 ],
-						'end_line'   => [ 'type' => 'integer', 'minimum' => 1 ],
+						'start_line' => [
+							'type'    => 'integer',
+							'minimum' => 1,
+						],
+						'end_line'   => [
+							'type'    => 'integer',
+							'minimum' => 1,
+						],
 						'source'     => $source,
 					],
 					'required'             => [ 'path' ],
@@ -76,11 +89,14 @@ final class Source_Tools {
 				'name'        => 'search_code',
 				'description' => 'Search source files in the selected codebase for an exact, case-insensitive text string and return matching lines.',
 				'parameters'  => [
-					'type'       => 'object',
-					'properties' => [
+					'type'                 => 'object',
+					'properties'           => [
 						'query'     => [ 'type' => 'string' ],
 						'path'      => [ 'type' => 'string' ],
-						'extension' => [ 'type' => 'string', 'enum' => self::EXTENSIONS ],
+						'extension' => [
+							'type' => 'string',
+							'enum' => self::EXTENSIONS,
+						],
 						'source'    => $source,
 					],
 					'required'             => [ 'query' ],
@@ -90,7 +106,11 @@ final class Source_Tools {
 			[
 				'name'        => 'get_target_metadata',
 				'description' => 'Return target headers and source statistics without reading source files. For a child theme this also includes a separate parent_theme metadata object.',
-				'parameters'  => [ 'type' => 'object', 'properties' => new \stdClass(), 'additionalProperties' => false ],
+				'parameters'  => [
+					'type'                 => 'object',
+					'properties'           => new \stdClass(),
+					'additionalProperties' => false,
+				],
 			],
 			[
 				'name'        => 'list_hooks',
@@ -98,8 +118,15 @@ final class Source_Tools {
 				'parameters'  => [
 					'type'                 => 'object',
 					'properties'           => [
-						'offset' => [ 'type' => 'integer', 'minimum' => 0 ],
-						'limit'  => [ 'type' => 'integer', 'minimum' => 1, 'maximum' => 50 ],
+						'offset' => [
+							'type'    => 'integer',
+							'minimum' => 0,
+						],
+						'limit'  => [
+							'type'    => 'integer',
+							'minimum' => 1,
+							'maximum' => 50,
+						],
 						'source' => $source,
 					],
 					'additionalProperties' => false,
@@ -116,7 +143,13 @@ final class Source_Tools {
 	public function bootstrap(): array {
 		$tree         = $this->tree();
 		$structure    = $this->tree_context( $tree );
-		$main         = $this->read_file( [ 'path' => $this->main_file, 'start_line' => 1, 'end_line' => 2000 ] );
+		$main         = $this->read_file(
+			[
+				'path'       => $this->main_file,
+				'start_line' => 1,
+				'end_line'   => 2000,
+			]
+		);
 		$instructions = $this->plugin_instructions();
 		$content      = "Target metadata:\n" . wp_json_encode( $this->public_metadata(), JSON_PRETTY_PRINT ) . "\n\nEditable target source structure:\n" . $structure['content'] . "\n\nEditable target main entry file:\n" . $main['content'];
 		$inspected    = $main['inspected'];
@@ -129,9 +162,9 @@ final class Source_Tools {
 			'metadata'            => $this->public_metadata(),
 		];
 		if ( null !== $this->parent_root ) {
-			$parent_tree      = $this->tree( 'parent_theme' );
-			$parent_structure = $this->tree_context( $parent_tree );
-			$parent_main      = $this->read_file(
+			$parent_tree           = $this->tree( 'parent_theme' );
+			$parent_structure      = $this->tree_context( $parent_tree );
+			$parent_main           = $this->read_file(
 				[
 					'path'       => $this->parent_main_file,
 					'start_line' => 1,
@@ -139,8 +172,8 @@ final class Source_Tools {
 					'source'     => 'parent_theme',
 				]
 			);
-			$content .= "\n\nRead-only parent theme source structure:\n" . $parent_structure['content'] . "\n\nRead-only parent theme main entry file:\n" . $parent_main['content'];
-			$inspected = array_merge( $inspected, $parent_main['inspected'] );
+			$content              .= "\n\nRead-only parent theme source structure:\n" . $parent_structure['content'] . "\n\nRead-only parent theme main entry file:\n" . $parent_main['content'];
+			$inspected             = array_merge( $inspected, $parent_main['inspected'] );
 			$audit['parent_theme'] = [
 				'ref'                 => (string) ( $this->parent_target['ref'] ?? '' ),
 				'main_file'           => $this->parent_main_file,
@@ -151,9 +184,9 @@ final class Source_Tools {
 			];
 		}
 		if ( $instructions ) {
-			$content .= "\n\nroot_plugin_instructions (from the installed plugin root AGENTS.md):\n<<<\n" . $instructions['content'] . "\n>>>";
+			$content                           .= "\n\nroot_plugin_instructions (from the installed plugin root AGENTS.md):\n<<<\n" . $instructions['content'] . "\n>>>";
 			$inspected[ $instructions['path'] ] = $instructions['content_hash'];
-			$audit['agent_instructions'] = [
+			$audit['agent_instructions']        = [
 				'path'         => $instructions['path'],
 				'bytes'        => $instructions['bytes'],
 				'content_hash' => $instructions['content_hash'],
@@ -224,7 +257,7 @@ final class Source_Tools {
 			array_pop( $parts );
 			$directory = '';
 			foreach ( $parts as $part ) {
-				$directory .= ( '' === $directory ? '' : '/' ) . $part;
+				$directory                .= ( '' === $directory ? '' : '/' ) . $part;
 				$directories[ $directory ] = true;
 			}
 		}
@@ -255,7 +288,7 @@ final class Source_Tools {
 		$files = [];
 		$bytes = 0;
 		foreach ( $tree as $file ) {
-			$item = [
+			$item       = [
 				'path' => (string) $file['path'],
 				'type' => (string) $file['type'],
 				'size' => (int) $file['size'],
@@ -308,7 +341,7 @@ final class Source_Tools {
 		foreach ( $inspected as $key => $hash ) {
 			try {
 				[ $source, $relative ] = $this->inspected_source_path( (string) $key );
-				$path = $this->safe_file( $relative, $source );
+				$path                  = $this->safe_file( $relative, $source );
 			} catch ( \Throwable $error ) {
 				return false;
 			}
@@ -329,12 +362,12 @@ final class Source_Tools {
 	 * @return array<string, mixed>|\WP_Error
 	 */
 	public function code_snapshot( array $files ) {
-		$tree       = $this->tree();
-		$by_path    = [];
-		$source     = [];
-		$hashes     = [];
-		$total      = 0;
-		$allowed    = self::EXTENSIONS;
+		$tree    = $this->tree();
+		$by_path = [];
+		$source  = [];
+		$hashes  = [];
+		$total   = 0;
+		$allowed = self::EXTENSIONS;
 		foreach ( $tree as $file ) {
 			$by_path[ $file['path'] ] = $file;
 		}
@@ -368,9 +401,14 @@ final class Source_Tools {
 			if ( false === $content ) {
 				return new \WP_Error( 'code_target_file_unreadable', sprintf( __( '%s could not be read from the target.', 'wp-autoplugin' ), $relative ) );
 			}
-			$total             += strlen( $content );
+			$total              += strlen( $content );
 			$hashes[ $relative ] = hash( 'sha256', $content );
-			$source[]            = [ 'path' => $relative, 'type' => $type, 'operation' => $operation, 'content' => $content ];
+			$source[]            = [
+				'path'      => $relative,
+				'type'      => $type,
+				'operation' => $operation,
+				'content'   => $content,
+			];
 		}
 
 		return [
@@ -463,7 +501,16 @@ final class Source_Tools {
 		$page   = array_slice( $tree, $offset, $limit );
 		do {
 			$next_offset = $offset + count( $page ) < count( $tree ) ? $offset + count( $page ) : null;
-			$content     = (string) wp_json_encode( [ 'source' => $source, 'files' => $page, 'offset' => $offset, 'next_offset' => $next_offset, 'total' => count( $tree ) ], JSON_PRETTY_PRINT );
+			$content     = (string) wp_json_encode(
+				[
+					'source'      => $source,
+					'files'       => $page,
+					'offset'      => $offset,
+					'next_offset' => $next_offset,
+					'total'       => count( $tree ),
+				],
+				JSON_PRETTY_PRINT
+			);
 			if ( strlen( $content ) <= self::MAX_RESULT_BYTES || ! $page ) {
 				break;
 			}
@@ -496,11 +543,11 @@ final class Source_Tools {
 		if ( false === $contents ) {
 			throw new \RuntimeException( __( 'The requested source file could not be read.', 'wp-autoplugin' ) );
 		}
-		$lines = preg_split( '/\R/', $contents );
-		$slice = array_slice( $lines ?: [], $start - 1, $end - $start + 1 );
-		$text  = [];
-		$display = $this->display_path( $relative, $source );
-		$used  = strlen( $display ) + 1;
+		$lines     = preg_split( '/\R/', $contents );
+		$slice     = array_slice( $lines ?: [], $start - 1, $end - $start + 1 );
+		$text      = [];
+		$display   = $this->display_path( $relative, $source );
+		$used      = strlen( $display ) + 1;
 		$truncated = false;
 		foreach ( $slice as $index => $line ) {
 			$numbered = sprintf( '%d: %s', $start + $index, $line );
@@ -540,7 +587,7 @@ final class Source_Tools {
 			throw new \InvalidArgumentException( __( 'The requested search extension is not supported.', 'wp-autoplugin' ) );
 		}
 
-		$hits = $inspected = [];
+		$hits          = $inspected = [];
 		$scanned_files = $scanned_bytes = 0;
 		foreach ( $this->tree( $source ) as $file ) {
 			$relative = (string) $file['path'];
@@ -562,7 +609,12 @@ final class Source_Tools {
 			$scanned_bytes += strlen( $contents );
 			foreach ( preg_split( '/\R/', $contents ) ?: [] as $index => $line ) {
 				if ( false !== stripos( $line, $query ) ) {
-					$hits[]   = [ 'source' => $source, 'path' => $relative, 'line' => $index + 1, 'text' => substr( $line, 0, 500 ) ];
+					$hits[] = [
+						'source' => $source,
+						'path'   => $relative,
+						'line'   => $index + 1,
+						'text'   => substr( $line, 0, 500 ),
+					];
 					$inspected[ $this->inspected_key( $relative, $source ) ] = hash( 'sha256', $contents );
 					if ( count( $hits ) >= self::MAX_SEARCH_HITS ) {
 						break 2;
@@ -572,7 +624,15 @@ final class Source_Tools {
 		}
 		$truncated = count( $hits ) >= self::MAX_SEARCH_HITS;
 		return $this->result(
-			(string) wp_json_encode( [ 'source' => $source, 'query' => $query, 'hits' => $hits, 'truncated' => $truncated ], JSON_PRETTY_PRINT ),
+			(string) wp_json_encode(
+				[
+					'source'    => $source,
+					'query'     => $query,
+					'hits'      => $hits,
+					'truncated' => $truncated,
+				],
+				JSON_PRETTY_PRINT
+			),
 			$inspected,
 			'',
 			[
@@ -596,11 +656,11 @@ final class Source_Tools {
 
 	/** @param array<string, mixed> $arguments */
 	private function list_hooks( array $arguments ): array {
-		$offset = max( 0, (int) ( $arguments['offset'] ?? 0 ) );
-		$limit  = min( 50, max( 1, (int) ( $arguments['limit'] ?? 25 ) ) );
-		$source = $this->source_from_arguments( $arguments );
-		$hooks  = $inspected = [];
-		$scanned_files = $scanned_bytes = 0;
+		$offset         = max( 0, (int) ( $arguments['offset'] ?? 0 ) );
+		$limit          = min( 50, max( 1, (int) ( $arguments['limit'] ?? 25 ) ) );
+		$source         = $this->source_from_arguments( $arguments );
+		$hooks          = $inspected = [];
+		$scanned_files  = $scanned_bytes = 0;
 		$scan_truncated = false;
 
 		foreach ( $this->tree( $source ) as $file ) {
@@ -627,7 +687,7 @@ final class Source_Tools {
 			unset( $hook );
 			if ( $discovered ) {
 				$remaining = self::MAX_HOOKS - count( $hooks );
-				$hooks = array_merge( $hooks, array_slice( $discovered, 0, $remaining ) );
+				$hooks     = array_merge( $hooks, array_slice( $discovered, 0, $remaining ) );
 				if ( count( $discovered ) > $remaining || count( $hooks ) >= self::MAX_HOOKS ) {
 					$scan_truncated = true;
 					break;
@@ -643,7 +703,7 @@ final class Source_Tools {
 		$page  = array_slice( $hooks, $offset, $limit );
 		do {
 			$next_offset = $offset + count( $page ) < $total ? $offset + count( $page ) : null;
-			$content = (string) wp_json_encode(
+			$content     = (string) wp_json_encode(
 				[
 					'source'         => $source,
 					'hooks'          => $page,
@@ -669,16 +729,16 @@ final class Source_Tools {
 			$inspected,
 			'',
 			[
-				'source'          => $source,
-				'offset'          => $offset,
-				'limit'           => $limit,
-				'returned_count'  => count( $page ),
-				'total_hooks'     => $total,
-				'next_offset'     => $next_offset,
-				'scanned_files'   => $scanned_files,
-				'scanned_bytes'   => $scanned_bytes,
-				'matched_files'   => array_keys( $returned_files ),
-				'scan_truncated'  => $scan_truncated,
+				'source'         => $source,
+				'offset'         => $offset,
+				'limit'          => $limit,
+				'returned_count' => count( $page ),
+				'total_hooks'    => $total,
+				'next_offset'    => $next_offset,
+				'scanned_files'  => $scanned_files,
+				'scanned_bytes'  => $scanned_bytes,
+				'matched_files'  => array_keys( $returned_files ),
+				'scan_truncated' => $scan_truncated,
 			]
 		);
 	}
@@ -698,9 +758,9 @@ final class Source_Tools {
 			'do_action_ref_array'      => 'action',
 			'do_action_deprecated'     => 'action',
 		];
-		$tokens = token_get_all( $contents );
-		$lines  = preg_split( '/\R/', $contents ) ?: [];
-		$hooks  = [];
+		$tokens  = token_get_all( $contents );
+		$lines   = preg_split( '/\R/', $contents ) ?: [];
+		$hooks   = [];
 
 		foreach ( $tokens as $index => $token ) {
 			if ( ! is_array( $token ) || T_STRING !== $token[0] ) {
@@ -726,7 +786,7 @@ final class Source_Tools {
 			if ( '' === $name ) {
 				continue;
 			}
-			$line = (int) $token[2];
+			$line    = (int) $token[2];
 			$hooks[] = [
 				'name'    => $name,
 				'type'    => $methods[ $method ],
@@ -825,13 +885,13 @@ final class Source_Tools {
 	/** @return array<int, array{path:string,size:int,modified:int,type:string}> */
 	private function tree( string $source = 'target' ): array {
 		$source_root = $this->source_root( $source );
-		$root = trailingslashit( wp_normalize_path( $source_root ) );
-		$files = [];
+		$root        = trailingslashit( wp_normalize_path( $source_root ) );
+		$files       = [];
 		if ( is_file( $source_root ) ) {
 			return [ $this->describe_file( $source_root, basename( $source_root ) ) ];
 		}
 		$directory = new \RecursiveDirectoryIterator( $root, \FilesystemIterator::SKIP_DOTS );
-		$filter = new \RecursiveCallbackFilterIterator(
+		$filter    = new \RecursiveCallbackFilterIterator(
 			$directory,
 			static function ( \SplFileInfo $file ): bool {
 				return ! $file->isDir() || ! in_array( $file->getFilename(), self::SKIPPED, true );
@@ -856,7 +916,12 @@ final class Source_Tools {
 	}
 
 	private function describe_file( string $path, string $relative ): array {
-		return [ 'path' => $relative, 'size' => (int) filesize( $path ), 'modified' => (int) filemtime( $path ), 'type' => strtolower( pathinfo( $relative, PATHINFO_EXTENSION ) ) ];
+		return [
+			'path'     => $relative,
+			'size'     => (int) filesize( $path ),
+			'modified' => (int) filemtime( $path ),
+			'type'     => strtolower( pathinfo( $relative, PATHINFO_EXTENSION ) ),
+		];
 	}
 
 	/** @param array<int, array<string, mixed>> $tree */
@@ -881,20 +946,23 @@ final class Source_Tools {
 		if ( count( $paths ) < count( $tree ) ) {
 			$content .= "\n[Structure truncated by WP-Autoplugin]";
 		}
-		return [ 'content' => $content, 'paths' => $paths ];
+		return [
+			'content' => $content,
+			'paths'   => $paths,
+		];
 	}
 
 	private function safe_file( string $relative, string $source = 'target' ): string {
-		$relative = $this->normalize_relative( $relative );
+		$relative    = $this->normalize_relative( $relative );
 		$source_root = $this->source_root( $source );
 		if ( is_file( $source_root ) && basename( $source_root ) !== $relative ) {
 			throw new \InvalidArgumentException( __( 'The requested source path is not readable.', 'wp-autoplugin' ) );
 		}
-		$path     = is_file( $source_root ) ? $source_root : trailingslashit( $source_root ) . $relative;
-		$real     = realpath( $path );
-		$root     = wp_normalize_path( $source_root );
-		$real     = false === $real ? '' : wp_normalize_path( $real );
-		$inside   = is_file( $root ) ? $real === $root : str_starts_with( $real, trailingslashit( $root ) );
+		$path   = is_file( $source_root ) ? $source_root : trailingslashit( $source_root ) . $relative;
+		$real   = realpath( $path );
+		$root   = wp_normalize_path( $source_root );
+		$real   = false === $real ? '' : wp_normalize_path( $real );
+		$inside = is_file( $root ) ? $real === $root : str_starts_with( $real, trailingslashit( $root ) );
 		if ( ! $inside || ! is_file( $real ) || $this->has_symlink_component( $relative, $source ) || filesize( $real ) > self::MAX_FILE_BYTES || ! in_array( strtolower( pathinfo( $real, PATHINFO_EXTENSION ) ), self::EXTENSIONS, true ) ) {
 			throw new \InvalidArgumentException( __( 'The requested source path is not readable.', 'wp-autoplugin' ) );
 		}
@@ -930,7 +998,14 @@ final class Source_Tools {
 	/** @param array<string, string> $inspected @param array<string, mixed> $audit */
 	private function result( string $content, array $inspected = [], string $path = '', array $audit = [] ): array {
 		$content = $this->truncate( $content );
-		return [ 'content' => $content, 'bytes' => strlen( $content ), 'inspected' => $inspected, 'path' => $path, 'audit' => $audit, 'error' => false ];
+		return [
+			'content'   => $content,
+			'bytes'     => strlen( $content ),
+			'inspected' => $inspected,
+			'path'      => $path,
+			'audit'     => $audit,
+			'error'     => false,
+		];
 	}
 
 	/** @param array<string, mixed> $arguments */
@@ -939,10 +1014,10 @@ final class Source_Tools {
 		$source  = isset( $arguments['source'] ) && is_scalar( $arguments['source'] ) ? sanitize_key( (string) $arguments['source'] ) : 'target';
 		$content = (string) wp_json_encode(
 			[
-				'error' => $message,
-				'tool'  => sanitize_key( $name ),
-				'path'  => $path,
-				'source'=> $source,
+				'error'  => $message,
+				'tool'   => sanitize_key( $name ),
+				'path'   => $path,
+				'source' => $source,
 			],
 			JSON_PRETTY_PRINT
 		);
@@ -951,7 +1026,12 @@ final class Source_Tools {
 			'bytes'     => strlen( $content ),
 			'inspected' => [],
 			'path'      => $this->display_path( $path, $source ),
-			'audit'     => [ 'tool' => sanitize_key( $name ), 'requested_path' => $path, 'source' => $source, 'error' => $message ],
+			'audit'     => [
+				'tool'           => sanitize_key( $name ),
+				'requested_path' => $path,
+				'source'         => $source,
+				'error'          => $message,
+			],
 			'error'     => true,
 		];
 	}
@@ -1056,11 +1136,11 @@ final class Source_Tools {
 			return;
 		}
 
-		$persisted = is_array( $this->target['parent_theme'] ?? null ) && $parent->get_stylesheet() === ( $this->target['parent_theme']['ref'] ?? '' )
+		$persisted              = is_array( $this->target['parent_theme'] ?? null ) && $parent->get_stylesheet() === ( $this->target['parent_theme']['ref'] ?? '' )
 			? (array) $this->target['parent_theme']
 			: [];
-		$this->parent_root   = wp_normalize_path( $real );
-		$this->parent_target = array_merge(
+		$this->parent_root      = wp_normalize_path( $real );
+		$this->parent_target    = array_merge(
 			$persisted,
 			[
 				'kind'                 => 'theme',
@@ -1088,7 +1168,7 @@ final class Source_Tools {
 		$ref  = (string) ( $target['ref'] ?? '' );
 		if ( 'plugin' === $kind ) {
 			$directory = dirname( $ref );
-			$path = WP_PLUGIN_DIR . '/' . ( '.' === $directory ? $ref : $directory );
+			$path      = WP_PLUGIN_DIR . '/' . ( '.' === $directory ? $ref : $directory );
 		} elseif ( 'theme' === $kind ) {
 			$theme = wp_get_theme( $ref );
 			$path  = $theme->exists() ? $theme->get_stylesheet_directory() : '';

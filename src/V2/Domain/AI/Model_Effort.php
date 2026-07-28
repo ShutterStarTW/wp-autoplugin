@@ -29,27 +29,111 @@ final class Model_Effort {
 		$anthropic_5     = [ 'low', 'medium', 'high', 'xhigh', 'max' ];
 
 		$capabilities = [
-			'gpt-5.6-sol'                 => [ 'provider' => 'openai', 'levels' => $openai_gpt_5_6, 'default' => 'medium' ],
-			'gpt-5.6-terra'               => [ 'provider' => 'openai', 'levels' => $openai_gpt_5_6, 'default' => 'medium' ],
-			'gpt-5.6-luna'                => [ 'provider' => 'openai', 'levels' => $openai_gpt_5_6, 'default' => 'medium' ],
-			'gpt-5.5'                     => [ 'provider' => 'openai', 'levels' => $openai_standard, 'default' => 'medium' ],
-			'gpt-5.5-pro'                 => [ 'provider' => 'openai', 'levels' => [ 'medium', 'high', 'xhigh' ], 'default' => 'high' ],
-			'gpt-5.4'                     => [ 'provider' => 'openai', 'levels' => $openai_standard, 'default' => 'none' ],
-			'gpt-5.4-pro'                 => [ 'provider' => 'openai', 'levels' => [ 'medium', 'high', 'xhigh' ], 'default' => 'medium' ],
-			'gpt-5.4-mini'                => [ 'provider' => 'openai', 'levels' => $openai_standard, 'default' => 'none' ],
-			'gpt-5.4-nano'                => [ 'provider' => 'openai', 'levels' => $openai_standard, 'default' => 'none' ],
-			'gpt-5'                       => [ 'provider' => 'openai', 'levels' => $openai_gpt_5, 'default' => 'medium' ],
-			'gpt-5-mini'                  => [ 'provider' => 'openai', 'levels' => $openai_gpt_5, 'default' => 'medium' ],
-			'gpt-5-nano'                  => [ 'provider' => 'openai', 'levels' => $openai_gpt_5, 'default' => 'medium' ],
-			'o3'                          => [ 'provider' => 'openai', 'levels' => [ 'low', 'medium', 'high' ], 'default' => 'medium' ],
-			'claude-fable-5'              => [ 'provider' => 'anthropic', 'levels' => $anthropic_5, 'default' => 'high' ],
-			'claude-opus-5'               => [ 'provider' => 'anthropic', 'levels' => $anthropic_5, 'default' => 'high' ],
-			'claude-sonnet-5'             => [ 'provider' => 'anthropic', 'levels' => $anthropic_5, 'default' => 'high' ],
-			'claude-opus-4-8'             => [ 'provider' => 'anthropic', 'levels' => [ 'low', 'medium', 'high', 'xhigh', 'max' ], 'default' => 'high' ],
-			'claude-opus-4-7'             => [ 'provider' => 'anthropic', 'levels' => [ 'low', 'medium', 'high', 'xhigh', 'max' ], 'default' => 'high' ],
-			'claude-opus-4-6'             => [ 'provider' => 'anthropic', 'levels' => $anthropic, 'default' => 'high' ],
-			'claude-sonnet-4-6'           => [ 'provider' => 'anthropic', 'levels' => $anthropic, 'default' => 'high' ],
-			'claude-opus-4-5-20251101'    => [ 'provider' => 'anthropic', 'levels' => [ 'low', 'medium', 'high' ], 'default' => 'high' ],
+			'gpt-5.6-sol'              => [
+				'provider' => 'openai',
+				'levels'   => $openai_gpt_5_6,
+				'default'  => 'medium',
+			],
+			'gpt-5.6-terra'            => [
+				'provider' => 'openai',
+				'levels'   => $openai_gpt_5_6,
+				'default'  => 'medium',
+			],
+			'gpt-5.6-luna'             => [
+				'provider' => 'openai',
+				'levels'   => $openai_gpt_5_6,
+				'default'  => 'medium',
+			],
+			'gpt-5.5'                  => [
+				'provider' => 'openai',
+				'levels'   => $openai_standard,
+				'default'  => 'medium',
+			],
+			'gpt-5.5-pro'              => [
+				'provider' => 'openai',
+				'levels'   => [ 'medium', 'high', 'xhigh' ],
+				'default'  => 'high',
+			],
+			'gpt-5.4'                  => [
+				'provider' => 'openai',
+				'levels'   => $openai_standard,
+				'default'  => 'none',
+			],
+			'gpt-5.4-pro'              => [
+				'provider' => 'openai',
+				'levels'   => [ 'medium', 'high', 'xhigh' ],
+				'default'  => 'medium',
+			],
+			'gpt-5.4-mini'             => [
+				'provider' => 'openai',
+				'levels'   => $openai_standard,
+				'default'  => 'none',
+			],
+			'gpt-5.4-nano'             => [
+				'provider' => 'openai',
+				'levels'   => $openai_standard,
+				'default'  => 'none',
+			],
+			'gpt-5'                    => [
+				'provider' => 'openai',
+				'levels'   => $openai_gpt_5,
+				'default'  => 'medium',
+			],
+			'gpt-5-mini'               => [
+				'provider' => 'openai',
+				'levels'   => $openai_gpt_5,
+				'default'  => 'medium',
+			],
+			'gpt-5-nano'               => [
+				'provider' => 'openai',
+				'levels'   => $openai_gpt_5,
+				'default'  => 'medium',
+			],
+			'o3'                       => [
+				'provider' => 'openai',
+				'levels'   => [ 'low', 'medium', 'high' ],
+				'default'  => 'medium',
+			],
+			'claude-fable-5'           => [
+				'provider' => 'anthropic',
+				'levels'   => $anthropic_5,
+				'default'  => 'high',
+			],
+			'claude-opus-5'            => [
+				'provider' => 'anthropic',
+				'levels'   => $anthropic_5,
+				'default'  => 'high',
+			],
+			'claude-sonnet-5'          => [
+				'provider' => 'anthropic',
+				'levels'   => $anthropic_5,
+				'default'  => 'high',
+			],
+			'claude-opus-4-8'          => [
+				'provider' => 'anthropic',
+				'levels'   => [ 'low', 'medium', 'high', 'xhigh', 'max' ],
+				'default'  => 'high',
+			],
+			'claude-opus-4-7'          => [
+				'provider' => 'anthropic',
+				'levels'   => [ 'low', 'medium', 'high', 'xhigh', 'max' ],
+				'default'  => 'high',
+			],
+			'claude-opus-4-6'          => [
+				'provider' => 'anthropic',
+				'levels'   => $anthropic,
+				'default'  => 'high',
+			],
+			'claude-sonnet-4-6'        => [
+				'provider' => 'anthropic',
+				'levels'   => $anthropic,
+				'default'  => 'high',
+			],
+			'claude-opus-4-5-20251101' => [
+				'provider' => 'anthropic',
+				'levels'   => [ 'low', 'medium', 'high' ],
+				'default'  => 'high',
+			],
 		];
 
 		foreach ( ( new ChatGPT_Model_Service() )->verified_models() as $slug => $metadata ) {
@@ -57,9 +141,13 @@ final class Model_Effort {
 				continue;
 			}
 			$fallback = ChatGPT_Config::models()[ $slug ];
-			$levels = array_values( (array) ( $metadata['levels'] ?? [] ) ) ?: $fallback['levels'];
-			$default = in_array( (string) ( $metadata['default'] ?? '' ), $levels, true ) ? (string) $metadata['default'] : $fallback['default'];
-			$capabilities[ ChatGPT_Config::catalog_id( $slug ) ] = [ 'provider' => 'chatgpt', 'levels' => $levels, 'default' => $default ];
+			$levels   = array_values( (array) ( $metadata['levels'] ?? [] ) ) ?: $fallback['levels'];
+			$default  = in_array( (string) ( $metadata['default'] ?? '' ), $levels, true ) ? (string) $metadata['default'] : $fallback['default'];
+			$capabilities[ ChatGPT_Config::catalog_id( $slug ) ] = [
+				'provider' => 'chatgpt',
+				'levels'   => $levels,
+				'default'  => $default,
+			];
 		}
 
 		return $capabilities;

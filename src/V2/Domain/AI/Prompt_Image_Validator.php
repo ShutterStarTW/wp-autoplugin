@@ -4,11 +4,11 @@ namespace WP_Autoplugin\V2\Domain\AI;
 
 /** Validates bounded prompt-image uploads before durable persistence. */
 final class Prompt_Image_Validator {
-	public const MAX_IMAGES       = 6;
-	public const MAX_IMAGE_BYTES  = 5 * 1024 * 1024;
-	public const MAX_TOTAL_BYTES  = 20 * 1024 * 1024;
-	public const MAX_DIMENSION    = 8000;
-	private const ALLOWED_MIMES   = [ 'image/jpeg', 'image/png', 'image/webp' ];
+	public const MAX_IMAGES      = 6;
+	public const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+	public const MAX_TOTAL_BYTES = 20 * 1024 * 1024;
+	public const MAX_DIMENSION   = 8000;
+	private const ALLOWED_MIMES  = [ 'image/jpeg', 'image/png', 'image/webp' ];
 
 	/**
 	 * Normalize PHP's single/multiple upload shapes and validate every image.

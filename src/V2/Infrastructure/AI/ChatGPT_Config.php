@@ -15,12 +15,36 @@ final class ChatGPT_Config {
 	/** @return array<string, array{label:string,default:string,levels:array<int,string>}> */
 	public static function models(): array {
 		return [
-			'gpt-5.6-sol'  => [ 'label' => 'GPT-5.6 Sol', 'default' => 'low', 'levels' => [ 'low', 'medium', 'high', 'xhigh', 'max', 'ultra' ] ],
-			'gpt-5.6-terra'=> [ 'label' => 'GPT-5.6 Terra', 'default' => 'medium', 'levels' => [ 'low', 'medium', 'high', 'xhigh', 'max', 'ultra' ] ],
-			'gpt-5.6-luna' => [ 'label' => 'GPT-5.6 Luna', 'default' => 'medium', 'levels' => [ 'low', 'medium', 'high', 'xhigh', 'max' ] ],
-			'gpt-5.5'      => [ 'label' => 'GPT-5.5', 'default' => 'medium', 'levels' => [ 'low', 'medium', 'high', 'xhigh' ] ],
-			'gpt-5.4'      => [ 'label' => 'GPT-5.4', 'default' => 'medium', 'levels' => [ 'low', 'medium', 'high', 'xhigh' ] ],
-			'gpt-5.4-mini' => [ 'label' => 'GPT-5.4 Mini', 'default' => 'medium', 'levels' => [ 'low', 'medium', 'high', 'xhigh' ] ],
+			'gpt-5.6-sol'   => [
+				'label'   => 'GPT-5.6 Sol',
+				'default' => 'low',
+				'levels'  => [ 'low', 'medium', 'high', 'xhigh', 'max', 'ultra' ],
+			],
+			'gpt-5.6-terra' => [
+				'label'   => 'GPT-5.6 Terra',
+				'default' => 'medium',
+				'levels'  => [ 'low', 'medium', 'high', 'xhigh', 'max', 'ultra' ],
+			],
+			'gpt-5.6-luna'  => [
+				'label'   => 'GPT-5.6 Luna',
+				'default' => 'medium',
+				'levels'  => [ 'low', 'medium', 'high', 'xhigh', 'max' ],
+			],
+			'gpt-5.5'       => [
+				'label'   => 'GPT-5.5',
+				'default' => 'medium',
+				'levels'  => [ 'low', 'medium', 'high', 'xhigh' ],
+			],
+			'gpt-5.4'       => [
+				'label'   => 'GPT-5.4',
+				'default' => 'medium',
+				'levels'  => [ 'low', 'medium', 'high', 'xhigh' ],
+			],
+			'gpt-5.4-mini'  => [
+				'label'   => 'GPT-5.4 Mini',
+				'default' => 'medium',
+				'levels'  => [ 'low', 'medium', 'high', 'xhigh' ],
+			],
 		];
 	}
 

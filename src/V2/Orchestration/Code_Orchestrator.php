@@ -83,11 +83,11 @@ final class Code_Orchestrator {
 			}
 			if ( 'hook_extension' === ( $workspace['operation'] ?? '' ) ) {
 				try {
-					$integration = new Source_Tools( (array) $workspace['target_metadata'] );
+					$integration                                = new Source_Tools( (array) $workspace['target_metadata'] );
 					$manifest['integration_target_kind']        = (string) $workspace['target_kind'];
 					$manifest['integration_target_ref']         = (string) $workspace['target_ref'];
 					$manifest['integration_target_fingerprint'] = $integration->inspection_fingerprint();
-					$manifest = $validator->manifest( $manifest );
+					$manifest                                   = $validator->manifest( $manifest );
 				} catch ( \Throwable $error ) {
 					return new \WP_Error( 'code_integration_target_unavailable', __( 'The extension integration target is unavailable.', 'wp-autoplugin' ) );
 				}
@@ -124,7 +124,12 @@ final class Code_Orchestrator {
 				(int) $job['id'],
 				'code_initialized',
 				__( 'Code generation initialized from the approved Plan.', 'wp-autoplugin' ),
-				[ 'files_count' => count( $manifest['files'] ), 'provider' => $run['provider'], 'model' => $run['model'], 'effort' => $run['effort'] ]
+				[
+					'files_count' => count( $manifest['files'] ),
+					'provider'    => $run['provider'],
+					'model'       => $run['model'],
+					'effort'      => $run['effort'],
+				]
 			);
 		} else {
 			$plan     = $jobs->find( (int) $run['plan_job_id'] );
@@ -165,7 +170,12 @@ final class Code_Orchestrator {
 			(int) $job['id'],
 			'code_file_started',
 			sprintf( __( 'Generating %1$d of %2$d: %3$s', 'wp-autoplugin' ), $index + 1, count( $files ), $current['path'] ),
-			[ 'path' => $current['path'], 'operation' => $current['operation'], 'index' => $index + 1, 'total' => count( $files ) ]
+			[
+				'path'      => $current['path'],
+				'operation' => $current['operation'],
+				'index'     => $index + 1,
+				'total'     => count( $files ),
+			]
 		);
 
 		$transport = ( new Direct_Transport_Factory() )->create_for( $run['provider'], $run['model'], $run['effort'] );
@@ -176,11 +186,15 @@ final class Code_Orchestrator {
 		$generated = [];
 		foreach ( $files as $file ) {
 			if ( 'completed' === $file['status'] && 'delete' !== $file['operation'] && null !== $file['content'] ) {
-				$generated[] = [ 'path' => $file['path'], 'operation' => $file['operation'], 'content' => (string) $file['content'] ];
+				$generated[] = [
+					'path'      => $file['path'],
+					'operation' => $file['operation'],
+					'content'   => (string) $file['content'],
+				];
 			}
 		}
-		$prompt   = $this->prompt( $workspace, (string) $current['operation'] );
-		$input    = $this->prompt_input( $prompt['instance'], $workspace, $plan, $manifest, $current, $source, $generated, $feedback );
+		$prompt = $this->prompt( $workspace, (string) $current['operation'] );
+		$input  = $this->prompt_input( $prompt['instance'], $workspace, $plan, $manifest, $current, $source, $generated, $feedback );
 		if ( is_wp_error( $input ) ) {
 			$runs->release( (int) $run['id'], $token );
 			return $input;
@@ -188,7 +202,10 @@ final class Code_Orchestrator {
 		$response = $transport->complete(
 			Global_Instructions::apply( $prompt['instructions'], $jobs->global_instructions( (int) $job['id'] ) ),
 			$input,
-			[ 'max_output_tokens' => 16384, 'json' => true ]
+			[
+				'max_output_tokens' => 16384,
+				'json'              => true,
+			]
 		);
 
 		$latest = $jobs->find( (int) $job['id'] );
@@ -203,7 +220,14 @@ final class Code_Orchestrator {
 		( new Usage_Repository() )->record( (int) $job['id'], $transport->provider(), $transport->model(), 'code', $usage );
 		if ( 'final' !== ( $response['type'] ?? '' ) || ! is_string( $response['content'] ?? null ) ) {
 			$runs->account_usage( (int) $run['id'], $token, $usage );
-			$error = new \WP_Error( 'code_response_invalid', __( 'The provider did not return a complete Code response.', 'wp-autoplugin' ), [ 'retryable' => true, 'ambiguous' => false ] );
+			$error = new \WP_Error(
+				'code_response_invalid',
+				__( 'The provider did not return a complete Code response.', 'wp-autoplugin' ),
+				[
+					'retryable' => true,
+					'ambiguous' => false,
+				]
+			);
 			return $this->retry_or_fail( $error, $job, $run, $current, (int) $current['sequence'], $token, $runs, $jobs );
 		}
 		$parsed = 'update' === $current['operation']
@@ -215,14 +239,38 @@ final class Code_Orchestrator {
 		}
 		if ( 'update' === $current['operation'] && $this->source_content( $source, $current['path'] ) === $parsed['content'] ) {
 			$runs->account_usage( (int) $run['id'], $token, $usage );
-			$error = new \WP_Error( 'code_update_unchanged', __( 'The updated file was byte-identical to the target source.', 'wp-autoplugin' ), [ 'retryable' => true, 'issues' => [ [ 'path' => $current['path'], 'line' => 0, 'code' => 'unchanged_update', 'message' => __( 'Implement the approved change while preserving unrelated code.', 'wp-autoplugin' ) ] ] ] );
+			$error = new \WP_Error(
+				'code_update_unchanged',
+				__( 'The updated file was byte-identical to the target source.', 'wp-autoplugin' ),
+				[
+					'retryable' => true,
+					'issues'    => [
+						[
+							'path'    => $current['path'],
+							'line'    => 0,
+							'code'    => 'unchanged_update',
+							'message' => __( 'Implement the approved change while preserving unrelated code.', 'wp-autoplugin' ),
+						],
+					],
+				]
+			);
 			return $this->retry_or_fail( $error, $job, $run, $current, (int) $current['sequence'], $token, $runs, $jobs );
 		}
 
 		$runs->complete_file( (int) $run['id'], (int) $current['sequence'], $token, $parsed['content'], $usage );
 		$completed = count( array_filter( $files, static fn( array $file ): bool => 'completed' === $file['status'] ) ) + 1;
 		$jobs->update( (int) $job['id'], [ 'progress' => min( 95, 10 + (int) floor( 85 * $completed / count( $files ) ) ) ] );
-		$jobs->event( (int) $job['id'], 'code_file_completed', sprintf( __( 'Completed %s.', 'wp-autoplugin' ), $current['path'] ), [ 'path' => $current['path'], 'operation' => $current['operation'], 'completed' => $completed, 'total' => count( $files ) ] );
+		$jobs->event(
+			(int) $job['id'],
+			'code_file_completed',
+			sprintf( __( 'Completed %s.', 'wp-autoplugin' ), $current['path'] ),
+			[
+				'path'      => $current['path'],
+				'operation' => $current['operation'],
+				'completed' => $completed,
+				'total'     => count( $files ),
+			]
+		);
 
 		$run = $runs->find_by_job( (int) $job['id'] );
 		if ( $completed === count( $files ) && $run ) {
@@ -237,14 +285,20 @@ final class Code_Orchestrator {
 		$latest = $jobs->find( (int) $job['id'] );
 		if ( ! $latest || $latest['cancel_requested'] ) {
 			( new Code_Run_Repository() )->terminate_by_job( (int) $job['id'], 'cancelled' );
-			$jobs->update( (int) $job['id'], [ 'status' => 'cancelled', 'finished_at' => current_time( 'mysql', true ) ] );
+			$jobs->update(
+				(int) $job['id'],
+				[
+					'status'      => 'cancelled',
+					'finished_at' => current_time( 'mysql', true ),
+				]
+			);
 			$jobs->event( (int) $job['id'], 'cancelled', __( 'Code generation cancelled before staging. No partial revision was created.', 'wp-autoplugin' ) );
 			return [ '_continuation' => true ];
 		}
 		$expected = array_key_exists( 'expected_latest_revision_id', $job['payload'] ) && null !== $job['payload']['expected_latest_revision_id']
 			? (int) $job['payload']['expected_latest_revision_id']
 			: null;
-		$source = $this->source_snapshot( $workspace, $manifest );
+		$source   = $this->source_snapshot( $workspace, $manifest );
 		if ( is_wp_error( $source ) ) {
 			return $source;
 		}
@@ -268,8 +322,14 @@ final class Code_Orchestrator {
 			'provider'             => $run['provider'],
 			'model'                => $run['model'],
 			'effort'               => $run['effort'],
-			'usage'                => [ 'input_tokens' => (int) $run['input_tokens'], 'output_tokens' => (int) $run['output_tokens'] ],
-			'prompt'               => [ 'slug' => $run['prompt_slug'], 'version' => (int) $run['prompt_version'] ],
+			'usage'                => [
+				'input_tokens'  => (int) $run['input_tokens'],
+				'output_tokens' => (int) $run['output_tokens'],
+			],
+			'prompt'               => [
+				'slug'    => $run['prompt_slug'],
+				'version' => (int) $run['prompt_version'],
+			],
 		];
 	}
 
@@ -298,9 +358,18 @@ final class Code_Orchestrator {
 	/** @return array{slug:string,version:int} */
 	private function prompt_metadata( array $workspace ): array {
 		return match ( (string) $workspace['operation'] ) {
-			'hook_extension' => [ 'slug' => Extension_Plugin_Code_Prompt::SLUG, 'version' => Extension_Plugin_Code_Prompt::VERSION ],
-			'modify', 'fix'  => [ 'slug' => Existing_Target_Code_Prompt::SLUG, 'version' => Existing_Target_Code_Prompt::VERSION ],
-			default          => [ 'slug' => New_Plugin_Code_Prompt::SLUG, 'version' => New_Plugin_Code_Prompt::VERSION ],
+			'hook_extension' => [
+				'slug'    => Extension_Plugin_Code_Prompt::SLUG,
+				'version' => Extension_Plugin_Code_Prompt::VERSION,
+			],
+			'modify', 'fix'  => [
+				'slug'    => Existing_Target_Code_Prompt::SLUG,
+				'version' => Existing_Target_Code_Prompt::VERSION,
+			],
+			default          => [
+				'slug'    => New_Plugin_Code_Prompt::SLUG,
+				'version' => New_Plugin_Code_Prompt::VERSION,
+			],
 		};
 	}
 
@@ -314,14 +383,17 @@ final class Code_Orchestrator {
 		$instructions = $instance instanceof Existing_Target_Code_Prompt
 			? $instance->instructions( $operation )
 			: $instance->instructions();
-		return [ 'instance' => $instance, 'instructions' => $instructions ];
+		return [
+			'instance'     => $instance,
+			'instructions' => $instructions,
+		];
 	}
 
 	/** @return string|\WP_Error */
 	private function prompt_input( object $prompt, array $workspace, array $plan, array $manifest, array $current, array $source, array $generated, array $feedback ) {
-		$request = (string) $workspace['request'];
-		$content = $this->plan_content( $plan );
-		$target  = array_intersect_key(
+		$request      = (string) $workspace['request'];
+		$content      = $this->plan_content( $plan );
+		$target       = array_intersect_key(
 			(array) $workspace['target_metadata'],
 			array_flip( [ 'kind', 'ref', 'name', 'version', 'author', 'description', 'active', 'source_files', 'lines', 'tokens', 'hooks', 'stylesheet', 'template', 'is_child', 'is_block_theme', 'parent_ref', 'parent_available', 'parent_name', 'parent_version', 'parent_theme', 'active_as_stylesheet', 'active_as_template', 'in_use' ] )
 		);
@@ -330,16 +402,34 @@ final class Code_Orchestrator {
 			return $instructions;
 		}
 		if ( $instructions ) {
-			$target['root_plugin_instructions'] = [ 'path' => $instructions['path'], 'content' => $instructions['content'] ];
+			$target['root_plugin_instructions'] = [
+				'path'    => $instructions['path'],
+				'content' => $instructions['content'],
+			];
 		}
-		$current = [ 'path' => $current['path'], 'type' => $current['type'], 'description' => $current['description'], 'operation' => $current['operation'] ];
+		$current = [
+			'path'        => $current['path'],
+			'type'        => $current['type'],
+			'description' => $current['description'],
+			'operation'   => $current['operation'],
+		];
 		if ( $prompt instanceof Existing_Target_Code_Prompt ) {
 			return $prompt->input( $request, $content, $target, $manifest, $current, (array) ( $source['source_files'] ?? [] ), $generated, $feedback );
 		}
 		if ( $prompt instanceof Extension_Plugin_Code_Prompt ) {
 			return $prompt->input( $request, $content, $target, $manifest, $current, $generated, $feedback );
 		}
-		return $prompt->input( $request, $content, [ 'main_file' => $manifest['main_file'], 'files' => $manifest['files'] ], $current, $generated, $feedback );
+		return $prompt->input(
+			$request,
+			$content,
+			[
+				'main_file' => $manifest['main_file'],
+				'files'     => $manifest['files'],
+			],
+			$current,
+			$generated,
+			$feedback
+		);
 	}
 
 	/** @return array{path:string,content:string,bytes:int,content_hash:string}|null|\WP_Error */
@@ -404,7 +494,17 @@ final class Code_Orchestrator {
 			$runs->retry_file( (int) $run['id'], $index, $token, $error->get_error_message(), $issues );
 			$next_generation = (int) $run['generation'] + 1;
 			$jobs->update( (int) $job['id'], [ 'status' => 'retrying' ] );
-			$jobs->event( (int) $job['id'], 'code_file_retry', sprintf( __( 'Retrying %s after a bounded validation or provider failure.', 'wp-autoplugin' ), $current['path'] ), [ 'path' => $current['path'], 'operation' => $current['operation'], 'attempt' => (int) $run['retry_count'] + 2 ], 'warning' );
+			$jobs->event(
+				(int) $job['id'],
+				'code_file_retry',
+				sprintf( __( 'Retrying %s after a bounded validation or provider failure.', 'wp-autoplugin' ), $current['path'] ),
+				[
+					'path'      => $current['path'],
+					'operation' => $current['operation'],
+					'attempt'   => (int) $run['retry_count'] + 2,
+				],
+				'warning'
+			);
 			( new Queue() )->schedule( (int) $job['id'], $next_generation, 2 ** (int) $run['retry_count'] );
 			return [ '_continuation' => true ];
 		}
@@ -415,7 +515,13 @@ final class Code_Orchestrator {
 	private function cancel( array $run, string $token, Job_Repository $jobs, Code_Run_Repository $runs ): array {
 		$runs->release( (int) $run['id'], $token );
 		$runs->terminate_by_job( (int) $run['job_id'], 'cancelled' );
-		$jobs->update( (int) $run['job_id'], [ 'status' => 'cancelled', 'finished_at' => current_time( 'mysql', true ) ] );
+		$jobs->update(
+			(int) $run['job_id'],
+			[
+				'status'      => 'cancelled',
+				'finished_at' => current_time( 'mysql', true ),
+			]
+		);
 		$jobs->event( (int) $run['job_id'], 'cancelled', __( 'Code generation cancelled. No partial revision was created.', 'wp-autoplugin' ) );
 		return [ '_continuation' => true ];
 	}

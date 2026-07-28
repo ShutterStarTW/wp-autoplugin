@@ -28,7 +28,7 @@ final class Review_Orchestrator {
 		if ( ! $job || 'review_fix' !== ( $job['task'] ?? '' ) || empty( $job['payload']['auto_re_review'] ) || 'revision' !== ( $result['outcome'] ?? '' ) || empty( $result['revision_id'] ) ) {
 			return;
 		}
-		$jobs = new Job_Repository();
+		$jobs         = new Job_Repository();
 		$verification = null;
 		try {
 			$verification = $jobs->create(
@@ -43,12 +43,27 @@ final class Review_Orchestrator {
 				],
 				(int) $job['created_by']
 			);
-			$runner = ( new Queue() )->dispatch( (int) $verification['id'] );
+			$runner       = ( new Queue() )->dispatch( (int) $verification['id'] );
 			$jobs->update( (int) $verification['id'], [ 'runner' => $runner ] );
-			$jobs->event( (int) $job['id'], 'review_verification_queued', __( 'Incremental Review was queued for the Review-fix revision.', 'wp-autoplugin' ), [ 'review_job_id' => (int) $verification['id'], 'revision_id' => (int) $result['revision_id'] ] );
+			$jobs->event(
+				(int) $job['id'],
+				'review_verification_queued',
+				__( 'Incremental Review was queued for the Review-fix revision.', 'wp-autoplugin' ),
+				[
+					'review_job_id' => (int) $verification['id'],
+					'revision_id'   => (int) $result['revision_id'],
+				]
+			);
 		} catch ( \Throwable $error ) {
 			if ( $verification ) {
-				$jobs->update( (int) $verification['id'], [ 'status' => 'failed', 'error_message' => $error->getMessage(), 'finished_at' => current_time( 'mysql', true ) ] );
+				$jobs->update(
+					(int) $verification['id'],
+					[
+						'status'        => 'failed',
+						'error_message' => $error->getMessage(),
+						'finished_at'   => current_time( 'mysql', true ),
+					]
+				);
 				$jobs->event( (int) $verification['id'], 'failed', $error->getMessage(), [], 'error' );
 			}
 			$jobs->event( (int) $job['id'], 'review_verification_dispatch_failed', __( 'The successor revision is intact, but automatic Review could not be queued. Use Verify fixes.', 'wp-autoplugin' ), [ 'revision_id' => (int) $result['revision_id'] ], 'warning' );
@@ -64,11 +79,11 @@ final class Review_Orchestrator {
 		if ( null !== $result || ! $this->supports( $job ) ) {
 			return $result;
 		}
-		$workspaces = new Workspace_Repository();
-		$revisions  = new Revision_Repository();
-		$reviews    = new Review_Repository();
-		$jobs       = new Job_Repository();
-		$workspace  = $workspaces->find( (int) $job['workspace_id'] );
+		$workspaces  = new Workspace_Repository();
+		$revisions   = new Revision_Repository();
+		$reviews     = new Review_Repository();
+		$jobs        = new Job_Repository();
+		$workspace   = $workspaces->find( (int) $job['workspace_id'] );
 		$revision_id = absint( $job['payload']['revision_id'] ?? 0 );
 		$revision    = $revision_id ? $revisions->find( $revision_id ) : null;
 		if ( ! $workspace || ! $revision || (int) $revision['workspace_id'] !== (int) $workspace['id'] ) {
@@ -99,7 +114,11 @@ final class Review_Orchestrator {
 		];
 		if ( '' === $capability['provider'] || '' === $capability['model'] ) {
 			$current    = ( new Direct_Transport_Factory() )->capability( 'review' );
-			$capability = [ 'provider' => $current['provider'], 'model' => $current['model'], 'effort' => $current['effort'] ];
+			$capability = [
+				'provider' => $current['provider'],
+				'model'    => $current['model'],
+				'effort'   => $current['effort'],
+			];
 		}
 		$transport = ( new Direct_Transport_Factory() )->create_for( $capability['provider'], $capability['model'], $capability['effort'] );
 		if ( is_wp_error( $transport ) ) {
@@ -129,24 +148,49 @@ final class Review_Orchestrator {
 			(int) $job['id'],
 			'review_provider_request',
 			__( 'Sending the staged revision to the selected reviewer.', 'wp-autoplugin' ),
-			[ 'revision_id' => $revision_id, 'provider' => $transport->provider(), 'model' => $transport->model(), 'effort' => $transport->effort(), 'prompt_slug' => Review_Prompt::SLUG, 'prompt_version' => Review_Prompt::VERSION ]
+			[
+				'revision_id'    => $revision_id,
+				'provider'       => $transport->provider(),
+				'model'          => $transport->model(),
+				'effort'         => $transport->effort(),
+				'prompt_slug'    => Review_Prompt::SLUG,
+				'prompt_version' => Review_Prompt::VERSION,
+			]
 		);
 
 		$parsed = null;
-		$usage  = [ 'input_tokens' => 0, 'output_tokens' => 0 ];
+		$usage  = [
+			'input_tokens'  => 0,
+			'output_tokens' => 0,
+		];
 		for ( $attempt = 1; $attempt <= 3; $attempt++ ) {
 			$latest_job = $jobs->find( (int) $job['id'] );
 			if ( ! $latest_job || $latest_job['cancel_requested'] ) {
 				return $this->cancel( $job, $jobs );
 			}
-			$response = $transport->complete( $instructions, $input, [ 'json' => true, 'max_output_tokens' => 16384, 'prompt_images' => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ) ] );
+			$response = $transport->complete(
+				$instructions,
+				$input,
+				[
+					'json'              => true,
+					'max_output_tokens' => 16384,
+					'prompt_images'     => ( new Prompt_Attachment_Repository() )->for_job( (int) $job['id'], true ),
+				]
+			);
 			if ( ! is_wp_error( $response ) ) {
-				$attempt_usage = (array) ( $response['usage'] ?? [] );
+				$attempt_usage           = (array) ( $response['usage'] ?? [] );
 				$usage['input_tokens']  += (int) ( $attempt_usage['input_tokens'] ?? 0 );
 				$usage['output_tokens'] += (int) ( $attempt_usage['output_tokens'] ?? 0 );
 				( new Usage_Repository() )->record( (int) $job['id'], $transport->provider(), $transport->model(), 'review', $attempt_usage );
 				if ( 'final' !== ( $response['type'] ?? '' ) || ! is_string( $response['content'] ?? null ) ) {
-					$response = new \WP_Error( 'review_response_invalid', __( 'The reviewer did not return a final Review response.', 'wp-autoplugin' ), [ 'retryable' => true, 'ambiguous' => false ] );
+					$response = new \WP_Error(
+						'review_response_invalid',
+						__( 'The reviewer did not return a final Review response.', 'wp-autoplugin' ),
+						[
+							'retryable' => true,
+							'ambiguous' => false,
+						]
+					);
 				} else {
 					$parsed = ( new Review_Response() )->parse( $response['content'], $revision, $previous, $is_conversation, (bool) $same_revision );
 					if ( ! is_wp_error( $parsed ) ) {
@@ -187,12 +231,27 @@ final class Review_Orchestrator {
 			$job,
 			$revision,
 			$parsed,
-			[ 'provider' => $transport->provider(), 'model' => $transport->model(), 'effort' => $transport->effort(), 'prompt_slug' => Review_Prompt::SLUG, 'prompt_version' => Review_Prompt::VERSION ]
+			[
+				'provider'       => $transport->provider(),
+				'model'          => $transport->model(),
+				'effort'         => $transport->effort(),
+				'prompt_slug'    => Review_Prompt::SLUG,
+				'prompt_version' => Review_Prompt::VERSION,
+			]
 		);
 		if ( is_wp_error( $report ) ) {
 			return $report;
 		}
-		$jobs->event( (int) $job['id'], 'review_report_created', __( 'The immutable Review report was saved.', 'wp-autoplugin' ), [ 'report_id' => (int) $report['id'], 'revision_id' => $revision_id, 'verdict' => $report['verdict'] ] );
+		$jobs->event(
+			(int) $job['id'],
+			'review_report_created',
+			__( 'The immutable Review report was saved.', 'wp-autoplugin' ),
+			[
+				'report_id'   => (int) $report['id'],
+				'revision_id' => $revision_id,
+				'verdict'     => $report['verdict'],
+			]
+		);
 		return [
 			'outcome'     => 'report',
 			'content'     => (string) ( $parsed['content'] ?? '' ),
@@ -203,7 +262,10 @@ final class Review_Orchestrator {
 			'provider'    => $transport->provider(),
 			'effort'      => $transport->effort(),
 			'usage'       => $usage,
-			'prompt'      => [ 'slug' => Review_Prompt::SLUG, 'version' => Review_Prompt::VERSION ],
+			'prompt'      => [
+				'slug'    => Review_Prompt::SLUG,
+				'version' => Review_Prompt::VERSION,
+			],
 		];
 	}
 
@@ -215,9 +277,9 @@ final class Review_Orchestrator {
 
 	/** @return array<string, mixed>|\WP_Error */
 	private function context( array $workspace, array $revision, ?array $parent, Job_Repository $jobs ) {
-		$plan = $jobs->find( (int) ( $revision['plan_job_id'] ?? 0 ) );
-		$files = [];
-		$parent_files = [];
+		$plan            = $jobs->find( (int) ( $revision['plan_job_id'] ?? 0 ) );
+		$files           = [];
+		$parent_files    = [];
 		$parent_revision = null;
 		if ( ! empty( $revision['parent_revision_id'] ) ) {
 			$parent_revision = ( new Revision_Repository() )->find( (int) $revision['parent_revision_id'] );
@@ -226,9 +288,9 @@ final class Review_Orchestrator {
 			}
 		}
 		foreach ( (array) $revision['files'] as $file ) {
-			$before = null !== ( $file['base_content'] ?? null ) ? (string) $file['base_content'] : ( $parent_files[ $file['path'] ] ?? null );
+			$before               = null !== ( $file['base_content'] ?? null ) ? (string) $file['base_content'] : ( $parent_files[ $file['path'] ] ?? null );
 			$file['base_content'] = $before;
-			$files[] = [
+			$files[]              = [
 				'id'           => (int) $file['id'],
 				'path'         => (string) $file['path'],
 				'change_type'  => (string) $file['change_type'],
@@ -238,11 +300,25 @@ final class Review_Orchestrator {
 			];
 		}
 		$revision['files'] = $files;
-		$target_tree = null;
+		$target_tree       = null;
 		if ( 'changes' === ( $revision['project_manifest']['scope'] ?? '' ) ) {
 			try {
-				$tree = ( new Source_Tools( (array) $workspace['target_metadata'] ) )->revision_tree();
-				$target_tree = [ 'directories' => array_slice( (array) $tree['directories'], 0, 500 ), 'files' => array_slice( array_map( static fn( array $file ): array => [ 'path' => $file['path'], 'type' => $file['type'], 'size' => $file['size'] ], (array) $tree['files'] ), 0, 2000 ) ];
+				$tree        = ( new Source_Tools( (array) $workspace['target_metadata'] ) )->revision_tree();
+				$target_tree = [
+					'directories' => array_slice( (array) $tree['directories'], 0, 500 ),
+					'files'       => array_slice(
+						array_map(
+							static fn( array $file ): array => [
+								'path' => $file['path'],
+								'type' => $file['type'],
+								'size' => $file['size'],
+							],
+							(array) $tree['files']
+						),
+						0,
+						2000
+					),
+				];
 			} catch ( \Throwable $error ) {
 				return new \WP_Error( 'review_target_unavailable', __( 'The installed target could not be read safely for Review.', 'wp-autoplugin' ) );
 			}
@@ -252,14 +328,17 @@ final class Review_Orchestrator {
 			try {
 				$instructions = ( new Source_Tools( (array) $workspace['target_metadata'] ) )->plugin_instructions();
 				if ( $instructions ) {
-					$root_plugin_instructions = [ 'path' => $instructions['path'], 'content' => $instructions['content'] ];
+					$root_plugin_instructions = [
+						'path'    => $instructions['path'],
+						'content' => $instructions['content'],
+					];
 				}
 			} catch ( \Throwable $error ) {
 				return new \WP_Error( 'review_plugin_instructions_unavailable', $error->getMessage() );
 			}
 		}
 		return [
-			'workspace' => [
+			'workspace'                => [
 				'id'              => (int) $workspace['id'],
 				'request'         => (string) $workspace['request'],
 				'operation'       => (string) $workspace['operation'],
@@ -272,9 +351,27 @@ final class Review_Orchestrator {
 				),
 			],
 			'root_plugin_instructions' => $root_plugin_instructions,
-			'plan' => [ 'job_id' => (int) ( $plan['id'] ?? 0 ), 'content' => (string) ( $plan['result']['artifact']['content'] ?? $plan['result']['content'] ?? '' ), 'structured' => (array) ( $plan['result']['structured'] ?? [] ) ],
-			'revision' => [ 'id' => (int) $revision['id'], 'number' => (int) $revision['revision_number'], 'parent_revision_id' => $revision['parent_revision_id'], 'manifest' => $revision['project_manifest'], 'files' => $files, 'parent_changes' => $this->parent_changes( $parent_revision, $revision ), 'target_tree' => $target_tree ],
-			'previous_report' => $parent ? [ 'id' => (int) $parent['id'], 'revision_id' => (int) $parent['revision_id'], 'verdict' => $parent['verdict'], 'summary' => $parent['summary'], 'tests' => $parent['tests'] ] : null,
+			'plan'                     => [
+				'job_id'     => (int) ( $plan['id'] ?? 0 ),
+				'content'    => (string) ( $plan['result']['artifact']['content'] ?? $plan['result']['content'] ?? '' ),
+				'structured' => (array) ( $plan['result']['structured'] ?? [] ),
+			],
+			'revision'                 => [
+				'id'                 => (int) $revision['id'],
+				'number'             => (int) $revision['revision_number'],
+				'parent_revision_id' => $revision['parent_revision_id'],
+				'manifest'           => $revision['project_manifest'],
+				'files'              => $files,
+				'parent_changes'     => $this->parent_changes( $parent_revision, $revision ),
+				'target_tree'        => $target_tree,
+			],
+			'previous_report'          => $parent ? [
+				'id'          => (int) $parent['id'],
+				'revision_id' => (int) $parent['revision_id'],
+				'verdict'     => $parent['verdict'],
+				'summary'     => $parent['summary'],
+				'tests'       => $parent['tests'],
+			] : null,
 		];
 	}
 
@@ -286,24 +383,42 @@ final class Review_Orchestrator {
 		$before = [];
 		$after  = [];
 		foreach ( (array) ( $parent['files'] ?? [] ) as $file ) {
-			$before[ (string) $file['path'] ] = [ 'change_type' => (string) $file['change_type'], 'content_hash' => (string) $file['content_hash'], 'base_content_hash' => (string) ( $file['base_content_hash'] ?? '' ) ];
+			$before[ (string) $file['path'] ] = [
+				'change_type'       => (string) $file['change_type'],
+				'content_hash'      => (string) $file['content_hash'],
+				'base_content_hash' => (string) ( $file['base_content_hash'] ?? '' ),
+			];
 		}
 		foreach ( (array) ( $revision['files'] ?? [] ) as $file ) {
-			$after[ (string) $file['path'] ] = [ 'change_type' => (string) $file['change_type'], 'content_hash' => (string) $file['content_hash'], 'base_content_hash' => (string) ( $file['base_content_hash'] ?? '' ) ];
+			$after[ (string) $file['path'] ] = [
+				'change_type'       => (string) $file['change_type'],
+				'content_hash'      => (string) $file['content_hash'],
+				'base_content_hash' => (string) ( $file['base_content_hash'] ?? '' ),
+			];
 		}
 		$changes = [];
 		foreach ( array_unique( array_merge( array_keys( $before ), array_keys( $after ) ) ) as $path ) {
 			if ( ( $before[ $path ] ?? null ) === ( $after[ $path ] ?? null ) ) {
 				continue;
 			}
-			$changes[] = [ 'path' => $path, 'before' => $before[ $path ] ?? null, 'after' => $after[ $path ] ?? null ];
+			$changes[] = [
+				'path'   => $path,
+				'before' => $before[ $path ] ?? null,
+				'after'  => $after[ $path ] ?? null,
+			];
 		}
 		return $changes;
 	}
 
 	/** Finish a running Review cancellation without creating a partial report. */
 	private function cancel( array $job, Job_Repository $jobs ): array {
-		$jobs->update( (int) $job['id'], [ 'status' => 'cancelled', 'finished_at' => current_time( 'mysql', true ) ] );
+		$jobs->update(
+			(int) $job['id'],
+			[
+				'status'      => 'cancelled',
+				'finished_at' => current_time( 'mysql', true ),
+			]
+		);
 		$jobs->event( (int) $job['id'], 'cancelled', __( 'Review was cancelled. No partial report was created.', 'wp-autoplugin' ) );
 		return [ '_continuation' => true ];
 	}
@@ -342,10 +457,16 @@ final class Review_Orchestrator {
 				continue;
 			}
 			if ( ! empty( $item['payload']['message'] ) ) {
-				$history[] = [ 'role' => 'administrator', 'content' => (string) $item['payload']['message'] ];
+				$history[] = [
+					'role'    => 'administrator',
+					'content' => (string) $item['payload']['message'],
+				];
 			}
 			if ( 'completed' === $item['status'] && ! empty( $item['result']['content'] ) ) {
-				$history[] = [ 'role' => 'assistant', 'content' => (string) $item['result']['content'] ];
+				$history[] = [
+					'role'    => 'assistant',
+					'content' => (string) $item['result']['content'],
+				];
 			}
 		}
 		return array_slice( $history, -8 );
