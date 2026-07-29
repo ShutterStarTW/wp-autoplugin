@@ -2,6 +2,7 @@
 
 namespace WP_Autoplugin\V2\Infrastructure\AI;
 
+use WP_Autoplugin\V2\Domain\AI\Custom_Endpoint_Security;
 use WP_Autoplugin\V2\Domain\AI\Direct_Transport;
 use WP_Autoplugin\V2\Domain\AI\Model_Catalog;
 
@@ -92,17 +93,6 @@ final class Direct_Transport_Factory {
 
 	/** @param array<int, string> $lines @return array<string, string> */
 	private function custom_headers( array $lines ): array {
-		$headers = [];
-		foreach ( $lines as $line ) {
-			if ( ! is_string( $line ) || ! str_contains( $line, '=' ) ) {
-				continue;
-			}
-			[ $name, $value ] = array_map( 'trim', explode( '=', $line, 2 ) );
-			if ( '' !== $name && '' !== $value ) {
-				$headers[ $name ] = $value;
-			}
-		}
-
-		return $headers;
+		return Custom_Endpoint_Security::headers( $lines );
 	}
 }

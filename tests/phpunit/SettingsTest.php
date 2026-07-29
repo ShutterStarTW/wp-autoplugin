@@ -1,6 +1,7 @@
 <?php
 
 use WP_Autoplugin\V2\Admin\Settings;
+use WP_Autoplugin\V2\Domain\AI\Custom_Endpoint_Security;
 use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 
 /** Coverage for the v2-only Settings API contract. */
@@ -60,19 +61,59 @@ final class SettingsTest extends WP_UnitTestCase {
 				[
 					[
 						'name'           => 'private-endpoint',
-						'url'            => 'https://example.test/v1/chat/completions',
+						'url'            => 'https://8.8.8.8/v1/chat/completions',
 						'modelParameter' => 'remote-model',
 						'apiKey'         => 'secret',
-						'headers'        => [ "X-Trace=enabled\r\nInjected=true", '' ],
+						'headers'        => [ 'X-Trace=enabled', '' ],
 					],
 				]
 			)
 		);
 
 		$this->assertSame( 'private-endpoint', $models[0]['name'] );
-		$this->assertSame( 'https://example.test/v1/chat/completions', $models[0]['url'] );
-		$this->assertSame( [ 'X-Trace=enabledInjected=true' ], $models[0]['headers'] );
+		$this->assertSame( 'https://8.8.8.8/v1/chat/completions', $models[0]['url'] );
+		$this->assertSame( [ 'X-Trace=enabled' ], $models[0]['headers'] );
 		$this->assertSame( 'key%2Fvalue', $settings->sanitize_secret( " key%2Fvalue\n" ) );
+		$this->assertSame( 4096, strlen( $settings->sanitize_secret( str_repeat( 's', 5000 ) ) ) );
+		$this->assertSame( '', $settings->sanitize_secret( "invalid\xFFkey" ) );
+		$this->assertCount( 64, Custom_Endpoint_Security::headers( array_map( static fn( int $index ): string => 'X-Test-' . $index . '=yes', range( 1, 65 ) ) ) );
+	}
+
+	public function test_custom_models_reject_unsafe_urls_and_routing_headers_without_replacing_stored_models(): void {
+		$settings = new Settings();
+		$stored   = [
+			[
+				'name'           => 'existing-model',
+				'url'            => 'https://8.8.8.8/v1/chat/completions',
+				'modelParameter' => 'remote-model',
+				'apiKey'         => 'secret',
+				'headers'        => [],
+			],
+		];
+		update_option( 'wp_autoplugin_custom_models', $stored, false );
+
+		foreach (
+			[
+				[ 'url' => 'http://8.8.8.8/v1/chat/completions', 'headers' => [] ],
+				[ 'url' => 'https://127.0.0.1/v1/chat/completions', 'headers' => [] ],
+				[ 'url' => 'https://8.8.8.8/v1/chat/completions', 'headers' => [ 'Host=internal.example' ] ],
+				[ 'url' => 'https://8.8.8.8/v1/chat/completions', 'headers' => [ "X-Trace=enabled\r\nInjected=true" ] ],
+				[ 'url' => 'https://8.8.8.8/v1/chat/completions', 'headers' => array_fill( 0, 5, 'X-Trace=' . str_repeat( 'a', 2000 ) ) ],
+			] as $unsafe
+		) {
+			$result = $settings->sanitize_custom_models(
+				[
+					[
+						'name'           => 'unsafe-model',
+						'url'            => $unsafe['url'],
+						'modelParameter' => 'remote-model',
+						'apiKey'         => 'secret',
+						'headers'        => $unsafe['headers'],
+					],
+				]
+			);
+			$this->assertSame( $stored, $result );
+		}
 	}
 
 	public function test_custom_model_names_cannot_shadow_native_catalog_ids(): void {
@@ -81,7 +122,7 @@ final class SettingsTest extends WP_UnitTestCase {
 			[
 				[
 					'name'           => 'gpt-5.4',
-					'url'            => 'https://example.test/v1/chat/completions',
+					'url'            => 'https://8.8.8.8/v1/chat/completions',
 					'modelParameter' => 'remote-model',
 					'apiKey'         => 'secret',
 					'headers'        => [],

@@ -40,12 +40,14 @@ final class Google_Direct_Transport implements Direct_Transport {
 		if ( ! in_array( $this->selected_model, [ 'gemini-3.6-flash', 'gemini-3.5-flash-lite' ], true ) ) {
 			$generation_config['temperature'] = 0.2;
 		}
-		$response = wp_remote_post(
+		$response = wp_safe_remote_post(
 			$url,
 			[
-				'timeout' => Direct_Transport::REQUEST_TIMEOUT,
-				'headers' => [ 'Content-Type' => 'application/json' ],
-				'body'    => wp_json_encode(
+				'timeout'             => Direct_Transport::REQUEST_TIMEOUT,
+				'redirection'         => 0,
+				'limit_response_size' => Direct_Transport::MAX_RESPONSE_BYTES,
+				'headers'             => [ 'Content-Type' => 'application/json' ],
+				'body'                => wp_json_encode(
 					[
 						'systemInstruction' => [ 'parts' => [ [ 'text' => $instructions ] ] ],
 						'contents'          => [
@@ -67,7 +69,7 @@ final class Google_Direct_Transport implements Direct_Transport {
 		);
 		if ( is_wp_error( $response ) ) {
 			$raw_message = $response->get_error_message();
-			$message     = $has_images ? __( 'The Google Gemini image request failed.', 'wp-autoplugin' ) : $raw_message;
+			$message     = $has_images ? __( 'The Google Gemini image request failed.', 'wp-autoplugin' ) : __( 'The Google Gemini request could not be completed.', 'wp-autoplugin' );
 			$ambiguous   = false !== stripos( $raw_message, 'timed out' ) || false !== stripos( $raw_message, 'timeout' );
 			return new \WP_Error(
 				'direct_provider_network',

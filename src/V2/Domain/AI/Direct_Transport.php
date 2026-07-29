@@ -9,6 +9,9 @@ interface Direct_Transport {
 	/** Long-running coder/reasoning requests regularly exceed WordPress's default timeout. */
 	public const REQUEST_TIMEOUT = 300;
 
+	/** Bound provider responses before decoding or persisting them. */
+	public const MAX_RESPONSE_BYTES = 8388608;
+
 	public function provider(): string;
 	public function model(): string;
 	public function effort(): string;

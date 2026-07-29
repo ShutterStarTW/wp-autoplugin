@@ -392,9 +392,7 @@ function initializeCustomModels( settings: SettingsConfig ) {
 		let validUrl = false;
 
 		try {
-			validUrl = [ 'http:', 'https:' ].includes(
-				new URL( url ).protocol
-			);
+			validUrl = new URL( url ).protocol === 'https:';
 		} catch {
 			validUrl = false;
 		}

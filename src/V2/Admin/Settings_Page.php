@@ -104,7 +104,7 @@ final class Settings_Page {
 				</table>
 
 				<h2><?php esc_html_e( 'Custom Models', 'wp-autoplugin' ); ?></h2>
-				<p><?php esc_html_e( 'Add OpenAI-compatible endpoints. Custom model changes are persisted when you save this settings form.', 'wp-autoplugin' ); ?></p>
+				<p><?php esc_html_e( 'Add OpenAI-compatible public HTTPS endpoints. Custom model changes are persisted when you save this settings form.', 'wp-autoplugin' ); ?></p>
 				<div id="custom-models-list">
 					<div class="custom-models-items" aria-live="polite"></div>
 				</div>

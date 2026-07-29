@@ -6190,9 +6190,70 @@ function CodeBufferEditor( {
 	);
 }
 
-function DiffView( { html }: { html: string } ) {
+function sanitizeMarkdownHtml( content: string ): string {
+	const marked = ( window as any ).marked;
 	const purify = ( window as any ).DOMPurify;
-	const sanitized = purify ? purify.sanitize( html ) : '';
+	if ( ! marked || ! purify ) {
+		return '';
+	}
+	const rendered = marked.parse( content );
+	if ( typeof rendered !== 'string' ) {
+		return '';
+	}
+	return purify.sanitize( rendered, {
+		ALLOWED_TAGS: [
+			'a',
+			'blockquote',
+			'br',
+			'code',
+			'del',
+			'em',
+			'h1',
+			'h2',
+			'h3',
+			'h4',
+			'h5',
+			'h6',
+			'hr',
+			'li',
+			'ol',
+			'p',
+			'pre',
+			'strong',
+			'table',
+			'tbody',
+			'td',
+			'th',
+			'thead',
+			'tr',
+			'ul',
+		],
+		ALLOWED_ATTR: [ 'colspan', 'href', 'rowspan', 'title' ],
+		ALLOW_UNKNOWN_PROTOCOLS: false,
+	} );
+}
+
+function sanitizeDiffHtml( html: string ): string {
+	const purify = ( window as any ).DOMPurify;
+	return purify
+		? purify.sanitize( html, {
+				ALLOWED_TAGS: [
+					'del',
+					'ins',
+					'span',
+					'table',
+					'tbody',
+					'td',
+					'th',
+					'tr',
+				],
+				ALLOWED_ATTR: [ 'class', 'colspan', 'rowspan' ],
+		  } )
+		: '';
+}
+
+function DiffView( { html }: { html: string } ) {
+	const sanitized = sanitizeDiffHtml( html );
 	return sanitized ? (
 		<div
 			className="code-diff"
@@ -9465,10 +9526,7 @@ function EmptyStage( {
 }
 
 function Markdown( { content }: { content: string } ) {
-	const marked = ( window as any ).marked;
-	const purify = ( window as any ).DOMPurify;
-	const html =
-		marked && purify ? purify.sanitize( marked.parse( content ) ) : '';
+	const html = sanitizeMarkdownHtml( content );
 	return (
 		<div className="job-result">
 			{ html ? (
@@ -9900,12 +9958,7 @@ function Result( { result }: { result: NonNullable< Job[ 'result' ] > } ) {
 			</div>
 		);
 	}
-	const marked = ( window as any ).marked;
-	const purify = ( window as any ).DOMPurify;
-	const html =
-		marked && purify
-			? purify.sanitize( marked.parse( result.content || '' ) )
-			: '';
+	const html = sanitizeMarkdownHtml( result.content || '' );
 	return (
 		<div className="job-result">
 			{ html ? (

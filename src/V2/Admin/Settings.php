@@ -2,6 +2,7 @@
 
 namespace WP_Autoplugin\V2\Admin;
 
+use WP_Autoplugin\V2\Domain\AI\Custom_Endpoint_Security;
 use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 use WP_Autoplugin\V2\Domain\AI\Model_Registry;
@@ -118,8 +119,12 @@ final class Settings {
 	}
 
 	public function sanitize_secret( $value ): string {
-		$value = preg_replace( '/[\x00-\x1F\x7F]/', '', trim( (string) $value ) );
-		return is_string( $value ) ? $value : '';
+		$value = trim( (string) $value );
+		if ( 1 !== preg_match( '//u', $value ) ) {
+			return '';
+		}
+		$value = preg_replace( '/[\x00-\x1F\x7F]/', '', $value );
+		return is_string( $value ) ? substr( $value, 0, 4096 ) : '';
 	}
 
 	public function sanitize_checkbox( $value ): int {
@@ -179,44 +184,59 @@ final class Settings {
 			}
 
 			$name      = sanitize_text_field( (string) ( $candidate['name'] ?? '' ) );
-			$url       = esc_url_raw( trim( (string) ( $candidate['url'] ?? '' ) ), [ 'http', 'https' ] );
+			$url       = Custom_Endpoint_Security::validate_url( (string) ( $candidate['url'] ?? '' ) );
 			$model     = sanitize_text_field( (string) ( $candidate['modelParameter'] ?? '' ) );
-			$api_key   = $this->sanitize_secret( $candidate['apiKey'] ?? '' );
-			$url_parts = wp_parse_url( $url );
-			$valid_url = is_array( $url_parts )
-				&& in_array( strtolower( (string) ( $url_parts['scheme'] ?? '' ) ), [ 'http', 'https' ], true )
-				&& '' !== (string) ( $url_parts['host'] ?? '' )
-				&& ! isset( $url_parts['user'] )
-				&& ! isset( $url_parts['pass'] );
+			$raw_key   = (string) ( $candidate['apiKey'] ?? '' );
+			$api_key   = $this->sanitize_secret( $raw_key );
 
-			if ( '' === $name || '' === $url || '' === $api_key || ! $valid_url || isset( $known[ $name ] ) ) {
+			if (
+				'' === $name
+				|| strlen( $name ) > 100
+				|| is_wp_error( $url )
+				|| '' === $api_key
+				|| strlen( $raw_key ) > 4096
+				|| strlen( $model ) > 200
+				|| isset( $known[ $name ] )
+			) {
 				$invalid = true;
 				break;
 			}
 
 			$headers = [];
+			$header_bytes = 0;
 			foreach ( (array) ( $candidate['headers'] ?? [] ) as $line ) {
 				if ( ! is_string( $line ) ) {
+					$invalid = true;
+					break;
+				}
+				if ( '' === trim( $line ) ) {
 					continue;
 				}
-				$line = trim( preg_replace( '/[\r\n]+/', '', $line ) ?? '' );
-				if ( '' !== $line ) {
-					$headers[] = sanitize_text_field( $line );
+				$line = Custom_Endpoint_Security::normalize_header_line( $line );
+				if ( is_wp_error( $line ) ) {
+					$invalid = true;
+					break;
 				}
+				$header_bytes += strlen( $line );
+				$headers[]     = $line;
+			}
+			if ( $invalid || count( $headers ) > Custom_Endpoint_Security::MAX_HEADERS || $header_bytes > Custom_Endpoint_Security::MAX_HEADERS_BYTES ) {
+				$invalid = true;
+				break;
 			}
 
 			$known[ $name ] = true;
 			$models[]       = [
 				'name'           => $name,
-				'url'            => $url,
+				'url'            => (string) $url,
 				'modelParameter' => $model,
 				'apiKey'         => $api_key,
-				'headers'        => array_slice( $headers, 0, 64 ),
+				'headers'        => $headers,
 			];
 		}
 
 		if ( $invalid ) {
-			$this->settings_error( __( 'Each custom model needs a unique name, a valid endpoint URL, and an API key. Names cannot duplicate built-in models.', 'wp-autoplugin' ) );
+			$this->settings_error( __( 'Each custom model needs a unique name, a public HTTPS endpoint, an API key, and only valid non-routing headers. Names cannot duplicate built-in models.', 'wp-autoplugin' ) );
 			return $this->stored_custom_models();
 		}
 

@@ -26,7 +26,7 @@ final class Theme_Package_Builder {
 		$token   = wp_generate_password( 32, false, false );
 		$work    = $private . '/build-' . $token;
 		$archive = $private . '/package-' . $token . '.zip';
-		if ( ! wp_mkdir_p( $work ) ) {
+		if ( ! @mkdir( $work, 0700 ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_mkdir -- Exclusive private workspace creation prevents symlink reuse.
 			return new \WP_Error( 'release_temp_unavailable', __( 'A private package workspace could not be created.', 'wp-autoplugin' ) );
 		}
 		@chmod( $work, 0700 );
@@ -316,13 +316,7 @@ final class Theme_Package_Builder {
 
 	/** @return string|\WP_Error */
 	private function private_root() {
-		$base   = wp_normalize_path( sys_get_temp_dir() . '/wp-autoplugin-v2-release' );
-		$public = trailingslashit( wp_normalize_path( realpath( ABSPATH ) ?: ABSPATH ) );
-		if ( str_starts_with( trailingslashit( $base ), $public ) || ( ! is_dir( $base ) && ! wp_mkdir_p( $base ) ) ) {
-			return new \WP_Error( 'release_private_temp', __( 'A private temporary release directory is unavailable.', 'wp-autoplugin' ) );
-		}
-		@chmod( $base, 0700 );
-		return $base;
+		return ( new Private_Release_Storage() )->root();
 	}
 
 	private function delete_tree( string $path, string $private_root ): void {

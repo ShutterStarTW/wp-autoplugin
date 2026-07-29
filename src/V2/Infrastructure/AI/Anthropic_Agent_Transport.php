@@ -126,16 +126,18 @@ final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transpo
 		if ( '' !== $this->selected_effort ) {
 			$body['output_config'] = [ 'effort' => $this->selected_effort ];
 		}
-		$response = wp_remote_post(
+		$response = wp_safe_remote_post(
 			'https://api.anthropic.com/v1/messages',
 			[
-				'timeout' => Direct_Transport::REQUEST_TIMEOUT,
-				'headers' => [
+				'timeout'             => Direct_Transport::REQUEST_TIMEOUT,
+				'redirection'         => 0,
+				'limit_response_size' => Direct_Transport::MAX_RESPONSE_BYTES,
+				'headers'             => [
 					'x-api-key'         => $this->api_key,
 					'anthropic-version' => '2023-06-01',
 					'content-type'      => 'application/json',
 				],
-				'body'    => wp_json_encode( $body ),
+				'body'                => wp_json_encode( $body ),
 			]
 		);
 		if ( is_wp_error( $response ) ) {

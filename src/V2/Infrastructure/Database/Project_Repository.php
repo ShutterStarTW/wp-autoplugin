@@ -3,6 +3,7 @@
 namespace WP_Autoplugin\V2\Infrastructure\Database;
 
 use WP_Autoplugin\V2\Domain\Target\Target_Scanner;
+use WP_Autoplugin\V2\Release\Private_Release_Storage;
 
 /**
  * Persists the durable project aggregate shown as a workspace in the UI.
@@ -38,12 +39,7 @@ final class Project_Repository extends Repository {
 	}
 
 	private function persistence_error( string $resource ): string {
-		$message = sprintf( 'Could not persist %s.', $resource );
-		if ( $this->wpdb->last_error ) {
-			$message .= ' ' . $this->wpdb->last_error;
-		}
-
-		return $message;
+		return sprintf( 'Could not persist %s.', $resource );
 	}
 
 	/**
@@ -553,14 +549,11 @@ final class Project_Repository extends Repository {
 	 * @param array<int, string> $paths
 	 */
 	private function delete_package_files( array $paths ): void {
-		$root = untrailingslashit( wp_normalize_path( sys_get_temp_dir() . '/wp-autoplugin-v2-release' ) );
+		$storage = new Private_Release_Storage();
 		foreach ( array_unique( $paths ) as $path ) {
-			$path = wp_normalize_path( $path );
-			if ( $root !== dirname( $path ) || ! preg_match( '/^package-[A-Za-z0-9]+\.zip$/', basename( $path ) ) ) {
-				continue;
-			}
-			if ( is_file( $path ) ) {
-				wp_delete_file( $path );
+			$archive = $storage->verified_archive( (string) $path );
+			if ( $archive ) {
+				wp_delete_file( $archive );
 			}
 		}
 	}

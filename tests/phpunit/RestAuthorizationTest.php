@@ -51,6 +51,28 @@ final class RestAuthorizationTest extends WP_Autoplugin_Integration_Test_Case {
 		$this->assertSame( WP_AUTOPLUGIN_VERSION, $response->get_data()['version'] );
 	}
 
+	public function test_rest_write_payloads_are_strictly_bounded_before_persistence(): void {
+		$routes = new Routes();
+
+		$this->assertTrue( $routes->validate_project_request( str_repeat( 'a', 65536 ) ) );
+		$this->assertFalse( $routes->validate_project_request( str_repeat( 'a', 65537 ) ) );
+		$this->assertFalse( $routes->validate_project_request( "invalid\0request" ) );
+		$this->assertFalse( $routes->validate_plan_content( "invalid\xFFplan" ) );
+
+		$this->assertTrue( $routes->validate_job_payload( [ 'message' => 'safe' ] ) );
+		$this->assertTrue( $routes->validate_job_payload( '{"message":"safe"}' ) );
+		$this->assertFalse( $routes->validate_job_payload( '{"message":' ) );
+		$this->assertFalse( $routes->validate_job_payload( [ 'message' => str_repeat( 'a', 65536 ) ] ) );
+
+		$this->assertTrue( $routes->validate_attachment_id_argument( [ 1, '2', 3 ] ) );
+		$this->assertFalse( $routes->validate_attachment_id_argument( [ 0 ] ) );
+		$this->assertFalse( $routes->validate_attachment_id_argument( range( 1, 7 ) ) );
+
+		$this->assertTrue( $routes->validate_revision_changes( [ [ 'path' => 'plugin.php', 'content' => '<?php' ] ] ) );
+		$this->assertFalse( $routes->validate_revision_changes( [] ) );
+		$this->assertFalse( $routes->validate_revision_changes( array_fill( 0, 21, [ 'path' => 'plugin.php' ] ) ) );
+	}
+
 	public function test_project_job_and_revision_resources_are_hidden_from_another_administrator(): void {
 		$project = $this->create_test_project();
 		$fixture = $this->stage_test_revision(

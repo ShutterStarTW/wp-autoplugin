@@ -2,6 +2,7 @@
 
 namespace WP_Autoplugin\V2\Infrastructure\AI;
 
+use WP_Autoplugin\V2\Domain\AI\Custom_Endpoint_Security;
 use WP_Autoplugin\V2\Domain\AI\Direct_Transport;
 
 /** Direct transport for xAI and custom OpenAI-compatible chat endpoints. */
@@ -23,6 +24,15 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 		return ''; }
 
 	public function complete( string $instructions, string $input, array $options = [] ) {
+		if ( 'custom' === $this->selected_provider ) {
+			$endpoint = Custom_Endpoint_Security::validate_url( $this->endpoint );
+			if ( is_wp_error( $endpoint ) ) {
+				return new \WP_Error( 'direct_provider_endpoint', __( 'The custom provider endpoint is not a public-safe HTTPS URL.', 'wp-autoplugin' ), [ 'retryable' => false, 'ambiguous' => false ] );
+			}
+			$this->endpoint      = $endpoint;
+			$this->extra_headers = Custom_Endpoint_Security::headers( array_map( static fn( string $name, string $value ): string => $name . '=' . $value, array_keys( $this->extra_headers ), $this->extra_headers ) );
+		}
+
 		$user_content = $input;
 		$has_images   = ! empty( $options['prompt_images'] );
 		$max_tokens   = 'xai' === $this->selected_provider
@@ -49,11 +59,13 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 				];
 			}
 		}
-		$response = wp_remote_post(
+		$response = wp_safe_remote_post(
 			$this->endpoint,
 			[
-				'timeout' => Direct_Transport::REQUEST_TIMEOUT,
-				'headers' => array_merge(
+				'timeout'             => Direct_Transport::REQUEST_TIMEOUT,
+				'redirection'         => 0,
+				'limit_response_size' => Custom_Endpoint_Security::MAX_RESPONSE_BYTES,
+				'headers'             => array_merge(
 					[
 						'Authorization' => 'Bearer ' . $this->api_key,
 						'Content-Type'  => 'application/json',
@@ -85,7 +97,9 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 		);
 		if ( is_wp_error( $response ) ) {
 			$raw_message = $response->get_error_message();
-			$message     = $has_images ? __( 'The image request to the selected provider failed.', 'wp-autoplugin' ) : $raw_message;
+			$message     = $has_images || 'custom' === $this->selected_provider
+				? __( 'The request to the selected provider failed.', 'wp-autoplugin' )
+				: $raw_message;
 			$ambiguous   = false !== stripos( $raw_message, 'timed out' ) || false !== stripos( $raw_message, 'timeout' );
 			return new \WP_Error(
 				'direct_provider_network',
@@ -100,7 +114,13 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 		$status = wp_remote_retrieve_response_code( $response );
 		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 || ! is_array( $data ) ) {
-			$message = $has_images ? __( 'The image request to the selected provider failed.', 'wp-autoplugin' ) : ( is_array( $data ) ? (string) ( $data['error']['message'] ?? __( 'The direct provider request failed.', 'wp-autoplugin' ) ) : __( 'The direct provider request failed.', 'wp-autoplugin' ) );
+			$message = $has_images || 'custom' === $this->selected_provider
+				? sprintf(
+					/* translators: %d: HTTP response status code. */
+					__( 'The selected provider request failed (HTTP %d).', 'wp-autoplugin' ),
+					$status
+				)
+				: ( is_array( $data ) ? (string) ( $data['error']['message'] ?? __( 'The direct provider request failed.', 'wp-autoplugin' ) ) : __( 'The direct provider request failed.', 'wp-autoplugin' ) );
 			return new \WP_Error(
 				'direct_provider_http',
 				$message,

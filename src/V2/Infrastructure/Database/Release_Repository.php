@@ -2,6 +2,8 @@
 
 namespace WP_Autoplugin\V2\Infrastructure\Database;
 
+use WP_Autoplugin\V2\Release\Private_Release_Storage;
+
 /** Persists private release packages, promotions, and conflict-safe file snapshots. */
 final class Release_Repository extends Repository {
 	/** @return array<string,mixed> */
@@ -92,10 +94,11 @@ final class Release_Repository extends Repository {
 
 	/** Remove expired private artifacts without returning their paths to callers. */
 	public function cleanup_expired(): void {
-		$rows = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT id, temp_path FROM ' . Installer::table( 'release_packages' ) . ' WHERE status = %s AND expires_at IS NOT NULL AND expires_at < %s', 'ready', $this->now() ), ARRAY_A );
+		$rows    = $this->wpdb->get_results( $this->wpdb->prepare( 'SELECT id, temp_path FROM ' . Installer::table( 'release_packages' ) . ' WHERE status = %s AND expires_at IS NOT NULL AND expires_at < %s', 'ready', $this->now() ), ARRAY_A );
+		$storage = new Private_Release_Storage();
 		foreach ( (array) $rows as $row ) {
-			$path = (string) $row['temp_path'];
-			if ( '' !== $path && is_file( $path ) ) {
+			$path = $storage->verified_archive( (string) $row['temp_path'] );
+			if ( $path ) {
 				wp_delete_file( $path );
 			}
 			$this->wpdb->update(

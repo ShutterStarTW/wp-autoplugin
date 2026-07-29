@@ -80,7 +80,7 @@ final class Settings_Assets {
 				'apiKey'            => __( 'API Key', 'wp-autoplugin' ),
 				'headers'           => __( 'Headers', 'wp-autoplugin' ),
 				'remove'            => __( 'Remove', 'wp-autoplugin' ),
-				'fillOutFields'     => __( 'Please enter a unique model name, endpoint URL, and API key.', 'wp-autoplugin' ),
+				'fillOutFields'     => __( 'Please enter a unique model name, public HTTPS endpoint, API key, and valid additional headers.', 'wp-autoplugin' ),
 				'removeModel'       => __( 'Are you sure you want to remove this model?', 'wp-autoplugin' ),
 				'testing'           => __( 'Testing…', 'wp-autoplugin' ),
 				'testOk'            => __( 'OK', 'wp-autoplugin' ),

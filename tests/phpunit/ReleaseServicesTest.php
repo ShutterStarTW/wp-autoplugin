@@ -5,6 +5,7 @@ use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
 use WP_Autoplugin\V2\Infrastructure\Database\Release_Repository;
 use WP_Autoplugin\V2\Release\Package_Builder;
+use WP_Autoplugin\V2\Release\Private_Release_Storage;
 use WP_Autoplugin\V2\Release\Release_Matrix;
 use WP_Autoplugin\V2\Release\Theme_Header_Transformer;
 use WP_Autoplugin\V2\Release\Theme_Package_Builder;
@@ -60,6 +61,27 @@ final class ReleaseServicesTest extends WP_UnitTestCase {
 		add_filter( 'wp_autoplugin_v2_release_max_files', $limit );
 		$this->assertWPError( $builder->scan_tree( $this->directory ) );
 		remove_filter( 'wp_autoplugin_v2_release_max_files', $limit );
+	}
+
+	public function test_private_release_storage_rejects_external_or_tampered_archives(): void {
+		$storage = new Private_Release_Storage();
+		$root    = $storage->root();
+		$this->assertFalse( is_wp_error( $root ) );
+
+		$archive = $root . '/package-' . wp_generate_password( 12, false, false ) . '.zip';
+		file_put_contents( $archive, 'archive bytes' );
+		chmod( $archive, 0600 );
+		$this->package_paths[] = $archive;
+		$hash                  = hash_file( 'sha256', $archive );
+		$size                  = filesize( $archive );
+
+		$this->assertSame( $archive, $storage->verified_archive( $archive, $hash, $size ) );
+		$this->assertNull( $storage->verified_archive( $archive, str_repeat( '0', 64 ), $size ) );
+		$this->assertNull( $storage->verified_archive( $archive, $hash, $size + 1 ) );
+
+		$external = $this->directory . '/package-external.zip';
+		file_put_contents( $external, 'archive bytes' );
+		$this->assertNull( $storage->verified_archive( $external, hash_file( 'sha256', $external ), filesize( $external ) ) );
 	}
 
 	public function test_tree_rejects_symbolic_links(): void {

@@ -1,6 +1,7 @@
 <?php
 
 use WP_Autoplugin\V2\Domain\AI\Capability_Matrix;
+use WP_Autoplugin\V2\Domain\AI\Direct_Transport;
 use WP_Autoplugin\V2\Infrastructure\AI\Anthropic_Agent_Transport;
 use WP_Autoplugin\V2\Infrastructure\AI\Direct_Transport_Factory;
 use WP_Autoplugin\V2\Infrastructure\AI\Google_Direct_Transport;
@@ -11,6 +12,8 @@ use WP_Autoplugin\V2\Infrastructure\AI\OpenAI_Compatible_Direct_Transport;
 final class MultimodalTransportTest extends WP_UnitTestCase {
 	/** @var array<string, array<string, mixed>> */
 	private array $requests = [];
+	/** @var array<string, array<string, mixed>> */
+	private array $request_arguments = [];
 	private bool $echo_request_errors = false;
 
 	public function set_up(): void {
@@ -38,6 +41,11 @@ final class MultimodalTransportTest extends WP_UnitTestCase {
 		$this->assertFalse( is_wp_error( $xai ) );
 		$this->assertSame( 128000, $this->requests['https://api.openai.com/v1/responses']['max_output_tokens'] );
 		$this->assertSame( 64000, $this->requests['https://api.anthropic.com/v1/messages']['max_tokens'] );
+		foreach ( array_keys( $this->request_arguments ) as $url ) {
+			$this->assertSame( 0, $this->request_arguments[ $url ]['redirection'] );
+			$this->assertSame( Direct_Transport::MAX_RESPONSE_BYTES, $this->request_arguments[ $url ]['limit_response_size'] );
+			$this->assertTrue( $this->request_arguments[ $url ]['reject_unsafe_urls'] );
+		}
 
 		$openai_image = $this->requests['https://api.openai.com/v1/responses']['input'][0]['content'][0];
 		$this->assertSame( 'input_image', $openai_image['type'] );
@@ -62,14 +70,25 @@ final class MultimodalTransportTest extends WP_UnitTestCase {
 	}
 
 	public function test_custom_endpoint_retains_its_explicit_output_budget(): void {
-		$result = ( new OpenAI_Compatible_Direct_Transport( 'custom', 'https://private.example/v1/chat/completions', 'key', 'private-model' ) )->complete(
+		$result = ( new OpenAI_Compatible_Direct_Transport( 'custom', 'https://8.8.8.8/v1/chat/completions', 'key', 'private-model' ) )->complete(
 			'Instructions',
 			'Request',
 			[ 'max_output_tokens' => 32768 ]
 		);
 
 		$this->assertFalse( is_wp_error( $result ) );
-		$this->assertSame( 32768, $this->requests['https://private.example/v1/chat/completions']['max_tokens'] );
+		$this->assertSame( 32768, $this->requests['https://8.8.8.8/v1/chat/completions']['max_tokens'] );
+	}
+
+	public function test_custom_endpoint_transport_rejects_private_network_urls_before_requesting(): void {
+		$result = ( new OpenAI_Compatible_Direct_Transport( 'custom', 'https://127.0.0.1/v1/chat/completions', 'key', 'private-model' ) )->complete(
+			'Instructions',
+			'Request'
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'direct_provider_endpoint', $result->get_error_code() );
+		$this->assertArrayNotHasKey( 'https://127.0.0.1/v1/chat/completions', $this->requests );
 	}
 
 	public function test_custom_endpoints_require_an_explicit_capability_opt_in(): void {
@@ -97,7 +116,7 @@ final class MultimodalTransportTest extends WP_UnitTestCase {
 					[
 						'name'           => 'private-model',
 						'modelParameter' => 'shared-remote-model',
-						'url'            => 'https://private.example/v1/chat/completions',
+						'url'            => 'https://8.8.8.8/v1/chat/completions',
 						'apiKey'         => 'key',
 					],
 				]
@@ -142,7 +161,7 @@ final class MultimodalTransportTest extends WP_UnitTestCase {
 			( new OpenAI_Agent_Transport( 'key', 'gpt-5.4-mini' ) )->complete( 'Instructions', '', $options ),
 			( new Anthropic_Agent_Transport( 'key', 'claude-sonnet-4-6' ) )->complete( 'Instructions', '', $options ),
 			( new Google_Direct_Transport( 'key', 'gemini-2.5-pro' ) )->complete( 'Instructions', '', $options ),
-			( new OpenAI_Compatible_Direct_Transport( 'custom', 'https://private.example/v1/chat/completions', 'key', 'private-model' ) )->complete( 'Instructions', '', $options ),
+			( new OpenAI_Compatible_Direct_Transport( 'custom', 'https://8.8.8.8/v1/chat/completions', 'key', 'private-model' ) )->complete( 'Instructions', '', $options ),
 		];
 
 		foreach ( $responses as $response ) {
@@ -158,7 +177,8 @@ final class MultimodalTransportTest extends WP_UnitTestCase {
 	 * @return array<string, mixed>
 	 */
 	public function capture_request( $response, array $args, string $url ): array {
-		$this->requests[ $url ] = (array) json_decode( (string) $args['body'], true );
+		$this->requests[ $url ]          = (array) json_decode( (string) $args['body'], true );
+		$this->request_arguments[ $url ] = $args;
 		if ( $this->echo_request_errors ) {
 			return [
 				'headers'  => [],

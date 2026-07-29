@@ -22,6 +22,7 @@ use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
 use WP_Autoplugin\V2\Domain\AI\Prompt_Image_Validator;
 use WP_Autoplugin\V2\Release\Release_Matrix;
+use WP_Autoplugin\V2\Release\Private_Release_Storage;
 use WP_Autoplugin\V2\Release\Theme_Promotion_Service;
 
 /**
@@ -32,6 +33,10 @@ final class Routes {
 	private const OPERATIONS          = [ 'create', 'modify', 'fix', 'hook_extension', 'explain' ];
 	private const TASKS               = [ 'plan', 'code', 'review', 'review_fix', 'explain', 'conversation' ];
 	private const CONVERSATION_STAGES = [ 'plan', 'explain', 'code', 'review' ];
+	private const MAX_PROJECT_REQUEST_BYTES = 65536;
+	private const MAX_PLAN_CONTENT_BYTES    = 262144;
+	private const MAX_JOB_PAYLOAD_BYTES     = 65536;
+	private const MAX_REVISION_EDIT_BYTES   = 524288;
 
 	public function register(): void {
 		add_action( 'rest_api_init', [ $this, 'register_routes' ] );
@@ -74,11 +79,13 @@ final class Routes {
 					'model'  => [
 						'required'          => true,
 						'type'              => 'string',
+						'maxLength'         => 200,
 						'sanitize_callback' => 'sanitize_text_field',
 					],
 					'effort' => [
 						'type'              => 'string',
 						'default'           => '',
+						'maxLength'         => 32,
 						'sanitize_callback' => 'sanitize_key',
 					],
 				],
@@ -101,6 +108,7 @@ final class Routes {
 						'search'   => [
 							'type'              => 'string',
 							'default'           => '',
+							'maxLength'         => 255,
 							'sanitize_callback' => 'sanitize_text_field',
 						],
 						'page'     => [
@@ -124,11 +132,13 @@ final class Routes {
 						'target_kind' => [
 							'required'          => true,
 							'type'              => 'string',
+							'enum'              => [ 'new_plugin', 'plugin', 'theme' ],
 							'sanitize_callback' => 'sanitize_key',
 						],
 						'target_ref'  => [
 							'required'          => true,
 							'type'              => 'string',
+							'maxLength'         => 255,
 							'sanitize_callback' => 'sanitize_text_field',
 						],
 						'operation'   => [
@@ -139,6 +149,7 @@ final class Routes {
 						'request'     => [
 							'required'          => true,
 							'type'              => 'string',
+							'validate_callback' => [ $this, 'validate_project_request' ],
 							'sanitize_callback' => 'sanitize_textarea_field',
 						],
 					],
@@ -304,6 +315,7 @@ final class Routes {
 						'reason'      => [
 							'type'              => 'string',
 							'default'           => '',
+							'maxLength'         => 2000,
 							'sanitize_callback' => 'sanitize_textarea_field',
 						],
 					],
@@ -328,8 +340,14 @@ final class Routes {
 						'type'     => 'string',
 						'enum'     => self::TASKS,
 					],
-					'payload'               => [ 'default' => [] ],
-					'prompt_attachment_ids' => [ 'default' => [] ],
+					'payload'               => [
+						'default'           => [],
+						'validate_callback' => [ $this, 'validate_job_payload' ],
+					],
+					'prompt_attachment_ids' => [
+						'default'           => [],
+						'validate_callback' => [ $this, 'validate_attachment_id_argument' ],
+					],
 				],
 			]
 		);
@@ -411,8 +429,9 @@ final class Routes {
 						'minimum' => 1,
 					],
 					'content' => [
-						'required' => true,
-						'type'     => 'string',
+						'required'          => true,
+						'type'              => 'string',
+						'validate_callback' => [ $this, 'validate_plan_content' ],
 					],
 				],
 			]
@@ -469,8 +488,9 @@ final class Routes {
 						'minimum' => 1,
 					],
 					'path' => [
-						'required' => true,
-						'type'     => 'string',
+						'required'  => true,
+						'type'      => 'string',
+						'maxLength' => 1024,
 					],
 				],
 			]
@@ -493,8 +513,9 @@ final class Routes {
 						'minimum'  => 1,
 					],
 					'changes'                     => [
-						'required' => true,
-						'type'     => 'array',
+						'required'          => true,
+						'type'              => 'array',
+						'validate_callback' => [ $this, 'validate_revision_changes' ],
 					],
 				],
 			]
@@ -544,6 +565,7 @@ final class Routes {
 					'destination_slug'            => [
 						'type'              => 'string',
 						'default'           => '',
+						'maxLength'         => 100,
 						'sanitize_callback' => 'sanitize_title',
 					],
 					'review_report_id'            => [
@@ -612,6 +634,7 @@ final class Routes {
 					'destination_slug'            => [
 						'type'              => 'string',
 						'default'           => '',
+						'maxLength'         => 100,
 						'sanitize_callback' => 'sanitize_title',
 					],
 					'review_report_id'            => [
@@ -625,6 +648,7 @@ final class Routes {
 					'target_confirmation'         => [
 						'type'              => 'string',
 						'default'           => '',
+						'maxLength'         => 255,
 						'sanitize_callback' => 'sanitize_text_field',
 					],
 				],
@@ -666,6 +690,62 @@ final class Routes {
 
 	public function can_manage(): bool {
 		return current_user_can( 'manage_options' );
+	}
+
+	/** Strict byte and text validation for the initial administrator request. */
+	public function validate_project_request( $value ): bool {
+		return is_string( $value ) && $this->valid_utf8_text( $value, self::MAX_PROJECT_REQUEST_BYTES );
+	}
+
+	/** Strict byte and text validation for an administrator-edited Plan. */
+	public function validate_plan_content( $value ): bool {
+		return is_string( $value ) && $this->valid_utf8_text( $value, self::MAX_PLAN_CONTENT_BYTES );
+	}
+
+	/** Bound JSON or multipart job payloads before they reach persistence. */
+	public function validate_job_payload( $value ): bool {
+		if ( is_string( $value ) ) {
+			if ( strlen( $value ) > self::MAX_JOB_PAYLOAD_BYTES ) {
+				return false;
+			}
+			$value = json_decode( wp_unslash( $value ), true, 32 );
+		}
+		if ( ! is_array( $value ) ) {
+			return false;
+		}
+		$encoded = wp_json_encode( $value );
+		return is_string( $encoded ) && strlen( $encoded ) <= self::MAX_JOB_PAYLOAD_BYTES;
+	}
+
+	/** Require at most six positive reusable attachment IDs. */
+	public function validate_attachment_id_argument( $value ): bool {
+		if ( is_string( $value ) ) {
+			if ( strlen( $value ) > 256 ) {
+				return false;
+			}
+			$value = json_decode( wp_unslash( $value ), true, 8 );
+		}
+		if ( ! is_array( $value ) || count( $value ) > Prompt_Image_Validator::MAX_IMAGES ) {
+			return false;
+		}
+		foreach ( $value as $id ) {
+			if ( ! is_int( $id ) && ! ( is_string( $id ) && ctype_digit( $id ) ) ) {
+				return false;
+			}
+			if ( (int) $id < 1 ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Bound manual edit sessions before per-file revision validation. */
+	public function validate_revision_changes( $value ): bool {
+		if ( ! is_array( $value ) || ! $value || count( $value ) > Code_Validator::MAX_FILES ) {
+			return false;
+		}
+		$encoded = wp_json_encode( $value );
+		return is_string( $encoded ) && strlen( $encoded ) <= self::MAX_REVISION_EDIT_BYTES;
 	}
 
 	public function bootstrap(): \WP_REST_Response {
@@ -778,7 +858,7 @@ final class Routes {
 			}
 			return new \WP_REST_Response( $workspace, 201 );
 		} catch ( \Throwable $error ) {
-			return new \WP_Error( 'wp_autoplugin_workspace_error', $error->getMessage(), [ 'status' => 500 ] );
+			return new \WP_Error( 'wp_autoplugin_workspace_error', __( 'The workspace could not be created.', 'wp-autoplugin' ), [ 'status' => 500 ] );
 		}
 	}
 
@@ -1323,8 +1403,9 @@ final class Routes {
 		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['project_id'] ) ) {
 			return new \WP_Error( 'wp_autoplugin_package_not_found', __( 'Release package not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
+		$archive_available = (bool) ( new Private_Release_Storage() )->verified_archive( (string) $package['temp_path'], (string) $package['sha256'], (int) $package['size'] );
 		unset( $package['temp_path'] );
-		$package['download_available'] = 'ready' === $package['status'] && ! empty( $package['expires_at'] ) && strtotime( $package['expires_at'] . ' UTC' ) >= time();
+		$package['download_available'] = $archive_available && 'ready' === $package['status'] && ! empty( $package['expires_at'] ) && strtotime( $package['expires_at'] . ' UTC' ) >= time();
 		return rest_ensure_response( $package );
 	}
 
@@ -1333,7 +1414,11 @@ final class Routes {
 		$release = new Release_Repository();
 		$release->cleanup_expired();
 		$package = $release->package( (int) $request['id'] );
-		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['project_id'] ) || 'ready' !== $package['status'] || empty( $package['temp_path'] ) || ! is_file( $package['temp_path'] ) || strtotime( $package['expires_at'] . ' UTC' ) < time() ) {
+		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['project_id'] ) || 'ready' !== $package['status'] || empty( $package['expires_at'] ) || strtotime( $package['expires_at'] . ' UTC' ) < time() ) {
+			return new \WP_Error( 'wp_autoplugin_package_unavailable', __( 'The private release package is unavailable or expired.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+		$archive = ( new Private_Release_Storage() )->verified_archive( (string) $package['temp_path'], (string) $package['sha256'], (int) $package['size'] );
+		if ( ! $archive ) {
 			return new \WP_Error( 'wp_autoplugin_package_unavailable', __( 'The private release package is unavailable or expired.', 'wp-autoplugin' ), [ 'status' => 404 ] );
 		}
 		$response = new \WP_REST_Response( [ 'wp_autoplugin_package_download' => (int) $package['id'] ] );
@@ -1368,7 +1453,11 @@ final class Routes {
 			return $served;
 		}
 		$package = ( new Release_Repository() )->package( $id );
-		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['project_id'] ) || 'ready' !== $package['status'] || ! is_file( (string) $package['temp_path'] ) ) {
+		if ( ! $package || ! $this->workspace_for_current_user( (int) $package['project_id'] ) || 'ready' !== $package['status'] || empty( $package['expires_at'] ) || strtotime( $package['expires_at'] . ' UTC' ) < time() ) {
+			return $served;
+		}
+		$archive = ( new Private_Release_Storage() )->verified_archive( (string) $package['temp_path'], (string) $package['sha256'], (int) $package['size'] );
+		if ( ! $archive ) {
 			return $served;
 		}
 		$filename = sanitize_file_name( (string) $package['slug'] . '-' . (string) $package['mode'] . '.zip' );
@@ -1379,7 +1468,7 @@ final class Routes {
 			header( 'X-Content-Type-Options: nosniff' );
 			nocache_headers();
 		}
-		readfile( (string) $package['temp_path'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- Authorized private binary endpoint.
+		readfile( $archive ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- Authorized and hash-verified private binary endpoint.
 		return true;
 	}
 
@@ -1665,7 +1754,7 @@ final class Routes {
 			return $raw;
 		}
 		if ( is_string( $raw ) && '' !== trim( $raw ) ) {
-			$decoded = json_decode( wp_unslash( $raw ), true );
+			$decoded = json_decode( wp_unslash( $raw ), true, 32 );
 			if ( is_array( $decoded ) ) {
 				return $decoded;
 			}
@@ -2008,6 +2097,10 @@ final class Routes {
 		return $workspace && (int) $workspace['created_by'] === get_current_user_id()
 			? $workspace
 			: null;
+	}
+
+	private function valid_utf8_text( string $value, int $max_bytes ): bool {
+		return strlen( $value ) <= $max_bytes && ! str_contains( $value, "\0" ) && 1 === preg_match( '//u', $value );
 	}
 
 	/** @param array<string, mixed> $job @return array<string, mixed> */

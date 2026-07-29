@@ -81,16 +81,17 @@ final class ChatGPT_Transport implements Agent_Transport, Direct_Transport {
 		$response   = wp_safe_remote_post(
 			$url,
 			[
-				'timeout'     => Direct_Transport::REQUEST_TIMEOUT,
-				'redirection' => 0,
-				'headers'     => array_merge(
+				'timeout'             => Direct_Transport::REQUEST_TIMEOUT,
+				'redirection'         => 0,
+				'limit_response_size' => Direct_Transport::MAX_RESPONSE_BYTES,
+				'headers'             => array_merge(
 					ChatGPT_Token_Manager::headers( $tokens ),
 					[
 						'Content-Type' => 'application/json',
 						'Accept'       => 'text/event-stream',
 					]
 				),
-				'body'        => wp_json_encode( $body ),
+				'body'                => wp_json_encode( $body ),
 			]
 		);
 		$has_images = $this->has_prompt_images( $transcript );

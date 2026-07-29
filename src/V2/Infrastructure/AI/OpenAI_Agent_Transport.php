@@ -115,15 +115,17 @@ final class OpenAI_Agent_Transport implements Agent_Transport, Direct_Transport 
 		if ( '' !== $this->selected_effort ) {
 			$body['reasoning'] = [ 'effort' => $this->selected_effort ];
 		}
-		$response   = wp_remote_post(
+		$response   = wp_safe_remote_post(
 			'https://api.openai.com/v1/responses',
 			[
-				'timeout' => Direct_Transport::REQUEST_TIMEOUT,
-				'headers' => [
+				'timeout'             => Direct_Transport::REQUEST_TIMEOUT,
+				'redirection'         => 0,
+				'limit_response_size' => Direct_Transport::MAX_RESPONSE_BYTES,
+				'headers'             => [
 					'Authorization' => 'Bearer ' . $this->api_key,
 					'Content-Type'  => 'application/json',
 				],
-				'body'    => wp_json_encode( $body ),
+				'body'                => wp_json_encode( $body ),
 			]
 		);
 		$has_images = $this->has_prompt_images( $transcript );
