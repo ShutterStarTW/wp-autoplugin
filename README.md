@@ -1,74 +1,185 @@
 # WP-Autoplugin
 
-WP-Autoplugin is a local-first WordPress development workspace that uses AI to plan, create, inspect, revise, review, package, and promote plugin changes.
+WP-Autoplugin is a local-first, agentic WordPress development workspace. It can inspect an existing codebase, plan a change, generate and revise code, review the result, and safely package or promote it, directly from the WordPress admin.
 
-Version 2 is a rewrite targeting WordPress 6.6+ and PHP 8.2+. The plugin now boots only the v2 application; the v1 workers, AJAX workflows, flow-specific admin pages, and simple/complex generation modes have been removed.
+Use it to **create new plugins**, **modify** or **fix installed plugins and themes**, or **build a separate plugin** that extends an existing plugin or theme through its hooks.
 
-## How v2 works
+Version 2 is a complete rewrite targeting WordPress 6.6+ and PHP 8.2+. It replaces the v1 flow-specific screens with one durable **Plan → Code → Review** workspace built around source-aware agents, targeted modifications, immutable revisions, and explicit release actions.
 
-Every task lives in a durable workspace:
+> **Screenshot placeholder — The universal workspace (`workspace-overview.png`):** Annotated overview of a project with multiple workspace tabs, the Plan → Code → Review navigation, model and token-usage chips, and the current task. Suggested labels: “Durable workspace tabs”, “Chat at every stage”, “Per-stage model”, “Project usage”, and “Distraction-free mode”.
 
-1. Choose a new plugin, installed plugin, or installed theme.
-2. Describe the task and generate a Plan.
-3. Generate Code into an immutable staged revision.
-4. Inspect source, diffs, history, and AI Review findings.
-5. Explicitly package, install, activate, fork, modify, or roll back supported plugin changes.
+## What you can do
 
-AI output never writes directly to a target. Code is validated and staged first, and filesystem promotion remains an explicit administrator action with capability checks, conflict detection, and rollback records.
+- Create complete, directly deployable WordPress plugins.
+- Modify or fix installed plugins and themes.
+- Inspect and explain an existing plugin or theme through a durable conversation.
+- Discover integration points and build a separate plugin that extends an installed plugin or theme through its hooks.
+- Attach screenshots, mockups, and other images to requests and follow-up messages when the selected model supports vision.
+- Review, edit, compare, restore, package, install, activate, fork, modify, and roll back generated changes from the same workspace.
 
-Closing a workspace tab is non-destructive. Projects, jobs, revisions, files, reviews, events, and usage remain available when the workspace is reopened.
+## An agentic development loop inside WordPress
 
-Installed plugins can provide project-specific AI guidance in an exact root-level `AGENTS.md`. WP-Autoplugin automatically reads and supplies the complete file to Plan, Explain, Code, Code follow-up, Review, and Review-fix work for that plugin, including hook-extension projects targeting it. The file must be a regular, non-symlinked UTF-8 file no larger than 64 KiB; nested `AGENTS.md` files are not loaded automatically.
+For existing plugins and themes, WP-Autoplugin v2 can run a native, bounded tool-calling loop directly on the WordPress server. Instead of sending the entire codebase in one request, the model can progressively:
 
-Settings also provides site-wide Custom instructions for coding conventions and other persistent guidance. Each future AI job privately snapshots the saved value when queued, so retries and resumable work stay consistent. Safety and response contracts take precedence, followed by the current request, a plugin-root `AGENTS.md`, and then the global guidance; built-in branding, metadata, naming, style, and architecture defaults are fallbacks below it.
+- inspect target metadata and the bounded project structure;
+- list and page through source files;
+- read only the relevant line ranges;
+- search for literal text across supported source files;
+- discover WordPress actions and filters with their locations and surrounding context; and
+- inspect an installed parent theme separately when working with a child theme.
 
-## Admin settings
+The loop runs through PHP, JavaScript, the WordPress REST API, and durable background jobs. It can pause between model turns, survive a page reload, and resume with the same model, reasoning effort, instructions, source fingerprint, and remaining tool budget.
 
-The native v2 settings screen keeps the existing upgrade-compatible option names for:
+> **Screenshot placeholder — Agentic source exploration (`agent-activity.png`):** Show an existing-plugin Plan or Explain conversation with the Agent activity panel expanded. Annotate a source search, a targeted line-range read, hook discovery, model turns, and the final answer or Plan.
 
-- OpenAI, Anthropic, Google Gemini, and xAI API keys
-- Default, Planner, Coder, and Reviewer model selection
-- per-role reasoning effort
-- site-wide Custom instructions for future AI jobs
-- custom OpenAI-compatible endpoints
-- the experimental ChatGPT Subscription connection
+### Targeted edits instead of whole-file rewrites
 
-The v1 simple/complex mode switch and AI Response Language option are intentionally not registered or shown in v2. Existing database rows for those retired options are left untouched and inert.
+WP-Autoplugin v1 regenerated an entire file even when a task required changing only a few lines. For existing-target updates, v2 uses bounded, exact search-and-replace operations. The server applies those operations to an immutable snapshot of the original file, validates the complete result, and stages only the approved Add, Update, and Delete paths.
+
+> **Screenshot placeholder — A targeted modification (`targeted-diff.png`):** Show the Code workspace in Changes view with an installed-plugin file selected and a small unified diff inside a larger file. Suggested labels: “Exact targeted replacement”, “Immutable baseline”, “Only planned paths staged”, “Add/Update/Delete summary”, and “Target-change protection”.
+
+## One universal, durable workspace
+
+Every task is a project, and every project opens as an IDE-style workspace tab. The same interface supports new plugins, installed plugins, themes, and hook-based extension plugins.
+
+- Workspace tabs and their active jobs survive navigation and reloads.
+- Closing a tab is non-destructive and does not cancel running work.
+- The project browser can search and paginate across open and closed projects.
+- Closed projects can be reopened with their Plans, conversations, revisions, reviews, usage, and release history intact.
+
+Background work runs through the bundled Action Scheduler integration.
+
+## Plan → Code → Review
+
+### 1. Plan
+
+Describe what you want to build or change. A Plan will be generated by the AI. Plans are immutable, versioned artifacts containing both readable Markdown and a validated file map. You can:
+
+- ask follow-up questions without replacing the Plan;
+- request changes and create a successor Plan;
+- edit the Plan manually;
+- regenerate its structured file map after an edit; and
+- keep the complete Plan lineage instead of overwriting earlier work.
+
+Hook Extension planning inspects real integration points and produces a separate-plugin Plan. If the requested behavior cannot be implemented safely through available hooks, the Plan explains why instead of proposing edits to the target.
+
+### 2. Code
+
+Code generation starts only when an administrator explicitly chooses **Generate Code**. Generated output never writes directly to an installed plugin or theme.
+
+The Code workspace provides:
+
+- a project tree with Code and Changes views;
+- Add, Update, and Delete operations for existing targets;
+- syntax-aware editing with WordPress CodeMirror;
+- staged/base source views and sanitized unified diffs;
+- durable per-file generation and validation progress;
+- multi-file manual edit sessions saved as one immutable successor;
+- validation Problems with navigation to the affected file;
+- immutable revision history and restore-as-successor;
+- regeneration from the latest Plan; and
+- support for PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, and plain-text files.
+
+Generation is atomic. Files are validated individually and as a complete project or change set. A failed, cancelled, conflicted, or noncompliant run creates no partial revision.
+
+### 3. Review
+
+AI Review is bound to one exact revision. It produces a structured report with an overall verdict, summary, manual test cases, and actionable P0–P3 findings. Each finding can include a source anchor, explanation, and suggested fix.
+
+You can:
+
+- discuss the report with the Reviewer;
+- ask it to inspect, reconsider, or reprioritize findings;
+- dismiss and reopen findings with durable history;
+- fix one, selected, or all findings;
+- automatically verify fixes against the successor revision; and
+- see when a Review became stale because the code changed.
+
+> **Screenshot placeholder — Structured Review (`review-findings.png`):** Show the Review master-detail interface with the verdict, finding rail, selected P0–P3 finding, source anchor, suggested fix, Fix controls, manual test cases, and Review conversation button.
+
+## Chat at every stage
+
+Plan, Code, Review, and Explain each have a durable follow-up conversation.
+
+- Ask a question and receive an answer without changing the current artifact.
+- Request a change and create a validated successor Plan, revision, or Review report.
+- Refer naturally to the previous exchange with messages such as “Please make that change.”
+- Override details from the original request or Plan with a newer, explicit Code request.
+- Focus an untouched target file and ask the Coder about it before deciding whether to stage a modification.
+- Reload or reopen the workspace without losing the conversation.
+
+Code changes run a separate request-compliance pass before staging. If the candidate does not satisfy the latest request, WP-Autoplugin v2 can perform one bounded corrective regeneration; otherwise it fails without creating a revision.
+
+## Visual prompts
+
+Every free-form composer accepts text, images, or both:
+
+- initial Create, Modify, Fix, Hook Extension, and Explain requests;
+- Plan follow-ups;
+- Code questions and change requests;
+- Review conversations; and
+- Explain follow-ups.
+
+Images are private, message-scoped attachments. WP-Autoplugin accepts verified JPEG, PNG, and WebP images and checks the selected model’s image capability before queueing work.
+
+## Safe, explicit release
+
+Release is available as soon as a staged revision exists; Review is strongly recommended but remains advisory. Releasing without a current all-clear Review requires an explicit, recorded override.
+
+Depending on the project and WordPress capabilities, WP-Autoplugin v2 can:
+
+- build a private, revision-exact plugin or theme ZIP;
+- install a new or hook-extension plugin inactive, then activate it separately;
+- create an inactive fork of an existing plugin, then switch to it through an isolated activation flow;
+- install an inactive copy of a standalone or child theme without switching the active theme;
+- produce replacement ZIPs for existing plugins and themes;
+- apply a confirmed direct Add/Update/Delete modification; and
+- roll back the latest supported direct modification when affected files have not drifted.
+
+Packaging and promotion recheck paths, baselines, source fingerprints, headers, platform requirements, and destination identity. Direct modifications persist complete before/after records before the first write, restore the original state after a mid-write failure, and perform deterministic semantic patch-version bumps without asking the model to edit version headers.
+
+Theme release never converts a parent theme into a generated child theme, activates or switches a theme, or copies Customizer, Site Editor, global-style, template, or other database-held settings. Direct theme changes are blocked while the theme is active or is the parent of the active child theme.
+
+> **Screenshot placeholder — Release workspace (`release-workspace.png`):** Show release actions beside the Review-generated manual testing checklist and recent activity. Annotate ZIP download, inactive install, Activate or Switch to fork, advanced direct modification, rollback, and Review readiness/override state.
 
 ## Providers and models
 
-Built-in model definitions are owned by the v2 model registry and remain filterable with `wp_autoplugin_models`. Supported direct transports include OpenAI, Anthropic, Google Gemini, xAI, and custom OpenAI-compatible endpoints. OpenAI and Anthropic models with the required capabilities can also use the native read-only source-agent tools.
+Supported direct transports include:
 
-Administrators may optionally connect one site-wide ChatGPT account through the experimental Codex device-authorization flow. OAuth tokens are exchanged and refreshed on the WordPress server, encrypted at rest with WordPress salts, and never exposed through v2 REST resources. Subscription availability, billing, workspace policy, and usage limits apply.
+- OpenAI;
+- Anthropic;
+- Google Gemini;
+- xAI; and
+- custom OpenAI-compatible endpoints.
+
+OpenAI, Anthropic, and experimental ChatGPT Subscription models with the required capabilities can use the native read-only source tools. Compatible models from the direct providers can be used for structured Plan, Code, and Review work.
+
+### Experimental ChatGPT Subscription support
+
+Administrators can optionally connect one site-wide ChatGPT account through a Codex device-authorization flow. This makes supported Codex models available through the connected account’s ChatGPT subscription entitlement and usage allowance, without configuring an OpenAI API key for this provider. Account eligibility, workspace policy, model availability, and usage limits apply. The connected account can be disconnected at any time.
+
+WP-Autoplugin provides separate Default, Planner, Coder, and Reviewer model roles. Supported models also expose per-role reasoning-effort controls.
 
 API usage may be billed by the selected provider.
 
-## Safety model
+> **Screenshot placeholder — Models and instructions (`settings-models.png`):** Annotated Settings screenshot showing the ChatGPT Subscription connection, provider API-key test controls, Default/Planner/Coder/Reviewer model roles, reasoning effort, Custom instructions, and the uninstall data-retention option.
 
-- All v2 REST resources require `manage_options`.
-- Source inspection is bounded, read-only, and constrained to the selected target root.
-- Root plugin `AGENTS.md` instructions cannot override v2 safety, staging, manifest, or independent-Review invariants.
-- Site-wide Custom instructions cannot override the current administrator request or a more-specific plugin-root `AGENTS.md`.
-- API secrets never belong in jobs, events, revisions, usage, or browser bootstrap data.
-- Generated files are deterministic staged revisions, not direct AI writes.
-- Plugin package, install, activation, modification, and rollback actions require explicit approval and the relevant WordPress capabilities.
-- `DISALLOW_FILE_MODS` and multisite mutation restrictions are respected.
-- Markdown rendered in the workspace is sanitized before insertion into the DOM.
+## Project and site-wide instructions
 
-AI-generated code should still be reviewed and tested on a staging site before production use.
+An installed plugin can provide project-specific AI guidance in an exact root-level `AGENTS.md`. WP-Autoplugin automatically supplies the complete file to the AI agents working on that plugin, including hook-extension projects targeting it.
 
-## Architecture
+Settings also provides site-wide **Custom instructions** for coding conventions, architecture preferences, metadata, naming, and other persistent guidance.
 
-- `src/V2/` — PHP domain, infrastructure, orchestration, REST, release, and admin modules
-- `assets/v2/src/` — TypeScript/React and SCSS source
-- `assets/v2/build/` — committed production bundles, metadata, and RTL styles
-- `assets/v2/vendor/` — vendored browser-only Markdown rendering dependencies
-- `wp-autoplugin/v2` — REST namespace
-- `WP_Autoplugin\V2\Application` — runtime composition root
+## Usage transparency
 
-Durable v2 records use additive, versioned custom tables. The bundled Action Scheduler runs queued jobs in the `wp-autoplugin` group.
+Token usage is recorded for every provider call and aggregated across the project. The token chip in the header shows the input/output totals and opens a breakdown by provider, model, and executed AI job.
 
-The detailed architecture, lifecycle, schema, security invariants, implementation status, and verification checklist live in [`docs/V2.md`](docs/V2.md).
+## Installation
+
+1. Install and activate WP-Autoplugin.
+2. Open **WP-Autoplugin → Settings**.
+3. Configure at least one provider and select a default model, or connect the experimental ChatGPT Subscription provider.
+4. Open **WP-Autoplugin → Workspace** and create a project.
 
 ## Development
 
@@ -86,16 +197,13 @@ Frontend changes must be made in `assets/v2/src/`. Commit the regenerated files 
 
 Do not hand-edit generated bundles.
 
-## Installation
-
-1. Install and activate WP-Autoplugin.
-2. Open **WP-Autoplugin → Settings**.
-3. Configure at least one provider and select a default model.
-4. Open **WP-Autoplugin → Workspace** and create a project.
-
 ## Privacy
 
-WP-Autoplugin does not require a WP-Autoplugin account. Source, credentials, and durable job snapshots remain on the WordPress site except for task content, relevant source, images, and any saved Custom instructions sent to the configured AI provider. Custom instructions are not a secret store. See `readme.txt` for the external-service disclosures.
+WP-Autoplugin does not require a WP-Autoplugin account. Source, credentials, durable job snapshots, revisions, reviews, and release history remain on the WordPress site except for task content, relevant source, prompt images, project instructions, and Custom instructions sent to the configured AI provider.
+
+Uninstall cleanup is enabled by default and can be disabled to preserve WP-Autoplugin data for a later reinstall. Uninstall never deletes or reverts plugins or themes created or modified through the workspace.
+
+See `readme.txt` for external-service disclosures.
 
 ## License
 
