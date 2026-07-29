@@ -4,6 +4,7 @@ namespace WP_Autoplugin\V2\Infrastructure\AI;
 
 use WP_Autoplugin\V2\Domain\AI\Agent_Transport;
 use WP_Autoplugin\V2\Domain\AI\Direct_Transport;
+use WP_Autoplugin\V2\Domain\AI\Model_Output_Limits;
 
 /** Anthropic Messages API native tool-use transport. */
 final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transport {
@@ -116,7 +117,7 @@ final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transpo
 			'model'      => $this->selected_model,
 			'system'     => $instructions,
 			'messages'   => $messages,
-			'max_tokens' => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 4096 ) ) ),
+			'max_tokens' => Model_Output_Limits::request_limit( 'anthropic', $this->selected_model, $options, 4096 ),
 		];
 		if ( $native_tools ) {
 			$body['tools']       = $native_tools;
@@ -164,8 +165,22 @@ final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transpo
 				]
 			);
 		}
+		$usage = [
+			'input_tokens'  => (int) ( $data['usage']['input_tokens'] ?? 0 ),
+			'output_tokens' => (int) ( $data['usage']['output_tokens'] ?? 0 ),
+		];
 		if ( 'max_tokens' === ( $data['stop_reason'] ?? '' ) ) {
-			return new \WP_Error( 'agent_response_incomplete', __( 'The model reached its output limit before completing the agent turn.', 'wp-autoplugin' ) );
+			return new \WP_Error(
+				'agent_response_incomplete',
+				__( 'The model reached its output limit before completing the agent turn.', 'wp-autoplugin' ),
+				[
+					'retryable'        => false,
+					'ambiguous'        => false,
+					'incomplete_reason' => 'max_tokens',
+					'usage'            => $usage,
+					'request_id'       => sanitize_text_field( (string) ( $data['id'] ?? '' ) ),
+				]
+			);
 		}
 
 		$text  = '';
@@ -181,10 +196,6 @@ final class Anthropic_Agent_Transport implements Agent_Transport, Direct_Transpo
 				];
 			}
 		}
-		$usage = [
-			'input_tokens'  => (int) ( $data['usage']['input_tokens'] ?? 0 ),
-			'output_tokens' => (int) ( $data['usage']['output_tokens'] ?? 0 ),
-		];
 		if ( $calls ) {
 			return [
 				'type'       => 'tool_calls',

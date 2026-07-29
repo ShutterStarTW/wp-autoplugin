@@ -4,6 +4,7 @@ namespace WP_Autoplugin\V2\Orchestration;
 
 use WP_Autoplugin\V2\Domain\AI\Agent_Task;
 use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
+use WP_Autoplugin\V2\Domain\AI\Model_Output_Limits;
 use WP_Autoplugin\V2\Domain\AI\Plan_Response;
 use WP_Autoplugin\V2\Domain\AI\Prompts\WordPress_Runtime_Constraints;
 use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
@@ -112,8 +113,8 @@ final class Source_Agent {
 					(int) $job['id'],
 					'agent_bootstrap',
 					'hook_extension' === (string) $workspace['operation']
-						? __( 'Provided target and available parent-theme metadata, source structures, main entry files, any root AGENTS.md instructions, and discovered hook contexts to the model.', 'wp-autoplugin' )
-						: __( 'Provided target and available parent-theme metadata, source structures, main entry files, and any root AGENTS.md instructions to the model.', 'wp-autoplugin' ),
+						? __( 'Provided target metadata, source structures, main entry files, any root AGENTS.md instructions, and discovered hook contexts to the model.', 'wp-autoplugin' )
+						: __( 'Provided target metadata, source structures, main entry files, and any root AGENTS.md instructions to the model.', 'wp-autoplugin' ),
 					(array) $bootstrap['audit']
 				);
 			} catch ( \Throwable $error ) {
@@ -168,7 +169,10 @@ final class Source_Agent {
 					$jobs->global_instructions( (int) $job['id'] )
 				),
 				$transcript,
-				$tools->definitions()
+				$tools->definitions(),
+				[
+					'max_output_tokens' => Model_Output_Limits::maximum( $transport->provider(), $transport->model() ) ?? 16384,
+				]
 			);
 			if ( is_wp_error( $response ) ) {
 				return $this->provider_failure( $response, $job, $run, $token, $runs );
@@ -466,7 +470,17 @@ final class Source_Agent {
 
 	/** @param array<string, mixed> $job @param array<string, mixed> $run */
 	private function provider_failure( \WP_Error $error, array $job, array $run, string $token, Agent_Run_Repository $runs ) {
-		$data = (array) $error->get_error_data();
+		$data  = (array) $error->get_error_data();
+		$usage = is_array( $data['usage'] ?? null ) ? (array) $data['usage'] : [];
+		if ( $usage ) {
+			( new Usage_Repository() )->record( (int) $job['id'], (string) $run['provider'], (string) $run['model'], Agent_Task::stage( $job ) ?: 'explain', $usage );
+		}
+		$usage_state = $usage
+			? [
+				'input_tokens'  => (int) $run['input_tokens'] + (int) ( $usage['input_tokens'] ?? 0 ),
+				'output_tokens' => (int) $run['output_tokens'] + (int) ( $usage['output_tokens'] ?? 0 ),
+			]
+			: [];
 		if ( ! empty( $data['retryable'] ) && empty( $data['ambiguous'] ) && (int) $run['retry_count'] < self::MAX_RETRIES ) {
 			$retry           = (int) $run['retry_count'] + 1;
 			$next_generation = (int) $run['generation'] + 1;
@@ -477,12 +491,29 @@ final class Source_Agent {
 					'generation'  => $next_generation,
 					'retry_count' => $retry,
 					'last_error'  => $error->get_error_message(),
-				]
+				] + $usage_state
 			);
 			( new Job_Repository() )->update( (int) $job['id'], [ 'status' => 'retrying' ] );
 			( new Job_Repository() )->event( (int) $job['id'], 'agent_retry', sprintf( /* translators: %d: retry number. */ __( 'Provider request will be retried (attempt %d).', 'wp-autoplugin' ), $retry ), [ 'retry' => $retry ], 'warning' );
 			( new Queue() )->schedule( (int) $job['id'], $next_generation, min( 60, 5 * ( 2 ** ( $retry - 1 ) ) ) );
 			return [ '_continuation' => true ];
+		}
+		if ( $usage_state ) {
+			$runs->checkpoint( (int) $run['id'], $token, $usage_state + [ 'last_error' => $error->get_error_message() ] );
+		}
+		if ( ! empty( $data['incomplete_reason'] ) || ! empty( $data['request_id'] ) ) {
+			( new Job_Repository() )->event(
+				(int) $job['id'],
+				'agent_provider_incomplete',
+				$error->get_error_message(),
+				array_filter(
+					[
+						'reason'     => sanitize_key( (string) ( $data['incomplete_reason'] ?? '' ) ),
+						'request_id' => sanitize_text_field( (string) ( $data['request_id'] ?? '' ) ),
+					]
+				),
+				'error'
+			);
 		}
 		$runs->terminate_by_job( (int) $job['id'], 'failed' );
 		if ( ! empty( $data['ambiguous'] ) ) {

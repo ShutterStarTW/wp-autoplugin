@@ -36,6 +36,8 @@ final class MultimodalTransportTest extends WP_UnitTestCase {
 		$this->assertFalse( is_wp_error( $anthropic ) );
 		$this->assertFalse( is_wp_error( $gemini ) );
 		$this->assertFalse( is_wp_error( $xai ) );
+		$this->assertSame( 128000, $this->requests['https://api.openai.com/v1/responses']['max_output_tokens'] );
+		$this->assertSame( 64000, $this->requests['https://api.anthropic.com/v1/messages']['max_tokens'] );
 
 		$openai_image = $this->requests['https://api.openai.com/v1/responses']['input'][0]['content'][0];
 		$this->assertSame( 'input_image', $openai_image['type'] );
@@ -48,13 +50,26 @@ final class MultimodalTransportTest extends WP_UnitTestCase {
 		$this->assertSame( base64_encode( 'private-image-bytes' ), $anthropic_image['source']['data'] );
 
 		$gemini_url   = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=key';
+		$this->assertSame( 65536, $this->requests[ $gemini_url ]['generationConfig']['maxOutputTokens'] );
 		$gemini_image = $this->requests[ $gemini_url ]['contents'][0]['parts'][0]['inline_data'];
 		$this->assertSame( 'image/png', $gemini_image['mime_type'] );
 		$this->assertSame( base64_encode( 'private-image-bytes' ), $gemini_image['data'] );
 
 		$xai_image = $this->requests['https://api.x.ai/v1/chat/completions']['messages'][1]['content'][0];
+		$this->assertArrayNotHasKey( 'max_tokens', $this->requests['https://api.x.ai/v1/chat/completions'] );
 		$this->assertSame( 'image_url', $xai_image['type'] );
 		$this->assertStringStartsWith( 'data:image/png;base64,', $xai_image['image_url']['url'] );
+	}
+
+	public function test_custom_endpoint_retains_its_explicit_output_budget(): void {
+		$result = ( new OpenAI_Compatible_Direct_Transport( 'custom', 'https://private.example/v1/chat/completions', 'key', 'private-model' ) )->complete(
+			'Instructions',
+			'Request',
+			[ 'max_output_tokens' => 32768 ]
+		);
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( 32768, $this->requests['https://private.example/v1/chat/completions']['max_tokens'] );
 	}
 
 	public function test_custom_endpoints_require_an_explicit_capability_opt_in(): void {

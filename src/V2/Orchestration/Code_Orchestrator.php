@@ -3,6 +3,7 @@
 namespace WP_Autoplugin\V2\Orchestration;
 
 use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
+use WP_Autoplugin\V2\Domain\AI\Model_Output_Limits;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Existing_Target_Code_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Extension_Plugin_Code_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Code_Prompt;
@@ -205,7 +206,7 @@ final class Code_Orchestrator {
 			Global_Instructions::apply( $prompt['instructions'], $jobs->global_instructions( (int) $job['id'] ) ),
 			$input,
 			[
-				'max_output_tokens' => 16384,
+				'max_output_tokens' => Model_Output_Limits::maximum( $transport->provider(), $transport->model() ) ?? 16384,
 				'json'              => true,
 			]
 		);
@@ -215,6 +216,27 @@ final class Code_Orchestrator {
 			return $this->cancel( $run, $token, $jobs, $runs );
 		}
 		if ( is_wp_error( $response ) ) {
+			$data  = (array) $response->get_error_data();
+			$usage = is_array( $data['usage'] ?? null ) ? (array) $data['usage'] : [];
+			if ( $usage ) {
+				( new Usage_Repository() )->record( (int) $job['id'], $transport->provider(), $transport->model(), 'code', $usage );
+				$runs->account_usage( (int) $run['id'], $token, $usage );
+			}
+			if ( ! empty( $data['incomplete_reason'] ) || ! empty( $data['request_id'] ) ) {
+				$jobs->event(
+					(int) $job['id'],
+					'code_provider_incomplete',
+					$response->get_error_message(),
+					array_filter(
+						[
+							'path'       => (string) $current['path'],
+							'reason'     => sanitize_key( (string) ( $data['incomplete_reason'] ?? '' ) ),
+							'request_id' => sanitize_text_field( (string) ( $data['request_id'] ?? '' ) ),
+						]
+					),
+					'error'
+				);
+			}
 			return $this->retry_or_fail( $response, $job, $run, $current, (int) $current['sequence'], $token, $runs, $jobs );
 		}
 

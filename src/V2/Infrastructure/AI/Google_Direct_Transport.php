@@ -3,6 +3,7 @@
 namespace WP_Autoplugin\V2\Infrastructure\AI;
 
 use WP_Autoplugin\V2\Domain\AI\Direct_Transport;
+use WP_Autoplugin\V2\Domain\AI\Model_Output_Limits;
 
 /** Google Gemini generateContent transport for direct v2 tasks. */
 final class Google_Direct_Transport implements Direct_Transport {
@@ -33,7 +34,7 @@ final class Google_Direct_Transport implements Direct_Transport {
 			$parts[] = [ 'text' => $input ];
 		}
 		$generation_config = [
-			'maxOutputTokens'  => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 8192 ) ) ),
+			'maxOutputTokens'  => Model_Output_Limits::request_limit( 'google', $this->selected_model, $options, 8192 ),
 			'responseMimeType' => 'application/json',
 		];
 		if ( ! in_array( $this->selected_model, [ 'gemini-3.6-flash', 'gemini-3.5-flash-lite' ], true ) ) {
@@ -93,6 +94,24 @@ final class Google_Direct_Transport implements Direct_Transport {
 			);
 		}
 
+		$usage = [
+			'input_tokens'  => (int) ( $data['usageMetadata']['promptTokenCount'] ?? 0 ),
+			'output_tokens' => (int) ( $data['usageMetadata']['candidatesTokenCount'] ?? 0 ),
+		];
+		if ( 'MAX_TOKENS' === ( $data['candidates'][0]['finishReason'] ?? '' ) ) {
+			return new \WP_Error(
+				'direct_response_incomplete',
+				__( 'The model reached its output limit before completing the response.', 'wp-autoplugin' ),
+				[
+					'retryable'        => false,
+					'ambiguous'        => false,
+					'incomplete_reason' => 'max_tokens',
+					'usage'            => $usage,
+					'request_id'       => '',
+				]
+			);
+		}
+
 		$content = '';
 		foreach ( (array) ( $data['candidates'][0]['content']['parts'] ?? [] ) as $part ) {
 			if ( is_string( $part['text'] ?? null ) ) {
@@ -113,10 +132,7 @@ final class Google_Direct_Transport implements Direct_Transport {
 		return [
 			'type'       => 'final',
 			'content'    => trim( $content ),
-			'usage'      => [
-				'input_tokens'  => (int) ( $data['usageMetadata']['promptTokenCount'] ?? 0 ),
-				'output_tokens' => (int) ( $data['usageMetadata']['candidatesTokenCount'] ?? 0 ),
-			],
+			'usage'      => $usage,
 			'request_id' => '',
 		];
 	}

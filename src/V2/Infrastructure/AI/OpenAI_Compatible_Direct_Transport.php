@@ -25,6 +25,9 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 	public function complete( string $instructions, string $input, array $options = [] ) {
 		$user_content = $input;
 		$has_images   = ! empty( $options['prompt_images'] );
+		$max_tokens   = 'xai' === $this->selected_provider
+			? null
+			: max( 1, (int) ( $options['max_output_tokens'] ?? 8192 ) );
 		if ( $has_images ) {
 			$user_content = [];
 			foreach ( (array) $options['prompt_images'] as $image ) {
@@ -72,7 +75,7 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 								],
 							],
 							'temperature'     => 0.2,
-							'max_tokens'      => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 8192 ) ) ),
+							'max_tokens'      => $max_tokens,
 							'response_format' => ! empty( $options['json'] ) ? [ 'type' => 'json_object' ] : null,
 						],
 						static fn( $value ): bool => null !== $value
@@ -109,6 +112,24 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 			);
 		}
 
+		$usage = [
+			'input_tokens'  => (int) ( $data['usage']['prompt_tokens'] ?? $data['usage']['input_tokens'] ?? 0 ),
+			'output_tokens' => (int) ( $data['usage']['completion_tokens'] ?? $data['usage']['output_tokens'] ?? 0 ),
+		];
+		if ( 'length' === ( $data['choices'][0]['finish_reason'] ?? '' ) ) {
+			return new \WP_Error(
+				'direct_response_incomplete',
+				__( 'The model reached its output limit before completing the response.', 'wp-autoplugin' ),
+				[
+					'retryable'        => false,
+					'ambiguous'        => false,
+					'incomplete_reason' => 'max_tokens',
+					'usage'            => $usage,
+					'request_id'       => sanitize_text_field( (string) ( $data['id'] ?? '' ) ),
+				]
+			);
+		}
+
 		$content = $data['choices'][0]['message']['content'] ?? '';
 		if ( ! is_string( $content ) || '' === trim( $content ) ) {
 			return new \WP_Error(
@@ -124,10 +145,7 @@ final class OpenAI_Compatible_Direct_Transport implements Direct_Transport {
 		return [
 			'type'       => 'final',
 			'content'    => trim( $content ),
-			'usage'      => [
-				'input_tokens'  => (int) ( $data['usage']['prompt_tokens'] ?? $data['usage']['input_tokens'] ?? 0 ),
-				'output_tokens' => (int) ( $data['usage']['completion_tokens'] ?? $data['usage']['output_tokens'] ?? 0 ),
-			],
+			'usage'      => $usage,
 			'request_id' => (string) ( $data['id'] ?? '' ),
 		];
 	}

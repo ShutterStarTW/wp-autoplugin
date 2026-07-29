@@ -4,6 +4,7 @@ namespace WP_Autoplugin\V2\Infrastructure\AI;
 
 use WP_Autoplugin\V2\Domain\AI\Agent_Transport;
 use WP_Autoplugin\V2\Domain\AI\Direct_Transport;
+use WP_Autoplugin\V2\Domain\AI\Model_Output_Limits;
 
 /** OpenAI Responses API native function-call transport. */
 final class OpenAI_Agent_Transport implements Agent_Transport, Direct_Transport {
@@ -100,7 +101,7 @@ final class OpenAI_Agent_Transport implements Agent_Transport, Direct_Transport 
 			'model'             => $this->selected_model,
 			'instructions'      => $instructions,
 			'input'             => $input,
-			'max_output_tokens' => min( 16384, max( 1, (int) ( $options['max_output_tokens'] ?? 4096 ) ) ),
+			'max_output_tokens' => Model_Output_Limits::request_limit( 'openai', $this->selected_model, $options, 4096 ),
 			'store'             => false,
 		];
 		if ( ! empty( $options['json'] ) ) {
@@ -134,8 +135,26 @@ final class OpenAI_Agent_Transport implements Agent_Transport, Direct_Transport 
 		if ( $status < 200 || $status >= 300 || ! is_array( $data ) ) {
 			return $this->http_error( $status, $data, $has_images );
 		}
+		$usage = [
+			'input_tokens'  => (int) ( $data['usage']['input_tokens'] ?? 0 ),
+			'output_tokens' => (int) ( $data['usage']['output_tokens'] ?? 0 ),
+		];
 		if ( 'incomplete' === ( $data['status'] ?? '' ) ) {
-			return new \WP_Error( 'agent_response_incomplete', __( 'The model reached its output limit before completing the agent turn.', 'wp-autoplugin' ) );
+			$reason  = sanitize_key( (string) ( $data['incomplete_details']['reason'] ?? 'unknown' ) );
+			$message = in_array( $reason, [ 'max_tokens', 'max_output_tokens' ], true )
+				? __( 'The model reached its output limit before completing the agent turn.', 'wp-autoplugin' )
+				: __( 'The provider stopped before completing the agent turn.', 'wp-autoplugin' );
+			return new \WP_Error(
+				'agent_response_incomplete',
+				$message,
+				[
+					'retryable'        => false,
+					'ambiguous'        => false,
+					'incomplete_reason' => $reason,
+					'usage'            => $usage,
+					'request_id'       => sanitize_text_field( (string) ( $data['id'] ?? '' ) ),
+				]
+			);
 		}
 
 		$text  = '';
@@ -158,10 +177,6 @@ final class OpenAI_Agent_Transport implements Agent_Transport, Direct_Transport 
 				}
 			}
 		}
-		$usage = [
-			'input_tokens'  => (int) ( $data['usage']['input_tokens'] ?? 0 ),
-			'output_tokens' => (int) ( $data['usage']['output_tokens'] ?? 0 ),
-		];
 		if ( $calls ) {
 			return [
 				'type'       => 'tool_calls',
