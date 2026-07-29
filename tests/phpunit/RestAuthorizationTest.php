@@ -68,6 +68,12 @@ final class RestAuthorizationTest extends WP_Autoplugin_Integration_Test_Case {
 		$this->assertFalse( $routes->validate_attachment_id_argument( [ 0 ] ) );
 		$this->assertFalse( $routes->validate_attachment_id_argument( range( 1, 7 ) ) );
 
+		$this->assertTrue( $routes->validate_workspace_order( [ 1, '2', 3 ] ) );
+		$this->assertTrue( $routes->validate_workspace_order( [] ) );
+		$this->assertFalse( $routes->validate_workspace_order( [ 1, 1 ] ) );
+		$this->assertFalse( $routes->validate_workspace_order( [ 0 ] ) );
+		$this->assertFalse( $routes->validate_workspace_order( range( 1, 501 ) ) );
+
 		$this->assertTrue( $routes->validate_revision_changes( [ [ 'path' => 'plugin.php', 'content' => '<?php' ] ] ) );
 		$this->assertFalse( $routes->validate_revision_changes( [] ) );
 		$this->assertFalse( $routes->validate_revision_changes( array_fill( 0, 21, [ 'path' => 'plugin.php' ] ) ) );

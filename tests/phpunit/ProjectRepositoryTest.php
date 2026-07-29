@@ -37,6 +37,21 @@ final class ProjectRepositoryTest extends WP_Autoplugin_Integration_Test_Case {
 		$this->assertNotNull( $jobs->find( (int) $job['id'] ) );
 	}
 
+	public function test_open_tabs_can_be_persistently_reordered_per_user(): void {
+		$first    = $this->create_test_project( null, 'create', 'Build the first plugin.' );
+		$second   = $this->create_test_project( null, 'create', 'Build the second plugin.' );
+		$third    = $this->create_test_project( null, 'create', 'Build the third plugin.' );
+		$projects = new Project_Repository();
+		$order    = [ (int) $first['id'], (int) $third['id'], (int) $second['id'] ];
+
+		$this->assertSame( $order, array_column( $projects->reorder_open( $order, $this->admin_id ), 'id' ) );
+		$this->assertSame( $order, array_column( $projects->list_open( $this->admin_id ), 'id' ) );
+
+		$other_id = self::factory()->user->create( [ 'role' => 'administrator' ] );
+		$this->expectException( InvalidArgumentException::class );
+		$projects->reorder_open( $order, $other_id );
+	}
+
 	public function test_search_pagination_and_activity_summaries_use_durable_records(): void {
 		$first  = $this->create_test_project( null, 'create', 'Build the Alpha calendar.' );
 		$second = $this->create_test_project( null, 'create', 'Build the Beta importer.' );

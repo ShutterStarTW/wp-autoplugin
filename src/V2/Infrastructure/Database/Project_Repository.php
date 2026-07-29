@@ -9,6 +9,13 @@ use WP_Autoplugin\V2\Release\Private_Release_Storage;
  * Persists the durable project aggregate shown as a workspace in the UI.
  */
 final class Project_Repository extends Repository {
+	public const TAB_ORDER_META_KEY_PREFIX = 'wp_autoplugin_v2_workspace_tab_order_';
+
+	/** Return the site-scoped user-meta key for workspace tab ordering. */
+	public static function tab_order_meta_key(): string {
+		return self::TAB_ORDER_META_KEY_PREFIX . get_current_blog_id();
+	}
+
 	/**
 	 * @param array<string, mixed> $target Target snapshot.
 	 * @return array{id:int}
@@ -86,7 +93,55 @@ final class Project_Repository extends Repository {
 			ARRAY_A
 		);
 
-		return array_map( [ $this, 'hydrate' ], $rows );
+		return $this->apply_tab_order(
+			array_map( [ $this, 'hydrate' ], $rows ),
+			$user_id
+		);
+	}
+
+	/**
+	 * Persist an exact ordering of the current user's open workspace tabs.
+	 *
+	 * @param array<int, int> $project_ids
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function reorder_open( array $project_ids, int $user_id ): array {
+		$project_ids = array_values( array_map( 'intval', $project_ids ) );
+		if ( count( $project_ids ) !== count( array_unique( $project_ids ) ) ) {
+			throw new \InvalidArgumentException( 'Workspace tab IDs must be unique.' );
+		}
+
+		$open_workspaces = $this->list_open( $user_id );
+		$open_ids        = array_map( 'intval', array_column( $open_workspaces, 'id' ) );
+		$expected_ids    = $open_ids;
+		$provided_ids    = $project_ids;
+		sort( $expected_ids, SORT_NUMERIC );
+		sort( $provided_ids, SORT_NUMERIC );
+
+		if ( $expected_ids !== $provided_ids ) {
+			throw new \InvalidArgumentException( 'Workspace tab order must contain every open workspace exactly once.' );
+		}
+
+		$meta_key      = self::tab_order_meta_key();
+		$current_order = get_user_meta( $user_id, $meta_key, true );
+		if (
+			$current_order !== $project_ids &&
+			false === update_user_meta( $user_id, $meta_key, $project_ids )
+		) {
+			throw new \RuntimeException( $this->persistence_error( 'workspace tab order' ) );
+		}
+
+		$workspaces_by_id = [];
+		foreach ( $open_workspaces as $workspace ) {
+			$workspaces_by_id[ (int) $workspace['id'] ] = $workspace;
+		}
+
+		return array_values(
+			array_map(
+				static fn( int $project_id ): array => $workspaces_by_id[ $project_id ],
+				$project_ids
+			)
+		);
 	}
 
 	/**
@@ -556,6 +611,57 @@ final class Project_Repository extends Repository {
 				wp_delete_file( $archive );
 			}
 		}
+	}
+
+	/**
+	 * Apply the current user's saved visual tab order without changing project
+	 * activity timestamps. Newly opened projects appear before the saved tabs.
+	 *
+	 * @param array<int, array<string, mixed>> $workspaces
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function apply_tab_order( array $workspaces, int $user_id ): array {
+		$saved_order = get_user_meta( $user_id, self::tab_order_meta_key(), true );
+		if ( ! is_array( $saved_order ) || ! $saved_order ) {
+			return $workspaces;
+		}
+
+		$positions = [];
+		foreach ( $saved_order as $position => $project_id ) {
+			$project_id = (int) $project_id;
+			if ( $project_id > 0 && ! isset( $positions[ $project_id ] ) ) {
+				$positions[ $project_id ] = (int) $position;
+			}
+		}
+		if ( ! $positions ) {
+			return $workspaces;
+		}
+
+		$fallback_positions = [];
+		foreach ( $workspaces as $position => $workspace ) {
+			$fallback_positions[ (int) $workspace['id'] ] = (int) $position;
+		}
+
+		usort(
+			$workspaces,
+			static function ( array $left, array $right ) use ( $positions, $fallback_positions ): int {
+				$left_id     = (int) $left['id'];
+				$right_id    = (int) $right['id'];
+				$left_saved  = isset( $positions[ $left_id ] );
+				$right_saved = isset( $positions[ $right_id ] );
+
+				if ( $left_saved && $right_saved ) {
+					return $positions[ $left_id ] <=> $positions[ $right_id ];
+				}
+				if ( $left_saved !== $right_saved ) {
+					return $left_saved ? 1 : -1;
+				}
+
+				return $fallback_positions[ $left_id ] <=> $fallback_positions[ $right_id ];
+			}
+		);
+
+		return $workspaces;
 	}
 
 	/**

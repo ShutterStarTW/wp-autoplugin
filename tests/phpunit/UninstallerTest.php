@@ -1,6 +1,7 @@
 <?php
 
 use WP_Autoplugin\V2\Infrastructure\Database\Installer;
+use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Uninstaller;
 
 /** Coverage for opt-in uninstall cleanup and explicit retention. */
@@ -12,6 +13,9 @@ final class UninstallerTest extends WP_UnitTestCase {
 		delete_option( Uninstaller::OPTION_NAME );
 		update_option( 'wp_autoplugin_test_setting', 'value', false );
 		set_transient( 'wp_autoplugin_test_transient', 'value', MINUTE_IN_SECONDS );
+		$user_id  = self::factory()->user->create();
+		$meta_key = Project_Repository::tab_order_meta_key();
+		update_user_meta( $user_id, $meta_key, [ 3, 1, 2 ] );
 		$projects = Installer::table( 'projects' );
 		$retired  = $wpdb->prefix . 'wp_autoplugin_retired_data';
 
@@ -24,6 +28,7 @@ final class UninstallerTest extends WP_UnitTestCase {
 			$this->assertFalse( get_option( 'wp_autoplugin_test_setting', false ) );
 			$this->assertFalse( get_transient( 'wp_autoplugin_test_transient' ) );
 			$this->assertFalse( get_option( 'wp_autoplugin_v2_schema_version', false ) );
+			$this->assertSame( '', get_user_meta( $user_id, $meta_key, true ) );
 			$this->assertNull( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $projects ) ) );
 			$this->assertNull( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $retired ) ) );
 		} finally {
@@ -39,6 +44,9 @@ final class UninstallerTest extends WP_UnitTestCase {
 		Installer::activate();
 		update_option( Uninstaller::OPTION_NAME, 0, false );
 		update_option( 'wp_autoplugin_test_setting', 'value', false );
+		$user_id  = self::factory()->user->create();
+		$meta_key = Project_Repository::tab_order_meta_key();
+		update_user_meta( $user_id, $meta_key, [ 2, 1 ] );
 		$projects = Installer::table( 'projects' );
 
 		try {
@@ -47,8 +55,10 @@ final class UninstallerTest extends WP_UnitTestCase {
 			$this->assertSame( $projects, $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $projects ) ) );
 			$this->assertSame( 'value', get_option( 'wp_autoplugin_test_setting' ) );
 			$this->assertSame( '0', (string) get_option( Uninstaller::OPTION_NAME ) );
+			$this->assertSame( [ 2, 1 ], get_user_meta( $user_id, $meta_key, true ) );
 		} finally {
 			delete_option( 'wp_autoplugin_test_setting' );
+			delete_user_meta( $user_id, $meta_key );
 			update_option( Uninstaller::OPTION_NAME, 1, false );
 		}
 	}

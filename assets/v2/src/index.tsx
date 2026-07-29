@@ -1108,6 +1108,7 @@ function App() {
 	const [ error, setError ] = useState( '' );
 	const [ initializing, setInitializing ] = useState( true );
 	const [ busy, setBusy ] = useState( false );
+	const [ tabOrderSaving, setTabOrderSaving ] = useState( false );
 	const [ allProjectsOpen, setAllProjectsOpen ] = useState( false );
 	const [ distractionFree, setDistractionFree ] = useState(
 		() => 'true' === window.localStorage.getItem( DISTRACTION_FREE_KEY )
@@ -1253,8 +1254,11 @@ function App() {
 	}, [ jobs, activeWorkspace ] );
 
 	useEffect( () => {
+		if ( initializing ) {
+			return;
+		}
+
 		if ( 'new' === activeWorkspaceId ) {
-			window.localStorage.removeItem( ACTIVE_WORKSPACE_KEY );
 			setJobs( [] );
 			setJobsLoading( false );
 			return;
@@ -1316,7 +1320,12 @@ function App() {
 		return () => {
 			current = false;
 		};
-	}, [ activeWorkspaceId, activeWorkspace?.operation, activeWorkspace?.id ] );
+	}, [
+		initializing,
+		activeWorkspaceId,
+		activeWorkspace?.operation,
+		activeWorkspace?.id,
+	] );
 
 	function selectWorkspaceStage( stage: string ) {
 		if (
@@ -1489,15 +1498,55 @@ function App() {
 		}
 	}
 
+	async function reorderWorkspaceTabs( orderedIds: number[] ) {
+		const workspacesById = new Map(
+			workspaces.map( ( workspace ) => [ workspace.id, workspace ] )
+		);
+		if (
+			orderedIds.length !== workspaces.length ||
+			orderedIds.some( ( id ) => ! workspacesById.has( id ) )
+		) {
+			return;
+		}
+
+		const previous = workspaces;
+		setWorkspaces(
+			orderedIds.map( ( id ) => workspacesById.get( id ) as Workspace )
+		);
+		setTabOrderSaving( true );
+		setError( '' );
+
+		try {
+			const response = await apiFetch< { items: Workspace[] } >( {
+				path: `${ rest }/projects/reorder`,
+				method: 'POST',
+				data: { project_ids: orderedIds },
+			} );
+			setWorkspaces( response.items );
+		} catch ( reason: any ) {
+			setWorkspaces( ( current ) =>
+				current.length === orderedIds.length &&
+				current.every(
+					( workspace, index ) => workspace.id === orderedIds[ index ]
+				)
+					? previous
+					: current
+			);
+			setError( reason.message );
+		} finally {
+			setTabOrderSaving( false );
+		}
+	}
+
 	async function reopenWorkspace( workspaceId: number ) {
 		const reopened = await apiFetch< Workspace >( {
 			path: `${ rest }/projects/${ workspaceId }/reopen`,
 			method: 'POST',
 		} );
-		setWorkspaces( ( current ) => [
-			reopened,
-			...current.filter( ( item ) => item.id !== reopened.id ),
-		] );
+		const response = await apiFetch< { items: Workspace[] } >( {
+			path: `${ rest }/projects`,
+		} );
+		setWorkspaces( response.items );
 		setActiveWorkspaceId( reopened.id );
 	}
 
@@ -1747,8 +1796,10 @@ function App() {
 				workspaces={ workspaces }
 				activeWorkspaceId={ activeWorkspaceId }
 				distractionFree={ distractionFree }
+				tabOrderSaving={ tabOrderSaving }
 				onSelect={ setActiveWorkspaceId }
 				onClose={ closeWorkspace }
+				onReorder={ reorderWorkspaceTabs }
 				onNew={ () => setActiveWorkspaceId( 'new' ) }
 				onLoadProjects={ () => setAllProjectsOpen( true ) }
 				onDistractionFreeToggle={ () =>
@@ -2517,8 +2568,10 @@ function WorkspaceTabBar( {
 	workspaces,
 	activeWorkspaceId,
 	distractionFree,
+	tabOrderSaving,
 	onSelect,
 	onClose,
+	onReorder,
 	onNew,
 	onLoadProjects,
 	onDistractionFreeToggle,
@@ -2526,14 +2579,66 @@ function WorkspaceTabBar( {
 	workspaces: Workspace[];
 	activeWorkspaceId: number | 'new';
 	distractionFree: boolean;
+	tabOrderSaving: boolean;
 	onSelect: ( id: number ) => void;
 	onClose: ( id: number ) => void;
+	onReorder: ( orderedIds: number[] ) => void;
 	onNew: () => void;
 	onLoadProjects: () => void;
 	onDistractionFreeToggle: () => void;
 } ) {
+	const [ draggedWorkspaceId, setDraggedWorkspaceId ] = useState<
+		number | null
+	>( null );
+	const [ dropTarget, setDropTarget ] = useState< {
+		id: number;
+		position: 'before' | 'after';
+	} | null >( null );
+
+	function clearDragState() {
+		setDraggedWorkspaceId( null );
+		setDropTarget( null );
+	}
+
+	function dropWorkspaceTab( targetId: number ) {
+		if (
+			null === draggedWorkspaceId ||
+			draggedWorkspaceId === targetId ||
+			dropTarget?.id !== targetId
+		) {
+			clearDragState();
+			return;
+		}
+
+		const orderedIds = workspaces
+			.map( ( workspace ) => workspace.id )
+			.filter( ( id ) => id !== draggedWorkspaceId );
+		const targetIndex = orderedIds.indexOf( targetId );
+		if ( targetIndex < 0 ) {
+			clearDragState();
+			return;
+		}
+		orderedIds.splice(
+			targetIndex + ( 'after' === dropTarget.position ? 1 : 0 ),
+			0,
+			draggedWorkspaceId
+		);
+
+		clearDragState();
+		if (
+			orderedIds.some( ( id, index ) => id !== workspaces[ index ]?.id )
+		) {
+			onReorder( orderedIds );
+		}
+	}
+
 	return (
-		<div className="workspace-tab-shell">
+		<div
+			className={ `workspace-tab-shell ${
+				tabOrderSaving ? 'is-saving-tab-order' : ''
+			}` }
+			aria-busy={ tabOrderSaving }
+		>
 			<div
 				className="workspace-tab-list"
 				role="tablist"
@@ -2563,14 +2668,72 @@ function WorkspaceTabBar( {
 						<div
 							className={ `workspace-file-tab ${
 								selected ? 'is-active' : ''
+							} ${
+								draggedWorkspaceId === workspace.id
+									? 'is-dragging'
+									: ''
+							} ${
+								dropTarget?.id === workspace.id
+									? `is-drop-${ dropTarget.position }`
+									: ''
 							}` }
 							key={ workspace.id }
+							draggable={ ! tabOrderSaving }
+							onDragStart={ ( event ) => {
+								if (
+									( event.target as HTMLElement ).closest(
+										'.workspace-file-tab__close'
+									)
+								) {
+									event.preventDefault();
+									return;
+								}
+								event.dataTransfer.effectAllowed = 'move';
+								event.dataTransfer.setData(
+									'text/plain',
+									String( workspace.id )
+								);
+								setDraggedWorkspaceId( workspace.id );
+								setDropTarget( null );
+							} }
+							onDragOver={ ( event ) => {
+								if (
+									null === draggedWorkspaceId ||
+									draggedWorkspaceId === workspace.id
+								) {
+									return;
+								}
+								event.preventDefault();
+								event.dataTransfer.dropEffect = 'move';
+								const bounds =
+									event.currentTarget.getBoundingClientRect();
+								const position =
+									event.clientX <
+									bounds.left + bounds.width / 2
+										? 'before'
+										: 'after';
+								setDropTarget( ( current ) =>
+									current?.id === workspace.id &&
+									current.position === position
+										? current
+										: { id: workspace.id, position }
+								);
+							} }
+							onDrop={ ( event ) => {
+								event.preventDefault();
+								dropWorkspaceTab( workspace.id );
+							} }
+							onDragEnd={ clearDragState }
 						>
 							<button
 								type="button"
 								role="tab"
 								aria-selected={ selected }
 								onClick={ () => onSelect( workspace.id ) }
+								title={ __(
+									'Drag to reorder this workspace tab',
+									'wp-autoplugin'
+								) }
 							>
 								<span
 									className={ `workspace-file-tab__status status--${

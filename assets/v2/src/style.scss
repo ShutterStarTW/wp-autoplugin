@@ -344,6 +344,11 @@ body.wp-autoplugin-v2-distraction-free {
 	display: flex;
 	margin-top: 18px;
 	overflow: hidden;
+	&.is-saving-tab-order {
+		.workspace-file-tab {
+			cursor: progress;
+		}
+	}
 }
 .workspace-tab-list {
 	display: flex;
@@ -659,6 +664,26 @@ body.wp-autoplugin-v2-distraction-free {
 	max-width: 250px;
 	min-width: 150px;
 	position: relative;
+	&.is-dragging {
+		opacity: 0.55;
+	}
+	&.is-drop-before::before,
+	&.is-drop-after::after {
+		background: $accent;
+		border-radius: 2px;
+		bottom: 3px;
+		content: "";
+		position: absolute;
+		top: 3px;
+		width: 3px;
+		z-index: 2;
+	}
+	&.is-drop-before::before {
+		left: -2px;
+	}
+	&.is-drop-after::after {
+		right: -2px;
+	}
 	> button[role="tab"] {
 		align-items: center;
 		background: transparent;

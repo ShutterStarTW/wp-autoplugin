@@ -186,6 +186,26 @@ final class Routes {
 		);
 		register_rest_route(
 			self::NAMESPACE,
+			'/projects/reorder',
+			[
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => [ $this, 'reorder_workspaces' ],
+				'permission_callback' => $permission,
+				'args'                => [
+					'project_ids' => [
+						'required'          => true,
+						'type'              => 'array',
+						'validate_callback' => [ $this, 'validate_workspace_order' ],
+						'items'             => [
+							'type'    => 'integer',
+							'minimum' => 1,
+						],
+					],
+				],
+			]
+		);
+		register_rest_route(
+			self::NAMESPACE,
 			'/projects/(?P<id>\d+)/close',
 			[
 				'methods'             => \WP_REST_Server::CREATABLE,
@@ -739,6 +759,27 @@ final class Routes {
 		return true;
 	}
 
+	/** Require a bounded, duplicate-free list of positive workspace IDs. */
+	public function validate_workspace_order( $value ): bool {
+		if ( ! is_array( $value ) || count( $value ) > 500 ) {
+			return false;
+		}
+
+		$project_ids = [];
+		foreach ( $value as $id ) {
+			if ( ! is_int( $id ) && ! ( is_string( $id ) && ctype_digit( $id ) ) ) {
+				return false;
+			}
+			$id = (int) $id;
+			if ( $id < 1 || isset( $project_ids[ $id ] ) ) {
+				return false;
+			}
+			$project_ids[ $id ] = true;
+		}
+
+		return true;
+	}
+
 	/** Bound manual edit sessions before per-file revision validation. */
 	public function validate_revision_changes( $value ): bool {
 		if ( ! is_array( $value ) || ! $value || count( $value ) > Code_Validator::MAX_FILES ) {
@@ -870,6 +911,34 @@ final class Routes {
 		return $workspace
 			? rest_ensure_response( $workspace )
 			: new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+	}
+
+	/**
+	 * Persist the current administrator's visual ordering of all open tabs.
+	 *
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function reorder_workspaces( \WP_REST_Request $request ) {
+		try {
+			$workspaces = ( new Project_Repository() )->reorder_open(
+				array_map( 'intval', (array) $request['project_ids'] ),
+				get_current_user_id()
+			);
+
+			return rest_ensure_response( [ 'items' => $workspaces ] );
+		} catch ( \InvalidArgumentException $error ) {
+			return new \WP_Error(
+				'wp_autoplugin_workspace_order_conflict',
+				__( 'The open workspace tabs changed. Reload the page and try reordering them again.', 'wp-autoplugin' ),
+				[ 'status' => 409 ]
+			);
+		} catch ( \Throwable $error ) {
+			return new \WP_Error(
+				'wp_autoplugin_workspace_order_error',
+				__( 'The workspace tab order could not be saved.', 'wp-autoplugin' ),
+				[ 'status' => 500 ]
+			);
+		}
 	}
 
 	/**

@@ -44,6 +44,7 @@ final class Uninstaller {
 
 		self::drop_tables();
 		self::delete_options();
+		self::delete_user_metadata();
 	}
 
 	/**
@@ -93,5 +94,12 @@ final class Uninstaller {
 		foreach ( $options as $option ) {
 			delete_option( (string) $option );
 		}
+	}
+
+	/**
+	 * Delete the current site's per-user workspace preferences for every user.
+	 */
+	private static function delete_user_metadata(): void {
+		delete_metadata( 'user', 0, Project_Repository::tab_order_meta_key(), '', true );
 	}
 }
