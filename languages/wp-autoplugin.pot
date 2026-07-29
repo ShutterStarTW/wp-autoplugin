@@ -362,6 +362,22 @@ msgstr ""
 msgid "Add Custom Model"
 msgstr ""
 
+#: src/V2/Admin/Settings_Page.php:128
+msgid "Data retention"
+msgstr ""
+
+#: src/V2/Admin/Settings_Page.php:131
+msgid "Uninstall cleanup"
+msgstr ""
+
+#: src/V2/Admin/Settings_Page.php:135
+msgid "Delete all WP-Autoplugin data when the plugin is uninstalled"
+msgstr ""
+
+#: src/V2/Admin/Settings_Page.php:138
+msgid "This removes settings and credentials, workspaces, plans, generated revisions, reviews, usage history, prompt attachments, and release history. Plugins and themes created or modified with WP-Autoplugin are not deleted or reverted."
+msgstr ""
+
 #: src/V2/Admin/Settings_Page.php:141
 msgid "Test"
 msgstr ""

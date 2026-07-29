@@ -125,6 +125,22 @@ final class Settings_Page {
 				</div>
 				<input type="hidden" name="wp_autoplugin_custom_models" id="wp_autoplugin_custom_models" value="<?php echo esc_attr( wp_json_encode( $custom_models ) ); ?>">
 
+				<h2><?php esc_html_e( 'Data retention', 'wp-autoplugin' ); ?></h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Uninstall cleanup', 'wp-autoplugin' ); ?></th>
+						<td>
+							<label for="<?php echo esc_attr( Settings::DELETE_DATA_OPTION ); ?>">
+								<input type="checkbox" name="<?php echo esc_attr( Settings::DELETE_DATA_OPTION ); ?>" id="<?php echo esc_attr( Settings::DELETE_DATA_OPTION ); ?>" value="1" <?php checked( (bool) get_option( Settings::DELETE_DATA_OPTION, true ) ); ?>>
+								<?php esc_html_e( 'Delete all WP-Autoplugin data when the plugin is uninstalled', 'wp-autoplugin' ); ?>
+							</label>
+							<p class="description">
+								<?php esc_html_e( 'This removes settings and credentials, workspaces, plans, generated revisions, reviews, usage history, prompt attachments, and release history. Plugins and themes created or modified with WP-Autoplugin are not deleted or reverted.', 'wp-autoplugin' ); ?>
+							</p>
+						</td>
+					</tr>
+				</table>
+
 				<?php submit_button(); ?>
 			</form>
 		</div>

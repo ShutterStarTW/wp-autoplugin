@@ -6,12 +6,14 @@ use WP_Autoplugin\V2\Domain\AI\Global_Instructions;
 use WP_Autoplugin\V2\Domain\AI\Model_Effort;
 use WP_Autoplugin\V2\Domain\AI\Model_Registry;
 use WP_Autoplugin\V2\Infrastructure\AI\ChatGPT_Config;
+use WP_Autoplugin\V2\Infrastructure\Database\Uninstaller;
 
 /**
  * Registers the v2 settings contract while retaining existing option names.
  */
 final class Settings {
 	public const GROUP              = 'wp_autoplugin_settings';
+	public const DELETE_DATA_OPTION = Uninstaller::OPTION_NAME;
 	private const MAX_CUSTOM_MODELS = 50;
 	private const SECRET_OPTIONS    = [
 		'wp_autoplugin_openai_api_key',
@@ -34,6 +36,9 @@ final class Settings {
 		if ( false === get_option( Global_Instructions::OPTION_NAME, false ) ) {
 			add_option( Global_Instructions::OPTION_NAME, '', '', false );
 		}
+		if ( false === get_option( self::DELETE_DATA_OPTION, false ) ) {
+			add_option( self::DELETE_DATA_OPTION, 1, '', false );
+		}
 
 		register_setting(
 			self::GROUP,
@@ -42,6 +47,16 @@ final class Settings {
 				'type'              => 'string',
 				'sanitize_callback' => [ $this, 'sanitize_custom_instructions' ],
 				'default'           => '',
+			]
+		);
+
+		register_setting(
+			self::GROUP,
+			self::DELETE_DATA_OPTION,
+			[
+				'type'              => 'boolean',
+				'sanitize_callback' => [ $this, 'sanitize_checkbox' ],
+				'default'           => true,
 			]
 		);
 
@@ -105,6 +120,10 @@ final class Settings {
 	public function sanitize_secret( $value ): string {
 		$value = preg_replace( '/[\x00-\x1F\x7F]/', '', trim( (string) $value ) );
 		return is_string( $value ) ? $value : '';
+	}
+
+	public function sanitize_checkbox( $value ): int {
+		return empty( $value ) ? 0 : 1;
 	}
 
 	/**

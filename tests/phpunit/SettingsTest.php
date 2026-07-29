@@ -8,6 +8,7 @@ final class SettingsTest extends WP_UnitTestCase {
 	private const OPTIONS = [
 		'wp_autoplugin_custom_instructions',
 		'wp_autoplugin_custom_models',
+		'wp_autoplugin_delete_data_on_uninstall',
 		'wp_autoplugin_model',
 		'wp_autoplugin_planner_model',
 		'wp_autoplugin_plugin_mode',
@@ -36,10 +37,20 @@ final class SettingsTest extends WP_UnitTestCase {
 
 		$this->assertArrayHasKey( 'wp_autoplugin_custom_models', $registered );
 		$this->assertArrayHasKey( Global_Instructions::OPTION_NAME, $registered );
+		$this->assertArrayHasKey( Settings::DELETE_DATA_OPTION, $registered );
 		$this->assertArrayHasKey( 'wp_autoplugin_model', $registered );
 		$this->assertArrayHasKey( 'wp_autoplugin_planner_model', $registered );
 		$this->assertArrayNotHasKey( 'wp_autoplugin_plugin_mode', $registered );
 		$this->assertArrayNotHasKey( 'wp_autoplugin_ai_language', $registered );
+	}
+
+	public function test_uninstall_cleanup_is_enabled_by_default_and_accepts_an_unchecked_value(): void {
+		$settings = new Settings();
+		$settings->register_settings();
+
+		$this->assertSame( '1', (string) get_option( Settings::DELETE_DATA_OPTION ) );
+		$this->assertSame( 1, $settings->sanitize_checkbox( '1' ) );
+		$this->assertSame( 0, $settings->sanitize_checkbox( null ) );
 	}
 
 	public function test_custom_models_are_sanitized_for_settings_persistence(): void {

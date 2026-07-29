@@ -459,6 +459,9 @@ final class Installer {
 		if ( false === get_option( 'wp_autoplugin_custom_instructions', false ) ) {
 			add_option( 'wp_autoplugin_custom_instructions', '', '', false );
 		}
+		if ( false === get_option( Uninstaller::OPTION_NAME, false ) ) {
+			add_option( Uninstaller::OPTION_NAME, 1, '', false );
+		}
 
 		wp_set_option_autoload_values(
 			[
@@ -468,6 +471,7 @@ final class Installer {
 				'wp_autoplugin_xai_api_key'              => false,
 				'wp_autoplugin_custom_models'            => false,
 				'wp_autoplugin_custom_instructions'      => false,
+				'wp_autoplugin_delete_data_on_uninstall' => false,
 				'wp_autoplugin_default_model_effort'     => false,
 				'wp_autoplugin_planner_model_effort'     => false,
 				'wp_autoplugin_coder_model_effort'       => false,
