@@ -37,3 +37,5 @@ tests_add_filter(
 );
 
 require $tests_dir . '/includes/bootstrap.php';
+
+require_once __DIR__ . '/Support/IntegrationTestCase.php';
