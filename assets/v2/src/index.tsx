@@ -3586,7 +3586,7 @@ function WorkspaceView( {
 	const isWorkflow = tabs.length === 3;
 	const latestPlan = latestPlanArtifact( jobs );
 	const latestPlanRun = latestJobForTask( jobs, 'plan' );
-	const latestStructureRun = latestJobForTask( jobs, 'plan_structure' );
+	const latestPlanReplacement = latestPlanReplacementJob( jobs, latestPlan );
 	const planConversationJobs = jobs.filter(
 		( job ) => job.task === 'conversation' && job.payload.stage === 'plan'
 	);
@@ -3719,7 +3719,7 @@ function WorkspaceView( {
 						<PlanStage
 							job={ latestPlan }
 							latestRun={ latestPlanRun }
-							regenerationJob={ latestStructureRun }
+							replacementJob={ latestPlanReplacement }
 							conversationJobs={ planConversationJobs }
 							capability={ effectivePlanCapability }
 							onCancel={ onCancel }
@@ -3836,6 +3836,25 @@ function latestPlanArtifact( jobs: Job[] ): Job | null {
 
 function latestJobForTask( jobs: Job[], task: string ): Job | null {
 	return [ ...jobs ].reverse().find( ( job ) => job.task === task ) ?? null;
+}
+
+function latestPlanReplacementJob( jobs: Job[], plan: Job | null ): Job | null {
+	if ( ! plan ) {
+		return null;
+	}
+
+	const planIndex = jobs.findIndex( ( job ) => job.id === plan.id );
+	if ( planIndex < 0 ) {
+		return null;
+	}
+
+	return (
+		[ ...jobs.slice( planIndex + 1 ) ]
+			.reverse()
+			.find( ( job ) =>
+				[ 'plan', 'plan_structure' ].includes( job.task )
+			) ?? null
+	);
 }
 
 function jobModelSnapshot( job: Job ): ModelSnapshot | null {
@@ -4134,7 +4153,7 @@ function formatBytes( bytes: number ): string {
 function PlanStage( {
 	job,
 	latestRun,
-	regenerationJob,
+	replacementJob,
 	conversationJobs,
 	capability,
 	onCancel,
@@ -4145,11 +4164,11 @@ function PlanStage( {
 }: {
 	job: Job | null;
 	latestRun: Job | null;
-	regenerationJob: Job | null;
+	replacementJob: Job | null;
 	conversationJobs: Job[];
 	capability: AgentCapability | null;
 	onCancel: ( job: Job ) => void;
-	onCreate: ( attachmentIds?: number[] ) => void;
+	onCreate: ( attachmentIds?: number[] ) => Promise< Job | null >;
 	onSave: ( job: Job, content: string ) => Promise< boolean >;
 	onContinue: () => void;
 	onFollowUp: (
@@ -4217,7 +4236,7 @@ function PlanStage( {
 			job={ job }
 			conversationJobs={ conversationJobs }
 			capability={ capability }
-			regenerationJob={ regenerationJob }
+			replacementJob={ replacementJob }
 			onCancel={ onCancel }
 			onSave={ onSave }
 			onRetry={ onCreate }
@@ -4231,7 +4250,7 @@ function PlanEditor( {
 	job,
 	conversationJobs,
 	capability,
-	regenerationJob,
+	replacementJob,
 	onCancel,
 	onSave,
 	onRetry,
@@ -4241,10 +4260,10 @@ function PlanEditor( {
 	job: Job;
 	conversationJobs: Job[];
 	capability: AgentCapability | null;
-	regenerationJob: Job | null;
+	replacementJob: Job | null;
 	onCancel: ( job: Job ) => void;
 	onSave: ( job: Job, content: string ) => Promise< boolean >;
-	onRetry: ( attachmentIds?: number[] ) => void;
+	onRetry: ( attachmentIds?: number[] ) => Promise< Job | null >;
 	onContinue: () => void;
 	onFollowUp: (
 		message: string,
@@ -4260,6 +4279,7 @@ function PlanEditor( {
 	);
 	const [ editing, setEditing ] = useState( false );
 	const [ saving, setSaving ] = useState( false );
+	const [ queueingRetry, setQueueingRetry ] = useState( false );
 	const [ content, setContent ] = useState( currentContent );
 	const cancelEditing = useCallback( () => {
 		setContent( currentContent );
@@ -4283,10 +4303,10 @@ function PlanEditor( {
 		document.addEventListener( 'keydown', onKeyDown );
 		return () => document.removeEventListener( 'keydown', onKeyDown );
 	}, [ editing, saving, cancelEditing ] );
-	const structureRegenerating = Boolean(
-		regenerationJob &&
+	const planReplacing = Boolean(
+		replacementJob &&
 			[ 'queued', 'running', 'retrying' ].includes(
-				regenerationJob.status
+				replacementJob.status
 			)
 	);
 	return (
@@ -4331,23 +4351,32 @@ function PlanEditor( {
 							<Button
 								variant="secondary"
 								disabled={
+									queueingRetry ||
+									planReplacing ||
 									! capability?.available ||
 									( ( job.prompt_attachments?.length || 0 ) >
 										0 &&
 										! capability?.images )
 								}
-								onClick={ () =>
-									onRetry(
-										job.prompt_attachments?.map(
-											( item ) => item.id
-										)
-									)
-								}
+								isBusy={ queueingRetry }
+								onClick={ async () => {
+									setQueueingRetry( true );
+									try {
+										await onRetry(
+											job.prompt_attachments?.map(
+												( item ) => item.id
+											)
+										);
+									} finally {
+										setQueueingRetry( false );
+									}
+								} }
 							>
 								{ __( 'Retry plan', 'wp-autoplugin' ) }
 							</Button>
 							<Button
 								variant="primary"
+								disabled={ queueingRetry || planReplacing }
 								onClick={ () => setEditing( true ) }
 							>
 								{ __( 'Edit plan', 'wp-autoplugin' ) }
@@ -4359,12 +4388,17 @@ function PlanEditor( {
 			{ job.task === 'plan' && hasAgentActivity( job ) && (
 				<AgentActivity job={ job } />
 			) }
-			{ regenerationJob && regenerationJob.status !== 'completed' && (
+			{ replacementJob && replacementJob.status !== 'completed' && (
 				<div className="plan-stage__regeneration">
 					<strong>
-						{ __( 'Updating project structure', 'wp-autoplugin' ) }
+						{ replacementJob.task === 'plan'
+							? __( 'Retrying plan', 'wp-autoplugin' )
+							: __(
+									'Updating project structure',
+									'wp-autoplugin'
+							  ) }
 					</strong>
-					<JobStatus job={ regenerationJob } onCancel={ onCancel } />
+					<JobStatus job={ replacementJob } onCancel={ onCancel } />
 				</div>
 			) }
 			<div className="plan-stage__overview">
@@ -4392,7 +4426,7 @@ function PlanEditor( {
 				</span>
 				<Button
 					variant="primary"
-					disabled={ structureRegenerating }
+					disabled={ queueingRetry || planReplacing }
 					onClick={ onContinue }
 				>
 					{ __( 'Continue to Code', 'wp-autoplugin' ) }
