@@ -3497,7 +3497,7 @@ function WorkspaceView( {
 			</header>
 			<div className="workspace-editor__request">
 				<strong>{ __( 'Request', 'wp-autoplugin' ) }</strong>
-				<p>
+				<p title={ workspace.request || undefined }>
 					{ workspace.request ||
 						__( 'Image-only request', 'wp-autoplugin' ) }
 				</p>

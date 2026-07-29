@@ -271,24 +271,24 @@ final class ProjectDeletionTest extends WP_UnitTestCase {
 		$this->assertInstanceOf( WP_REST_Response::class, $response );
 		$this->assertSame( [ 'project_id' => $project_id, 'deleted' => true ], $response->get_data() );
 		$this->assertNull( ( new Project_Repository() )->find( $project_id ) );
-		$this->assertSame( 0, $this->count( 'projects', 'id', $project_id ) );
-		$this->assertSame( 0, $this->count( 'plans', 'id', (int) $plan['id'] ) );
-		$this->assertSame( 0, $this->count( 'jobs', 'id', $job_id ) );
-		$this->assertSame( 0, $this->count( 'job_events', 'job_id', $job_id ) );
-		$this->assertSame( 0, $this->count( 'usage', 'job_id', $job_id ) );
-		$this->assertSame( 0, $this->count( 'job_prompt_attachments', 'job_id', $job_id ) );
-		$this->assertSame( 0, $this->count( 'prompt_attachments', 'project_id', $project_id ) );
-		$this->assertSame( 0, $this->count( 'revisions', 'id', $revision_id ) );
-		$this->assertSame( 0, $this->count( 'revision_files', 'revision_id', $revision_id ) );
-		$this->assertSame( 0, $this->count( 'review_reports', 'project_id', $project_id ) );
-		$this->assertSame( 0, $this->count( 'review_findings', 'id', $finding_id ) );
-		$this->assertSame( 0, $this->count( 'review_finding_events', 'finding_id', $finding_id ) );
-		$this->assertSame( 0, $this->count( 'agent_runs', 'id', $run_id ) );
-		$this->assertSame( 0, $this->count( 'code_runs', 'id', $code_run_id ) );
-		$this->assertSame( 0, $this->count( 'code_run_files', 'run_id', $code_run_id ) );
-		$this->assertSame( 0, $this->count( 'release_packages', 'id', $package_id ) );
-		$this->assertSame( 0, $this->count( 'promotions', 'id', $promotion_id ) );
-		$this->assertSame( 0, $this->count( 'promotion_files', 'promotion_id', $promotion_id ) );
+		$this->assertSame( 0, $this->count_rows( 'projects', 'id', $project_id ) );
+		$this->assertSame( 0, $this->count_rows( 'plans', 'id', (int) $plan['id'] ) );
+		$this->assertSame( 0, $this->count_rows( 'jobs', 'id', $job_id ) );
+		$this->assertSame( 0, $this->count_rows( 'job_events', 'job_id', $job_id ) );
+		$this->assertSame( 0, $this->count_rows( 'usage', 'job_id', $job_id ) );
+		$this->assertSame( 0, $this->count_rows( 'job_prompt_attachments', 'job_id', $job_id ) );
+		$this->assertSame( 0, $this->count_rows( 'prompt_attachments', 'project_id', $project_id ) );
+		$this->assertSame( 0, $this->count_rows( 'revisions', 'id', $revision_id ) );
+		$this->assertSame( 0, $this->count_rows( 'revision_files', 'revision_id', $revision_id ) );
+		$this->assertSame( 0, $this->count_rows( 'review_reports', 'project_id', $project_id ) );
+		$this->assertSame( 0, $this->count_rows( 'review_findings', 'id', $finding_id ) );
+		$this->assertSame( 0, $this->count_rows( 'review_finding_events', 'finding_id', $finding_id ) );
+		$this->assertSame( 0, $this->count_rows( 'agent_runs', 'id', $run_id ) );
+		$this->assertSame( 0, $this->count_rows( 'code_runs', 'id', $code_run_id ) );
+		$this->assertSame( 0, $this->count_rows( 'code_run_files', 'run_id', $code_run_id ) );
+		$this->assertSame( 0, $this->count_rows( 'release_packages', 'id', $package_id ) );
+		$this->assertSame( 0, $this->count_rows( 'promotions', 'id', $promotion_id ) );
+		$this->assertSame( 0, $this->count_rows( 'promotion_files', 'promotion_id', $promotion_id ) );
 		$this->assertFileDoesNotExist( $package_path );
 		unset( $this->projects[ $project_id ] );
 	}
@@ -316,7 +316,7 @@ final class ProjectDeletionTest extends WP_UnitTestCase {
 		return $request;
 	}
 
-	private function count( string $table, string $column, int $id ): int {
+	private function count_rows( string $table, string $column, int $id ): int {
 		global $wpdb;
 
 		return (int) $wpdb->get_var(

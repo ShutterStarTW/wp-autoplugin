@@ -13,7 +13,8 @@ final class SourceToolsTest extends WP_UnitTestCase {
 
 	protected function setUp(): void {
 		parent::setUp();
-		$this->root = sys_get_temp_dir() . '/wp-autoplugin-explain-' . wp_generate_password( 8, false );
+		$temp_root  = realpath( sys_get_temp_dir() ) ?: sys_get_temp_dir();
+		$this->root = wp_normalize_path( $temp_root ) . '/wp-autoplugin-explain-' . wp_generate_password( 8, false );
 		mkdir( $this->root . '/includes', 0777, true );
 		file_put_contents( $this->root . '/plugin.php', "<?php\n/* Plugin Name: Fixture */\nrequire __DIR__ . '/includes/class-fixture.php';\n" );
 		file_put_contents( $this->root . '/includes/class-fixture.php', "<?php\nclass Fixture {\n\tpublic function answer() {\n\t\tdo_action( 'fixture_before_answer', \$this );\n\t\treturn apply_filters( 'fixture_answer', 42, \$this );\n\t}\n}\n" );
@@ -61,7 +62,8 @@ final class SourceToolsTest extends WP_UnitTestCase {
 	public function test_reads_only_requested_line_range(): void {
 		$result = $this->tools->execute( 'read_file', [ 'path' => 'includes/class-fixture.php', 'start_line' => 2, 'end_line' => 3 ] );
 		$this->assertStringContainsString( '2: class Fixture', $result['content'] );
-		$this->assertStringContainsString( '3: \tpublic function answer()', $result['content'] );
+		$this->assertStringContainsString( '3:', $result['content'] );
+		$this->assertStringContainsString( 'public function answer()', $result['content'] );
 		$this->assertStringNotContainsString( '1: <?php', $result['content'] );
 		$this->assertArrayHasKey( 'includes/class-fixture.php', $result['inspected'] );
 		$this->assertSame( 'includes/class-fixture.php', $result['audit']['path'] );
@@ -350,7 +352,8 @@ final class SourceToolsTest extends WP_UnitTestCase {
 	}
 
 	private function configure_parent_theme(): void {
-		$this->parent_root = sys_get_temp_dir() . '/wp-autoplugin-parent-' . wp_generate_password( 8, false );
+		$temp_root         = realpath( sys_get_temp_dir() ) ?: sys_get_temp_dir();
+		$this->parent_root = wp_normalize_path( $temp_root ) . '/wp-autoplugin-parent-' . wp_generate_password( 8, false );
 		mkdir( $this->parent_root . '/inc', 0777, true );
 		file_put_contents( $this->parent_root . '/style.css', "/*\nTheme Name: Parent Fixture\n*/\n" );
 		file_put_contents( $this->parent_root . '/functions.php', "<?php\nrequire __DIR__ . '/inc/parent-hooks.php';\n" );

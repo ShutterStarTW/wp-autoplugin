@@ -44,7 +44,7 @@ final class GitHubUpdaterTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( '/' . self::SHA . '/wp-autoplugin.php', $this->requests[2]['url'] );
 		$this->assertSame( 3, $this->requests[0]['args']['redirection'] );
 		$this->assertSame( 10, $this->requests[0]['args']['timeout'] );
-		$this->assertArrayNotHasKey( 'sslverify', $this->requests[0]['args'] );
+		$this->assertTrue( $this->requests[0]['args']['sslverify'] );
 	}
 
 	public function test_update_check_is_scoped_and_fails_closed_for_invalid_versions(): void {
