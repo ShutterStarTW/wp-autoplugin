@@ -586,6 +586,7 @@ const DISTRACTION_FREE_KEY = 'wp-autoplugin-v2-distraction-free';
 const DISTRACTION_FREE_CLASS = 'wp-autoplugin-v2-distraction-free';
 const PROJECTS_PAGE_SIZE = 20;
 const PROJECT_SEARCH_DELAY = 300;
+const OPEN_WORKSPACES_POLL_INTERVAL = 30000;
 const MAX_PROMPT_IMAGES = 6;
 const MAX_PROMPT_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_PROMPT_IMAGE_TOTAL = 20 * 1024 * 1024;
@@ -600,6 +601,65 @@ const GENERATED_FILE_TYPES = [
 	'txt',
 ];
 let promptComposerSequence = 0;
+
+function mergeWorkspaceActivity(
+	current: Workspace[],
+	refreshed: Workspace[]
+): Workspace[] {
+	const refreshedById = new Map(
+		refreshed.map( ( workspace ) => [ workspace.id, workspace ] )
+	);
+	let changed = false;
+
+	const merged = current.map( ( workspace ) => {
+		const update = refreshedById.get( workspace.id );
+		if ( ! update ) {
+			return workspace;
+		}
+
+		const currentJobId = workspace.latest_job_id ?? 0;
+		const updatedJobId = update.latest_job_id ?? 0;
+		if ( updatedJobId < currentJobId ) {
+			return workspace;
+		}
+
+		const currentIsTerminal = [
+			'completed',
+			'failed',
+			'cancelled',
+		].includes( workspace.latest_job_status ?? '' );
+		const updateIsActive = [ 'queued', 'running', 'retrying' ].includes(
+			update.latest_job_status ?? ''
+		);
+		if (
+			updatedJobId === currentJobId &&
+			currentIsTerminal &&
+			updateIsActive
+		) {
+			return workspace;
+		}
+
+		if (
+			workspace.project_name === update.project_name &&
+			workspace.latest_job_id === update.latest_job_id &&
+			workspace.latest_job_status === update.latest_job_status &&
+			workspace.updated_at === update.updated_at
+		) {
+			return workspace;
+		}
+
+		changed = true;
+		return {
+			...workspace,
+			project_name: update.project_name,
+			latest_job_id: update.latest_job_id,
+			latest_job_status: update.latest_job_status,
+			updated_at: update.updated_at,
+		};
+	} );
+
+	return changed ? merged : current;
+}
 
 async function postJob(
 	workspaceId: number,
@@ -1105,6 +1165,55 @@ function App() {
 			.finally( () => setInitializing( false ) );
 	}, [ refreshBootstrap ] );
 
+	useEffect( () => {
+		if ( initializing || ! workspaces.length ) {
+			return;
+		}
+
+		let current = true;
+		let refreshing = false;
+		const refreshOpenWorkspaces = async () => {
+			if ( refreshing || document.visibilityState === 'hidden' ) {
+				return;
+			}
+
+			refreshing = true;
+			try {
+				const response = await apiFetch< { items: Workspace[] } >( {
+					path: `${ rest }/projects`,
+				} );
+				if ( current ) {
+					setWorkspaces( ( items ) =>
+						mergeWorkspaceActivity( items, response.items )
+					);
+				}
+			} catch {
+				// The active workspace poll surfaces actionable request errors.
+			} finally {
+				refreshing = false;
+			}
+		};
+		const handleVisibilityChange = () => {
+			if ( document.visibilityState === 'visible' ) {
+				void refreshOpenWorkspaces();
+			}
+		};
+		const timer = window.setInterval(
+			refreshOpenWorkspaces,
+			OPEN_WORKSPACES_POLL_INTERVAL
+		);
+		document.addEventListener( 'visibilitychange', handleVisibilityChange );
+
+		return () => {
+			current = false;
+			window.clearInterval( timer );
+			document.removeEventListener(
+				'visibilitychange',
+				handleVisibilityChange
+			);
+		};
+	}, [ initializing, workspaces.length ] );
+
 	const activeWorkspace = useMemo(
 		() =>
 			'new' === activeWorkspaceId
@@ -1176,6 +1285,21 @@ function App() {
 			.then( ( response ) => {
 				if ( current ) {
 					setJobs( response.items );
+					const latestJob =
+						response.items[ response.items.length - 1 ];
+					if ( latestJob ) {
+						setWorkspaces( ( items ) =>
+							items.map( ( item ) =>
+								item.id === latestJob.project_id
+									? {
+											...item,
+											latest_job_id: latestJob.id,
+											latest_job_status: latestJob.status,
+									  }
+									: item
+							)
+						);
+					}
 				}
 			} )
 			.catch( ( reason ) => {
