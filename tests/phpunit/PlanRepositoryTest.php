@@ -127,8 +127,50 @@ final class PlanRepositoryTest extends WP_UnitTestCase {
 
 		$this->assertSame( 3, $ready['plan_number'] );
 		$this->assertSame( 'ready', $ready['status'] );
+		$this->assertSame( 'manual', $ready['origin'] );
 		$this->assertSame( (int) $manual['id'], $ready['parent_plan_id'] );
 		$this->assertSame( (int) $ready['id'], (int) $plans->latest_ready( $this->project_id )['id'] );
+		$jobs->update(
+			(int) $structure_job['id'],
+			[
+				'status'      => 'completed',
+				'progress'    => 100,
+				'finished_at' => current_time( 'mysql', true ),
+			]
+		);
+
+		$history = $plans->list_for_workspace( $this->project_id );
+		$this->assertSame( [ 3, 1 ], array_column( $history, 'plan_number' ) );
+		$this->assertArrayNotHasKey( 'content', $history[0] );
+		$this->assertArrayNotHasKey( 'structured', $history[0] );
+
+		$restored = $plans->restore( (int) $first['id'], (int) $ready['id'], $this->owner_id );
+		$this->assertFalse( is_wp_error( $restored ), is_wp_error( $restored ) ? $restored->get_error_message() : '' );
+		$this->assertSame( 4, $restored['plan_number'] );
+		$this->assertSame( 'restore', $restored['origin'] );
+		$this->assertSame( (int) $first['id'], $restored['parent_plan_id'] );
+		$this->assertSame( '# Initial Plan', $restored['content'] );
+		$this->assertSame( 'fixture.php', $restored['structured']['project_structure']['files'][0]['path'] );
+		$this->assertSame( (int) $restored['id'], $plans->latest_id( $this->project_id ) );
+
+		$stale = $plans->restore( (int) $first['id'], (int) $ready['id'], $this->owner_id );
+		$this->assertWPError( $stale );
+		$this->assertSame( 'plan_conflict', $stale->get_error_code() );
+
+		$active = $jobs->create(
+			$this->project_id,
+			'conversation',
+			[
+				'stage'   => 'plan',
+				'plan_id' => (int) $restored['id'],
+			],
+			$this->owner_id
+		);
+		$blocked = $plans->restore( (int) $ready['id'], (int) $restored['id'], $this->owner_id );
+		$this->assertWPError( $blocked );
+		$this->assertSame( 'plan_conflict', $blocked->get_error_code() );
+		$this->assertStringContainsString( 'active Plan work', $blocked->get_error_message() );
+		$jobs->update( (int) $active['id'], [ 'status' => 'cancelled' ] );
 	}
 
 	/** @return array<string, mixed> */

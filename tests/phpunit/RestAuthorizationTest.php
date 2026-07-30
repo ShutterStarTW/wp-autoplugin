@@ -89,7 +89,9 @@ final class RestAuthorizationTest extends WP_Autoplugin_Integration_Test_Case {
 		$other   = self::factory()->user->create( [ 'role' => 'administrator' ] );
 		$requests = [
 			[ 'workspace', 'GET', '/wp-autoplugin/v2/projects/' . $project['id'], (int) $project['id'] ],
+			[ 'workspace_plans', 'GET', '/wp-autoplugin/v2/projects/' . $project['id'] . '/plans', (int) $project['id'] ],
 			[ 'job', 'GET', '/wp-autoplugin/v2/jobs/' . $fixture['job']['id'], (int) $fixture['job']['id'] ],
+			[ 'plan', 'GET', '/wp-autoplugin/v2/plans/' . $fixture['plan']['id'], (int) $fixture['plan']['id'] ],
 			[ 'revision', 'GET', '/wp-autoplugin/v2/revisions/' . $fixture['revision']['id'], (int) $fixture['revision']['id'] ],
 		];
 

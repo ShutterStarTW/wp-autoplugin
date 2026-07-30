@@ -197,6 +197,29 @@ type RevisionSummary = {
 	created_at: string;
 };
 
+type PlanSummary = {
+	id: number;
+	project_id: number;
+	plan_number: number;
+	parent_plan_id: number | null;
+	source_job_id: number | null;
+	status: 'ready';
+	origin: 'ai' | 'manual' | 'restore';
+	created_by: number;
+	created_at: string;
+};
+
+type PlanArtifact = PlanSummary & {
+	content: string;
+	structured: Record< string, unknown >;
+};
+
+type PlansResponse = {
+	items: PlanSummary[];
+	latest_plan_id: number | null;
+	latest_plan: PlanArtifact | null;
+};
+
 type RevisionFileManifest = {
 	id: number;
 	path: string;
@@ -3584,7 +3607,45 @@ function WorkspaceView( {
 			? [ 'explain' ]
 			: [ 'plan', 'code', 'review' ];
 	const isWorkflow = tabs.length === 3;
-	const latestPlan = latestPlanArtifact( jobs );
+	const hydratedLatestPlan = latestPlanArtifact( jobs );
+	const hydratedLatestPlanId = hydratedLatestPlan?.result?.plan_id ?? 0;
+	const [ planHistory, setPlanHistory ] = useState< PlanSummary[] >( [] );
+	const [ latestPlanRecord, setLatestPlanRecord ] =
+		useState< PlanArtifact | null >( null );
+	const [ planHistoryProjectId, setPlanHistoryProjectId ] = useState( 0 );
+	const [ planHistoryLoading, setPlanHistoryLoading ] = useState( true );
+	const [ planHistoryError, setPlanHistoryError ] = useState( '' );
+	const loadPlans = useCallback( async () => {
+		setPlanHistoryLoading( true );
+		setPlanHistoryError( '' );
+		try {
+			const response = await apiFetch< PlansResponse >( {
+				path: `${ rest }/projects/${ workspace.id }/plans`,
+			} );
+			setPlanHistory( response.items );
+			setLatestPlanRecord( response.latest_plan );
+			setPlanHistoryProjectId( workspace.id );
+		} catch ( reason: any ) {
+			setPlanHistoryError( reason.message );
+		} finally {
+			setPlanHistoryLoading( false );
+		}
+	}, [ workspace.id ] );
+	useEffect( () => {
+		void loadPlans();
+	}, [ loadPlans, hydratedLatestPlanId ] );
+	const historyIsCurrent = planHistoryProjectId === workspace.id;
+	const historyHasHydratedPlan =
+		historyIsCurrent &&
+		planHistory.some( ( plan ) => plan.id === hydratedLatestPlanId );
+	let latestPlan = hydratedLatestPlan;
+	if (
+		historyIsCurrent &&
+		latestPlanRecord &&
+		( ! hydratedLatestPlan || historyHasHydratedPlan )
+	) {
+		latestPlan = planArtifactJob( latestPlanRecord, jobs );
+	}
 	const latestPlanRun = latestJobForTask( jobs, 'plan' );
 	const latestPlanReplacement = latestPlanReplacementJob( jobs, latestPlan );
 	const planConversationJobs = jobs.filter(
@@ -3620,6 +3681,23 @@ function WorkspaceView( {
 		activeTab === 'plan' && workspace.target_kind !== 'new_plugin'
 			? 'native'
 			: 'direct';
+	const restorePlan = async (
+		selectedPlanId: number,
+		expectedLatestPlanId: number
+	): Promise< PlanArtifact > => {
+		const restored = await apiFetch< PlanArtifact >( {
+			path: `${ rest }/plans/${ selectedPlanId }/restore`,
+			method: 'POST',
+			data: { expected_latest_plan_id: expectedLatestPlanId },
+		} );
+		setPlanHistory( ( current ) => [
+			planSummary( restored ),
+			...current.filter( ( plan ) => plan.id !== restored.id ),
+		] );
+		setLatestPlanRecord( restored );
+		setPlanHistoryProjectId( workspace.id );
+		return restored;
+	};
 	return (
 		<section className="workspace-editor">
 			<header className="workspace-editor__header">
@@ -3721,12 +3799,20 @@ function WorkspaceView( {
 							latestRun={ latestPlanRun }
 							replacementJob={ latestPlanReplacement }
 							conversationJobs={ planConversationJobs }
+							jobs={ jobs }
+							plans={ historyIsCurrent ? planHistory : [] }
+							latestPlanRecord={
+								historyIsCurrent ? latestPlanRecord : null
+							}
+							historyLoading={ planHistoryLoading }
+							historyError={ planHistoryError }
 							capability={ effectivePlanCapability }
 							onCancel={ onCancel }
 							onCreate={ ( attachmentIds = [] ) =>
 								onCreateJob( 'plan', {}, [], attachmentIds )
 							}
 							onSave={ onSavePlan }
+							onRestore={ restorePlan }
 							onContinue={ () => onTabSelect( 'code' ) }
 							onFollowUp={ (
 								message,
@@ -3834,6 +3920,55 @@ function latestPlanArtifact( jobs: Job[] ): Job | null {
 	);
 }
 
+function planSummary( plan: PlanArtifact ): PlanSummary {
+	return {
+		id: plan.id,
+		project_id: plan.project_id,
+		plan_number: plan.plan_number,
+		parent_plan_id: plan.parent_plan_id,
+		source_job_id: plan.source_job_id,
+		status: plan.status,
+		origin: plan.origin,
+		created_by: plan.created_by,
+		created_at: plan.created_at,
+	};
+}
+
+function planArtifactJob( plan: PlanArtifact, jobs: Job[] ): Job {
+	const sourceJob = plan.source_job_id
+		? jobs.find( ( job ) => job.id === plan.source_job_id )
+		: null;
+	const result: NonNullable< Job[ 'result' ] > = {
+		...( sourceJob?.result ?? {} ),
+		outcome: 'artifact',
+		content: plan.content,
+		structured: plan.structured,
+		plan_id: plan.id,
+		artifact: {
+			type: 'plan',
+			content: plan.content,
+			plan_id: plan.id,
+			parent_plan_id: plan.parent_plan_id,
+		},
+	};
+	if ( sourceJob ) {
+		return { ...sourceJob, result };
+	}
+
+	return {
+		id: -plan.id,
+		project_id: plan.project_id,
+		task: 'plan_restore',
+		status: 'completed',
+		progress: 100,
+		payload: {},
+		result,
+		created_at: plan.created_at,
+		latest_event: null,
+		prompt_attachments: [],
+	};
+}
+
 function latestJobForTask( jobs: Job[], task: string ): Job | null {
 	return [ ...jobs ].reverse().find( ( job ) => job.task === task ) ?? null;
 }
@@ -3844,12 +3979,17 @@ function latestPlanReplacementJob( jobs: Job[], plan: Job | null ): Job | null {
 	}
 
 	const planIndex = jobs.findIndex( ( job ) => job.id === plan.id );
-	if ( planIndex < 0 ) {
-		return null;
-	}
+	const candidates =
+		planIndex >= 0
+			? jobs.slice( planIndex + 1 )
+			: jobs.filter(
+					( job ) =>
+						job.created_at >= plan.created_at &&
+						[ 'plan', 'plan_structure' ].includes( job.task )
+			  );
 
 	return (
-		[ ...jobs.slice( planIndex + 1 ) ]
+		[ ...candidates ]
 			.reverse()
 			.find( ( job ) =>
 				[ 'plan', 'plan_structure' ].includes( job.task )
@@ -4155,10 +4295,16 @@ function PlanStage( {
 	latestRun,
 	replacementJob,
 	conversationJobs,
+	jobs,
+	plans,
+	latestPlanRecord,
+	historyLoading,
+	historyError,
 	capability,
 	onCancel,
 	onCreate,
 	onSave,
+	onRestore,
 	onContinue,
 	onFollowUp,
 }: {
@@ -4166,10 +4312,19 @@ function PlanStage( {
 	latestRun: Job | null;
 	replacementJob: Job | null;
 	conversationJobs: Job[];
+	jobs: Job[];
+	plans: PlanSummary[];
+	latestPlanRecord: PlanArtifact | null;
+	historyLoading: boolean;
+	historyError: string;
 	capability: AgentCapability | null;
 	onCancel: ( job: Job ) => void;
 	onCreate: ( attachmentIds?: number[] ) => Promise< Job | null >;
 	onSave: ( job: Job, content: string ) => Promise< boolean >;
+	onRestore: (
+		selectedPlanId: number,
+		expectedLatestPlanId: number
+	) => Promise< PlanArtifact >;
 	onContinue: () => void;
 	onFollowUp: (
 		message: string,
@@ -4235,10 +4390,16 @@ function PlanStage( {
 		<PlanEditor
 			job={ job }
 			conversationJobs={ conversationJobs }
+			jobs={ jobs }
+			plans={ plans }
+			latestPlanRecord={ latestPlanRecord }
+			historyLoading={ historyLoading }
+			historyError={ historyError }
 			capability={ capability }
 			replacementJob={ replacementJob }
 			onCancel={ onCancel }
 			onSave={ onSave }
+			onRestore={ onRestore }
 			onRetry={ onCreate }
 			onContinue={ onContinue }
 			onFollowUp={ onFollowUp }
@@ -4249,20 +4410,35 @@ function PlanStage( {
 function PlanEditor( {
 	job,
 	conversationJobs,
+	jobs,
+	plans,
+	latestPlanRecord,
+	historyLoading,
+	historyError,
 	capability,
 	replacementJob,
 	onCancel,
 	onSave,
+	onRestore,
 	onRetry,
 	onContinue,
 	onFollowUp,
 }: {
 	job: Job;
 	conversationJobs: Job[];
+	jobs: Job[];
+	plans: PlanSummary[];
+	latestPlanRecord: PlanArtifact | null;
+	historyLoading: boolean;
+	historyError: string;
 	capability: AgentCapability | null;
 	replacementJob: Job | null;
 	onCancel: ( job: Job ) => void;
 	onSave: ( job: Job, content: string ) => Promise< boolean >;
+	onRestore: (
+		selectedPlanId: number,
+		expectedLatestPlanId: number
+	) => Promise< PlanArtifact >;
 	onRetry: ( attachmentIds?: number[] ) => Promise< Job | null >;
 	onContinue: () => void;
 	onFollowUp: (
@@ -4272,9 +4448,72 @@ function PlanEditor( {
 		attachmentIds?: number[]
 	) => Promise< Job | null >;
 } ) {
-	const structure = planArtifactStructure( job );
+	const latestPlanId = job.result?.plan_id ?? 0;
+	const [ selectedPlanId, setSelectedPlanId ] = useState( latestPlanId );
+	const [ selectedPlan, setSelectedPlan ] = useState< PlanArtifact | null >(
+		latestPlanRecord?.id === latestPlanId ? latestPlanRecord : null
+	);
+	const [ selectedPlanLoading, setSelectedPlanLoading ] = useState( false );
+	const [ localHistoryError, setLocalHistoryError ] = useState( '' );
+	const [ restoring, setRestoring ] = useState( false );
+	useEffect( () => {
+		setSelectedPlanId( latestPlanId );
+		setSelectedPlan(
+			latestPlanRecord?.id === latestPlanId ? latestPlanRecord : null
+		);
+		setLocalHistoryError( '' );
+	}, [ latestPlanId, latestPlanRecord ] );
+	useEffect( () => {
+		if ( selectedPlanId === latestPlanId ) {
+			setSelectedPlan(
+				latestPlanRecord?.id === latestPlanId ? latestPlanRecord : null
+			);
+			setSelectedPlanLoading( false );
+			return;
+		}
+
+		let current = true;
+		setSelectedPlan( null );
+		setSelectedPlanLoading( true );
+		setLocalHistoryError( '' );
+		apiFetch< PlanArtifact >( {
+			path: `${ rest }/plans/${ selectedPlanId }`,
+		} )
+			.then( ( plan ) => {
+				if ( current ) {
+					setSelectedPlan( plan );
+				}
+			} )
+			.catch( ( reason ) => {
+				if ( current ) {
+					setLocalHistoryError( reason.message );
+				}
+			} )
+			.finally( () => {
+				if ( current ) {
+					setSelectedPlanLoading( false );
+				}
+			} );
+
+		return () => {
+			current = false;
+		};
+	}, [ selectedPlanId, latestPlanId, latestPlanRecord ] );
+	const displayedJob = selectedPlan
+		? planArtifactJob( selectedPlan, jobs )
+		: job;
+	const historical = selectedPlanId !== latestPlanId;
+	const selectedSummary =
+		plans.find( ( plan ) => plan.id === selectedPlanId ) ??
+		( selectedPlan ? planSummary( selectedPlan ) : null );
+	const historyAvailable =
+		latestPlanId > 0 && plans.some( ( plan ) => plan.id === latestPlanId );
+	const activePlanConversation = conversationJobs.some( ( conversation ) =>
+		[ 'queued', 'running', 'retrying' ].includes( conversation.status )
+	);
+	const structure = planArtifactStructure( displayedJob );
 	const currentContent = planMarkdown(
-		planArtifactContent( job ),
+		planArtifactContent( displayedJob ),
 		structure
 	);
 	const [ editing, setEditing ] = useState( false );
@@ -4309,85 +4548,216 @@ function PlanEditor( {
 				replacementJob.status
 			)
 	);
+	const planWorkActive = planReplacing || activePlanConversation;
+	const restoreSelected = async () => {
+		if ( ! historical || ! selectedPlan || ! latestPlanId ) {
+			return;
+		}
+		// eslint-disable-next-line no-alert -- Restore is an explicit immutable-history operation.
+		const confirmed = window.confirm(
+			__( 'Restore this Plan as a new latest Plan?', 'wp-autoplugin' )
+		);
+		if ( ! confirmed ) {
+			return;
+		}
+		setRestoring( true );
+		setLocalHistoryError( '' );
+		try {
+			const restored = await onRestore( selectedPlan.id, latestPlanId );
+			setSelectedPlan( restored );
+			setSelectedPlanId( restored.id );
+		} catch ( reason: any ) {
+			setLocalHistoryError( reason.message );
+		} finally {
+			setRestoring( false );
+		}
+	};
+	let planContent = null;
+	if ( selectedPlanLoading ) {
+		planContent = (
+			<div className="plan-history-loading">
+				<Spinner />{ ' ' }
+				{ __( 'Loading historical Plan…', 'wp-autoplugin' ) }
+			</div>
+		);
+	} else if ( editing ) {
+		planContent = (
+			<TextareaControl
+				hideLabelFromVision
+				label={ __( 'Plan Markdown', 'wp-autoplugin' ) }
+				value={ content }
+				onChange={ setContent }
+				rows={ 20 }
+			/>
+		);
+	} else if ( selectedPlan || ! historical ) {
+		planContent = <Markdown content={ currentContent } />;
+	}
 	return (
 		<div className="plan-stage">
+			{ ( historyError || localHistoryError ) && (
+				<Notice status="error" isDismissible={ false }>
+					{ localHistoryError || historyError }
+				</Notice>
+			) }
+			{ historyLoading && ! historyAvailable && (
+				<div className="plan-history-loading">
+					<Spinner />{ ' ' }
+					{ __( 'Loading Plan history…', 'wp-autoplugin' ) }
+				</div>
+			) }
+			{ historyAvailable && (
+				<div className="plan-history-toolbar">
+					<label htmlFor="plan-history-select">
+						<span>{ __( 'Plan', 'wp-autoplugin' ) }</span>
+						<select
+							id="plan-history-select"
+							value={ selectedPlanId }
+							disabled={ editing || restoring }
+							onChange={ ( event ) =>
+								setSelectedPlanId(
+									Number( event.target.value )
+								)
+							}
+						>
+							{ plans.map( ( plan ) => (
+								<option value={ plan.id } key={ plan.id }>
+									{ sprintf(
+										/* translators: %d: immutable Plan number. */
+										__( 'Plan %d', 'wp-autoplugin' ),
+										plan.plan_number
+									) }{ ' ' }
+									· { planOrigin( plan.origin ) }
+								</option>
+							) ) }
+						</select>
+					</label>
+					<div className="plan-history-toolbar__provenance">
+						<strong>
+							{ selectedSummary
+								? planOrigin( selectedSummary.origin )
+								: __( 'Plan history', 'wp-autoplugin' ) }
+						</strong>
+						{ selectedSummary && (
+							<span>
+								{ sprintf(
+									/* translators: %d: immutable Plan number. */
+									__( 'Plan %d', 'wp-autoplugin' ),
+									selectedSummary.plan_number
+								) }
+							</span>
+						) }
+						{ ! historical && (
+							<span className="is-current">
+								{ __( 'Current', 'wp-autoplugin' ) }
+							</span>
+						) }
+					</div>
+					<div className="plan-history-toolbar__actions">
+						{ historical && (
+							<Button
+								variant="primary"
+								isBusy={ restoring }
+								disabled={
+									restoring ||
+									planWorkActive ||
+									selectedPlanLoading ||
+									! selectedPlan
+								}
+								onClick={ restoreSelected }
+							>
+								{ __( 'Restore as latest', 'wp-autoplugin' ) }
+							</Button>
+						) }
+					</div>
+				</div>
+			) }
 			<div className="stage-toolbar">
 				<div>
 					<strong>
 						{ __( 'Implementation plan', 'wp-autoplugin' ) }
 					</strong>
 					<small>
-						{ __( 'Saved with this plan job', 'wp-autoplugin' ) }
+						{ selectedSummary
+							? sprintf(
+									/* translators: 1: immutable Plan number. 2: Plan origin. */
+									__( 'Plan %1$d · %2$s', 'wp-autoplugin' ),
+									selectedSummary.plan_number,
+									planOrigin( selectedSummary.origin )
+							  )
+							: __( 'Saved Plan artifact', 'wp-autoplugin' ) }
 					</small>
-					<JobModelMeta job={ job } />
+					<JobModelMeta job={ displayedJob } />
 				</div>
 				<div>
-					{ editing ? (
-						<>
-							<Button
-								variant="secondary"
-								onClick={ cancelEditing }
-								disabled={ saving }
-							>
-								{ __( 'Cancel', 'wp-autoplugin' ) }
-							</Button>
-							<Button
-								variant="primary"
-								disabled={ saving }
-								isBusy={ saving }
-								onClick={ async () => {
-									setSaving( true );
-									if ( await onSave( job, content ) ) {
-										setEditing( false );
+					{ ! historical &&
+						( editing ? (
+							<>
+								<Button
+									variant="secondary"
+									onClick={ cancelEditing }
+									disabled={ saving }
+								>
+									{ __( 'Cancel', 'wp-autoplugin' ) }
+								</Button>
+								<Button
+									variant="primary"
+									disabled={ saving || planWorkActive }
+									isBusy={ saving }
+									onClick={ async () => {
+										setSaving( true );
+										if ( await onSave( job, content ) ) {
+											setEditing( false );
+										}
+										setSaving( false );
+									} }
+								>
+									{ __( 'Save plan', 'wp-autoplugin' ) }
+								</Button>
+							</>
+						) : (
+							<>
+								<Button
+									variant="secondary"
+									disabled={
+										queueingRetry ||
+										planWorkActive ||
+										! capability?.available ||
+										( ( job.prompt_attachments?.length ||
+											0 ) > 0 &&
+											! capability?.images )
 									}
-									setSaving( false );
-								} }
-							>
-								{ __( 'Save plan', 'wp-autoplugin' ) }
-							</Button>
-						</>
-					) : (
-						<>
-							<Button
-								variant="secondary"
-								disabled={
-									queueingRetry ||
-									planReplacing ||
-									! capability?.available ||
-									( ( job.prompt_attachments?.length || 0 ) >
-										0 &&
-										! capability?.images )
-								}
-								isBusy={ queueingRetry }
-								onClick={ async () => {
-									setQueueingRetry( true );
-									try {
-										await onRetry(
-											job.prompt_attachments?.map(
-												( item ) => item.id
-											)
-										);
-									} finally {
-										setQueueingRetry( false );
-									}
-								} }
-							>
-								{ __( 'Retry plan', 'wp-autoplugin' ) }
-							</Button>
-							<Button
-								variant="primary"
-								disabled={ queueingRetry || planReplacing }
-								onClick={ () => setEditing( true ) }
-							>
-								{ __( 'Edit plan', 'wp-autoplugin' ) }
-							</Button>
-						</>
-					) }
+									isBusy={ queueingRetry }
+									onClick={ async () => {
+										setQueueingRetry( true );
+										try {
+											await onRetry(
+												job.prompt_attachments?.map(
+													( item ) => item.id
+												)
+											);
+										} finally {
+											setQueueingRetry( false );
+										}
+									} }
+								>
+									{ __( 'Retry plan', 'wp-autoplugin' ) }
+								</Button>
+								<Button
+									variant="primary"
+									disabled={ queueingRetry || planWorkActive }
+									onClick={ () => setEditing( true ) }
+								>
+									{ __( 'Edit plan', 'wp-autoplugin' ) }
+								</Button>
+							</>
+						) ) }
 				</div>
 			</div>
-			{ job.task === 'plan' && hasAgentActivity( job ) && (
-				<AgentActivity job={ job } />
-			) }
+			{ displayedJob.task === 'plan' &&
+				hasAgentActivity( displayedJob ) && (
+					<AgentActivity job={ displayedJob } />
+				) }
 			{ replacementJob && replacementJob.status !== 'completed' && (
 				<div className="plan-stage__regeneration">
 					<strong>
@@ -4402,20 +4772,10 @@ function PlanEditor( {
 				</div>
 			) }
 			<div className="plan-stage__overview">
-				<div className="plan-stage__content">
-					{ editing ? (
-						<TextareaControl
-							hideLabelFromVision
-							label={ __( 'Plan Markdown', 'wp-autoplugin' ) }
-							value={ content }
-							onChange={ setContent }
-							rows={ 20 }
-						/>
-					) : (
-						<Markdown content={ content } />
-					) }
-				</div>
-				<ProjectStructure structure={ structure } />
+				<div className="plan-stage__content">{ planContent }</div>
+				{ ! selectedPlanLoading && ( selectedPlan || ! historical ) && (
+					<ProjectStructure structure={ structure } />
+				) }
 			</div>
 			<div className="stage-next">
 				<span>
@@ -4426,27 +4786,36 @@ function PlanEditor( {
 				</span>
 				<Button
 					variant="primary"
-					disabled={ queueingRetry || planReplacing }
+					disabled={ historical || queueingRetry || planWorkActive }
 					onClick={ onContinue }
 				>
 					{ __( 'Continue to Code', 'wp-autoplugin' ) }
 				</Button>
 			</div>
-			<StageConversation
-				stage="plan"
-				jobs={ conversationJobs }
-				planId={ job.result?.plan_id }
-				capability={ capability }
-				onCancel={ onCancel }
-				onFollowUp={ ( message, _planId, images, attachmentIds ) =>
-					onFollowUp(
-						message,
-						job.result?.plan_id ?? 0,
-						images,
-						attachmentIds
-					)
-				}
-			/>
+			{ historical ? (
+				<Notice status="info" isDismissible={ false }>
+					{ __(
+						'Restore this Plan or select the current Plan to continue the Plan conversation.',
+						'wp-autoplugin'
+					) }
+				</Notice>
+			) : (
+				<StageConversation
+					stage="plan"
+					jobs={ conversationJobs }
+					planId={ job.result?.plan_id }
+					capability={ capability }
+					onCancel={ onCancel }
+					onFollowUp={ ( message, _planId, images, attachmentIds ) =>
+						onFollowUp(
+							message,
+							job.result?.plan_id ?? 0,
+							images,
+							attachmentIds
+						)
+					}
+				/>
+			) }
 		</div>
 	);
 }
@@ -6645,6 +7014,16 @@ function revisionOrigin( origin: RevisionSummary[ 'origin' ] ): string {
 	}
 	if ( 'review_fix' === origin ) {
 		return __( 'Review fix', 'wp-autoplugin' );
+	}
+	return __( 'AI generated', 'wp-autoplugin' );
+}
+
+function planOrigin( origin: PlanSummary[ 'origin' ] ): string {
+	if ( 'manual' === origin ) {
+		return __( 'Edited', 'wp-autoplugin' );
+	}
+	if ( 'restore' === origin ) {
+		return __( 'Restored', 'wp-autoplugin' );
 	}
 	return __( 'AI generated', 'wp-autoplugin' );
 }

@@ -1661,6 +1661,55 @@ body.wp-autoplugin-v2-distraction-free {
 		margin-top: 10px;
 	}
 }
+.plan-history-toolbar {
+	align-items: center;
+	background: #f6f7f8;
+	border: 1px solid #d9dfe4;
+	border-radius: 5px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 18px;
+	justify-content: space-between;
+	margin-bottom: 18px;
+	padding: 10px 12px;
+	label {
+		align-items: center;
+		display: flex;
+		gap: 7px;
+		span {
+			color: $muted;
+			font-size: 11px;
+			font-weight: 600;
+		}
+		select {
+			max-width: 230px;
+		}
+	}
+	&__provenance {
+		align-items: center;
+		display: flex;
+		flex: 1;
+		font-size: 11px;
+		gap: 10px;
+		span {
+			color: $muted;
+		}
+		.is-current {
+			color: #14612c;
+		}
+	}
+	&__actions {
+		display: flex;
+		gap: 7px;
+	}
+}
+.plan-history-loading {
+	align-items: center;
+	color: $muted;
+	display: flex;
+	gap: 8px;
+	min-height: 42px;
+}
 .project-structure {
 	background: #f6f7f8;
 	border: 1px solid #d9dfe4;
@@ -3728,6 +3777,23 @@ body.wp-autoplugin-v2-distraction-free {
 	.stage-conversation--plan .explain-stage__composer {
 		align-items: stretch;
 		flex-direction: column;
+	}
+	.plan-history-toolbar {
+		align-items: stretch;
+		flex-direction: column;
+		label {
+			justify-content: space-between;
+			select {
+				flex: 1;
+			}
+		}
+		&__provenance {
+			flex-wrap: wrap;
+		}
+		&__actions .components-button {
+			justify-content: center;
+			width: 100%;
+		}
 	}
 	.workspace-launcher__actions {
 		align-items: stretch;

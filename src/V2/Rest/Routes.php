@@ -281,6 +281,21 @@ final class Routes {
 		);
 		register_rest_route(
 			self::NAMESPACE,
+			'/projects/(?P<id>\d+)/plans',
+			[
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => [ $this, 'workspace_plans' ],
+				'permission_callback' => $permission,
+				'args'                => [
+					'id' => [
+						'type'    => 'integer',
+						'minimum' => 1,
+					],
+				],
+			]
+		);
+		register_rest_route(
+			self::NAMESPACE,
 			'/projects/(?P<id>\d+)/review-reports',
 			[
 				'methods'             => \WP_REST_Server::READABLE,
@@ -440,18 +455,51 @@ final class Routes {
 			self::NAMESPACE,
 			'/plans/(?P<id>\d+)',
 			[
+				[
+					'methods'             => \WP_REST_Server::READABLE,
+					'callback'            => [ $this, 'plan' ],
+					'permission_callback' => $permission,
+					'args'                => [
+						'id' => [
+							'type'    => 'integer',
+							'minimum' => 1,
+						],
+					],
+				],
+				[
+					'methods'             => \WP_REST_Server::CREATABLE,
+					'callback'            => [ $this, 'update_plan' ],
+					'permission_callback' => $permission,
+					'args'                => [
+						'id'      => [
+							'type'    => 'integer',
+							'minimum' => 1,
+						],
+						'content' => [
+							'required'          => true,
+							'type'              => 'string',
+							'validate_callback' => [ $this, 'validate_plan_content' ],
+						],
+					],
+				],
+			]
+		);
+		register_rest_route(
+			self::NAMESPACE,
+			'/plans/(?P<id>\d+)/restore',
+			[
 				'methods'             => \WP_REST_Server::CREATABLE,
-				'callback'            => [ $this, 'update_plan' ],
+				'callback'            => [ $this, 'restore_plan' ],
 				'permission_callback' => $permission,
 				'args'                => [
-					'id'      => [
+					'id'                      => [
 						'type'    => 'integer',
 						'minimum' => 1,
 					],
-					'content' => [
-						'required'          => true,
-						'type'              => 'string',
-						'validate_callback' => [ $this, 'validate_plan_content' ],
+					'expected_latest_plan_id' => [
+						'required' => true,
+						'type'     => 'integer',
+						'minimum'  => 1,
 					],
 				],
 			]
@@ -1135,6 +1183,24 @@ final class Routes {
 		);
 	}
 
+	/** Return completed immutable Plan history and the full latest Plan. */
+	public function workspace_plans( \WP_REST_Request $request ) {
+		$project_id = (int) $request['id'];
+		if ( ! $this->workspace_for_current_user( $project_id ) ) {
+			return new \WP_Error( 'wp_autoplugin_workspace_not_found', __( 'Workspace not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+		$plans  = new Plan_Repository();
+		$latest = $plans->latest_ready( $project_id );
+
+		return rest_ensure_response(
+			[
+				'items'          => $plans->list_for_workspace( $project_id ),
+				'latest_plan_id' => $latest ? (int) $latest['id'] : null,
+				'latest_plan'    => $latest,
+			]
+		);
+	}
+
 	/** Return immutable Review report history and exact latest-revision state. */
 	public function workspace_review_reports( \WP_REST_Request $request ) {
 		$project_id = (int) $request['id'];
@@ -1260,6 +1326,16 @@ final class Routes {
 		return rest_ensure_response( $jobs->find( $job['id'] ) );
 	}
 
+	/** Return one owned immutable Plan artifact. */
+	public function plan( \WP_REST_Request $request ) {
+		$plan = ( new Plan_Repository() )->find( (int) $request['id'] );
+		if ( ! $plan || ! $this->workspace_for_current_user( (int) $plan['project_id'] ) ) {
+			return new \WP_Error( 'wp_autoplugin_plan_not_found', __( 'Plan not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+
+		return rest_ensure_response( $plan );
+	}
+
 	/**
 	 * Save a human-edited Plan and queue an immutable successor file map.
 	 *
@@ -1319,6 +1395,30 @@ final class Routes {
 			],
 			$regeneration && 'queued' === $regeneration['status'] ? 202 : 200
 		);
+	}
+
+	/** Copy a historical Plan into a new immutable latest Plan. */
+	public function restore_plan( \WP_REST_Request $request ) {
+		$plans     = new Plan_Repository();
+		$plan      = $plans->find( (int) $request['id'] );
+		$workspace = $plan ? $this->workspace_for_current_user( (int) $plan['project_id'] ) : null;
+		if ( ! $plan || ! $workspace ) {
+			return new \WP_Error( 'wp_autoplugin_plan_not_found', __( 'Plan not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+		if ( ! $plans->is_ready( $plan ) ) {
+			return new \WP_Error( 'wp_autoplugin_plan_not_restorable', __( 'Only completed Plans can be restored.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+		if ( ( new Job_Repository() )->has_active_plan_work( (int) $plan['project_id'] ) ) {
+			return new \WP_Error( 'wp_autoplugin_plan_active', __( 'Wait for active Plan work to finish before restoring Plan history.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+
+		$result = $plans->restore(
+			(int) $plan['id'],
+			(int) $request['expected_latest_plan_id'],
+			get_current_user_id()
+		);
+
+		return is_wp_error( $result ) ? $result : new \WP_REST_Response( $result, 201 );
 	}
 
 	/** Return revision provenance and a body-free file manifest. */

@@ -26,13 +26,20 @@ final class Plan_Repository extends Repository {
 		if ( '' === $content || ! $structured ) {
 			throw new \RuntimeException( __( 'The Plan artifact is incomplete and could not be stored.', 'wp-autoplugin' ) );
 		}
+		$origin = 'ai';
+		if ( $parent_plan_id ) {
+			$parent = $this->find( $parent_plan_id );
+			if ( $parent && 'manual' === $parent['origin'] && 'pending_structure' === $parent['status'] ) {
+				$origin = 'manual';
+			}
+		}
 
 		return $this->insert(
 			$project_id,
 			$content,
 			$structured,
 			$user_id,
-			'ai',
+			$origin,
 			'ready',
 			$source_job_id,
 			$parent_plan_id
@@ -95,6 +102,72 @@ final class Plan_Repository extends Repository {
 	}
 
 	/**
+	 * Return completed Plan history newest first without the potentially large
+	 * narrative or structured file map.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function list_for_workspace( int $project_id ): array {
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT id, project_id, plan_number, parent_plan_id, source_job_id, status, origin, created_by, created_at FROM ' . Installer::table( 'plans' ) . ' WHERE project_id = %d AND status = %s ORDER BY plan_number DESC',
+				$project_id,
+				'ready'
+			),
+			ARRAY_A
+		);
+
+		return array_map( [ $this, 'hydrate' ], (array) $rows );
+	}
+
+	public function latest_id( int $project_id ): ?int {
+		$id = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT id FROM ' . Installer::table( 'plans' ) . ' WHERE project_id = %d AND status = %s ORDER BY plan_number DESC LIMIT 1',
+				$project_id,
+				'ready'
+			)
+		);
+
+		return $id ? (int) $id : null;
+	}
+
+	/**
+	 * Copy a historical ready Plan into a new immutable latest Plan.
+	 *
+	 * @return array<string, mixed>|\WP_Error
+	 */
+	public function restore( int $selected_plan_id, int $expected_latest_plan_id, int $user_id ) {
+		$selected = $this->find( $selected_plan_id );
+		if ( ! $selected || ! $this->is_ready( $selected ) ) {
+			return new \WP_Error( 'plan_not_found', __( 'Plan not found.', 'wp-autoplugin' ), [ 'status' => 404 ] );
+		}
+		if ( $selected_plan_id === $expected_latest_plan_id ) {
+			return new \WP_Error( 'plan_restore_latest', __( 'Select an older Plan to restore as latest.', 'wp-autoplugin' ), [ 'status' => 409 ] );
+		}
+
+		try {
+			return $this->insert(
+				(int) $selected['project_id'],
+				(string) $selected['content'],
+				(array) $selected['structured'],
+				$user_id,
+				'restore',
+				'ready',
+				0,
+				$selected_plan_id,
+				$expected_latest_plan_id,
+				true
+			);
+		} catch ( \RuntimeException $error ) {
+			if ( 409 === $error->getCode() ) {
+				return new \WP_Error( 'plan_conflict', $error->getMessage(), [ 'status' => 409 ] );
+			}
+			throw $error;
+		}
+	}
+
+	/**
 	 * Expand a stored job outcome with its referenced Plan artifact.
 	 *
 	 * @param array<string, mixed> $result Stored job result.
@@ -152,7 +225,7 @@ final class Plan_Repository extends Repository {
 	 * @param array<string, mixed>|null $structured Structured Plan data.
 	 * @return array<string, mixed>
 	 */
-	private function insert( int $project_id, string $content, ?array $structured, int $user_id, string $origin, string $status, int $source_job_id, int $parent_plan_id ): array {
+	private function insert( int $project_id, string $content, ?array $structured, int $user_id, string $origin, string $status, int $source_job_id, int $parent_plan_id, int $expected_latest_plan_id = 0, bool $enforce_expected = false ): array {
 		$this->wpdb->query( 'START TRANSACTION' );
 		try {
 			$project = $this->wpdb->get_var(
@@ -163,6 +236,17 @@ final class Plan_Repository extends Repository {
 			}
 
 			$table = Installer::table( 'plans' );
+			if ( $enforce_expected ) {
+				if ( ( new Job_Repository( $this->wpdb ) )->has_active_plan_work( $project_id ) ) {
+					throw new \RuntimeException( __( 'Wait for active Plan work to finish before restoring Plan history.', 'wp-autoplugin' ), 409 );
+				}
+				$latest_id = (int) $this->wpdb->get_var(
+					$this->wpdb->prepare( "SELECT id FROM $table WHERE project_id = %d AND status = %s ORDER BY plan_number DESC LIMIT 1 FOR UPDATE", $project_id, 'ready' ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
+				);
+				if ( $latest_id !== $expected_latest_plan_id ) {
+					throw new \RuntimeException( __( 'A newer Plan exists. Reload Plan history before restoring.', 'wp-autoplugin' ), 409 );
+				}
+			}
 			if ( $source_job_id ) {
 				$existing_id = $this->wpdb->get_var(
 					$this->wpdb->prepare( "SELECT id FROM $table WHERE source_job_id = %d", $source_job_id ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed table.
@@ -254,9 +338,13 @@ final class Plan_Repository extends Repository {
 	 */
 	private function hydrate( array $row ): array {
 		foreach ( [ 'id', 'project_id', 'plan_number', 'parent_plan_id', 'source_job_id', 'created_by' ] as $field ) {
-			$row[ $field ] = null === $row[ $field ] ? null : (int) $row[ $field ];
+			if ( array_key_exists( $field, $row ) ) {
+				$row[ $field ] = null === $row[ $field ] ? null : (int) $row[ $field ];
+			}
 		}
-		$row['structured'] = null === $row['structured'] ? null : $this->decode( $row['structured'] );
+		if ( array_key_exists( 'structured', $row ) ) {
+			$row['structured'] = null === $row['structured'] ? null : $this->decode( $row['structured'] );
+		}
 
 		return $row;
 	}

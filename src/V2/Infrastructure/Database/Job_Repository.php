@@ -130,6 +130,26 @@ final class Job_Repository extends Repository {
 		return false;
 	}
 
+	/** Whether Plan-producing work is already active in the workspace. */
+	public function has_active_plan_work( int $project_id ): bool {
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				'SELECT * FROM ' . Installer::table( 'jobs' ) . ' WHERE project_id = %d AND status IN (%s,%s,%s)',
+				$project_id,
+				'queued',
+				'running',
+				'retrying'
+			),
+			ARRAY_A
+		);
+		foreach ( (array) $rows as $row ) {
+			if ( self::is_plan_work( $this->hydrate( $row ) ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** Whether revision-mutating or revision-bound work is active in the workspace. */
 	public function has_active_artifact_work( int $project_id ): bool {
 		$rows = $this->wpdb->get_results(
@@ -169,6 +189,12 @@ final class Job_Repository extends Repository {
 	public static function is_code_work( array $job ): bool {
 		return in_array( (string) ( $job['task'] ?? '' ), [ 'code', 'review_fix' ], true )
 			|| ( 'conversation' === ( $job['task'] ?? '' ) && 'code' === ( $job['payload']['stage'] ?? '' ) );
+	}
+
+	/** Whether a job can produce a new immutable Plan. */
+	public static function is_plan_work( array $job ): bool {
+		return in_array( (string) ( $job['task'] ?? '' ), [ 'plan', 'plan_structure' ], true )
+			|| ( 'conversation' === ( $job['task'] ?? '' ) && 'plan' === ( $job['payload']['stage'] ?? '' ) );
 	}
 
 	/** Whether a durable job sends one or more requests to an AI provider. */
