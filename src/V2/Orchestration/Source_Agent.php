@@ -276,12 +276,16 @@ final class Source_Agent {
 				);
 				throw new \RuntimeException( $this->with_debug_response( $message, $response ) );
 			}
-			$transcript   = (array) $run['transcript'];
-			$transcript[] = [
+			$transcript = (array) $run['transcript'];
+			$assistant  = [
 				'role'       => 'assistant',
 				'content'    => (string) ( $response['text'] ?? '' ),
 				'tool_calls' => $calls,
 			];
+			if ( is_array( $response['provider_parts'] ?? null ) && $response['provider_parts'] ) {
+				$assistant['provider_parts'] = array_values( $response['provider_parts'] );
+			}
+			$transcript[] = $assistant;
 			$inspected    = (array) $run['inspected_files'];
 			$source_bytes = (int) $run['source_bytes'];
 			foreach ( $calls as $call ) {

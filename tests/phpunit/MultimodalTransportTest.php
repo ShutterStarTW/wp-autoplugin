@@ -97,6 +97,8 @@ final class MultimodalTransportTest extends WP_UnitTestCase {
 		foreach ( [ 'openai' => 'gpt-5.4-mini', 'anthropic' => 'claude-sonnet-4-6', 'google' => 'gemini-2.5-pro', 'xai' => 'grok-4.3' ] as $provider => $model ) {
 			$this->assertTrue( (bool) $matrix->for_model( $provider, $model )['images'] );
 		}
+		$this->assertFalse( (bool) $matrix->for_model( 'google', 'gemini-2.5-pro' )['native_read_tools'] );
+		$this->assertTrue( (bool) $matrix->for_model( 'google', 'gemini-3.5-flash-lite' )['native_read_tools'] );
 
 		$filter = static function ( array $capabilities, string $provider, string $model ): array {
 			if ( 'custom' === $provider && 'private-model' === $model ) {

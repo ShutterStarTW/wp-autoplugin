@@ -32,8 +32,8 @@ final class Agent_Transport_Factory {
 			'model'     => (string) ( $selection['model'] ?? '' ),
 			'effort'    => '',
 			'message'   => $is_plan
-				? __( 'The selected planner model does not support v2 agentic Plan yet. Choose an OpenAI, Anthropic, or ChatGPT Subscription model.', 'wp-autoplugin' )
-				: __( 'The selected reviewer model does not support v2 agentic Explain yet. Choose an OpenAI, Anthropic, or ChatGPT Subscription model.', 'wp-autoplugin' ),
+				? __( 'The selected planner model does not support v2 agentic Plan yet. Choose an OpenAI, Anthropic, Gemini 3, or ChatGPT Subscription model.', 'wp-autoplugin' )
+				: __( 'The selected reviewer model does not support v2 agentic Explain yet. Choose an OpenAI, Anthropic, Gemini 3, or ChatGPT Subscription model.', 'wp-autoplugin' ),
 			'images'    => false,
 		];
 	}
@@ -57,6 +57,10 @@ final class Agent_Transport_Factory {
 		if ( 'anthropic' === $provider ) {
 			$key = (string) get_option( 'wp_autoplugin_anthropic_api_key' );
 			return '' !== $key ? new Anthropic_Agent_Transport( $key, $model, $effort ) : new \WP_Error( 'agent_transport_unavailable', __( 'The Anthropic API key used by this agent job is no longer configured.', 'wp-autoplugin' ) );
+		}
+		if ( 'google' === $provider ) {
+			$key = (string) get_option( 'wp_autoplugin_google_api_key' );
+			return '' !== $key ? new Google_Direct_Transport( $key, $model ) : new \WP_Error( 'agent_transport_unavailable', __( 'The Google Gemini API key used by this agent job is no longer configured.', 'wp-autoplugin' ) );
 		}
 		if ( 'chatgpt' === $provider ) {
 			$remote = ( new Model_Catalog() )->transport_model( $provider, $model );

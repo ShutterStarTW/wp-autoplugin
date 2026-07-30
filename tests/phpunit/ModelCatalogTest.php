@@ -144,6 +144,10 @@ final class ModelCatalogTest extends WP_UnitTestCase {
 		$this->assertTrue( ( new Direct_Transport_Factory() )->capability( 'plan' )['available'] );
 		$this->assertFalse( ( new Agent_Transport_Factory() )->capability( 'plan' )['available'] );
 
+		update_option( 'wp_autoplugin_planner_model', 'gemini-3.5-flash-lite' );
+		$this->assertTrue( ( new Direct_Transport_Factory() )->capability( 'plan' )['available'] );
+		$this->assertTrue( ( new Agent_Transport_Factory() )->capability( 'plan' )['available'] );
+
 		update_option( 'wp_autoplugin_planner_model', 'gpt-5.4-mini' );
 		update_option( 'wp_autoplugin_openai_api_key', 'test-key' );
 		$this->assertTrue( ( new Direct_Transport_Factory() )->capability( 'plan' )['available'] );

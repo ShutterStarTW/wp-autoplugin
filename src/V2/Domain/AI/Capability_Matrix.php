@@ -22,14 +22,16 @@ final class Capability_Matrix {
 	public function for_model( string $provider, string $model ): array {
 		$provider      = sanitize_key( $provider );
 		$image_pattern = self::IMAGE_MODEL_PATTERNS[ $provider ] ?? '';
+		$native_tools  = in_array( $provider, [ 'openai', 'anthropic', 'chatgpt' ], true )
+			|| ( 'google' === $provider && 1 === preg_match( '/^gemini-3(?:$|[.-])/', $model ) );
 		$capabilities  = [
 			'provider'            => $provider,
 			'model'               => sanitize_text_field( $model ),
 			'direct_mode'         => true,
-			'native_read_tools'   => in_array( sanitize_key( $provider ), [ 'openai', 'anthropic', 'chatgpt' ], true ),
+			'native_read_tools'   => $native_tools,
 			'unified_patch'       => false,
 			'images'              => '' !== $image_pattern && 1 === preg_match( $image_pattern, $model ),
-			'max_tool_iterations' => in_array( sanitize_key( $provider ), [ 'openai', 'anthropic', 'chatgpt' ], true ) ? 8 : 0,
+			'max_tool_iterations' => $native_tools ? 8 : 0,
 		];
 
 		/**

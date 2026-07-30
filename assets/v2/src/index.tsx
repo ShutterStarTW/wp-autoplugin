@@ -2071,7 +2071,7 @@ function StageModelControl( {
 									{ selectedModel?.availability_message ||
 										( context === 'native'
 											? __(
-													'This Plan requires a configured OpenAI, Anthropic, or ChatGPT Subscription model with native source tools.',
+													'This Plan requires a configured OpenAI, Anthropic, Gemini 3, or ChatGPT Subscription model with native source tools.',
 													'wp-autoplugin'
 											  )
 											: __(
