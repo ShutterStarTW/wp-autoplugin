@@ -3391,6 +3391,13 @@ body.wp-autoplugin-v2-distraction-free {
 		max-height: 420px;
 		overflow-y: auto;
 		padding: 20px;
+		&:empty {
+			display: none;
+
+			+ .explain-stage__composer {
+				border-top: 0;
+			}
+		}
 	}
 	.explain-stage__composer {
 		align-items: flex-end;
