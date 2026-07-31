@@ -2,7 +2,7 @@
 
 WP-Autoplugin brings an agentic coding workflow into WordPress. From the WordPress admin, it can explore an existing codebase, understand how it works, plan a change, write or revise the code, review the result, and prepare it for release as a new plugin, a fork, or a direct modification of an installed plugin or theme.
 
-It is completely free and bring-your-own-key. You can connect it directly to OpenAI, Anthropic, Google Gemini, xAI, or a compatible API endpoint and choose the models you want to use. It can also work with your ChatGPT subscription, using the subscription’s Codex credits instead of an OpenAI API key.
+It is completely free and bring-your-own-key: you can connect it directly to OpenAI, Anthropic, Google Gemini, xAI, or a compatible API endpoint and choose the models you want to use. It can also work with your ChatGPT subscription, using the subscription’s Codex credits instead of an OpenAI API key.
 
 In practical terms, it is similar to having **Claude Code or any other coding agent inside WordPress**, but with a workflow designed specifically for plugins and themes. It works with the code already installed on the site, keeps every generated revision recoverable, and never modifies a live target unless an administrator explicitly approves the release.
 
@@ -196,12 +196,6 @@ You can:
 * ask the Coder about an untouched target file before deciding to modify it; and
 * reload or reopen the project without losing the conversation.
 
-Code change requests also run through a separate compliance check before staging. WP-Autoplugin verifies whether the candidate actually satisfies the latest request.
-
-When it does not, the system can perform one bounded corrective regeneration. If the result still fails the check, the operation stops without creating a revision.
-
-This is intended to prevent plausible-looking code from being accepted when it does not implement what was requested.
-
 ## Use screenshots and mockups as part of the request
 
 Every free-form composer accepts text, images, or both when the selected model supports vision.
@@ -222,7 +216,7 @@ This is useful for tasks such as:
 * matching an existing admin screen; or
 * discussing a diagram alongside the code.
 
-Images are private, message-scoped attachments. WP-Autoplugin accepts verified JPEG, PNG, and WebP files and checks the selected model’s image capability before queueing the request.
+WP-Autoplugin accepts verified JPEG, PNG, and WebP files and checks the selected model’s image capability before queueing the request.
 
 ## Choose how a finished revision is released
 
@@ -239,7 +233,7 @@ WP-Autoplugin can:
 * switch from the original plugin to its fork through an isolated activation flow;
 * install an inactive copy of a standalone or child theme;
 * produce replacement ZIPs for existing plugins and themes;
-* apply confirmed Add, Update, and Delete operations directly to a target; and
+* apply modifications directly to a target; and
 * roll back the latest supported direct modification when the affected files have not changed since release.
 
 You can therefore download the result for testing elsewhere, install it without activating it, keep it as a fork, or deliberately apply it to the original target.
@@ -290,7 +284,7 @@ WP-Autoplugin can connect directly to:
 
 Compatible models from these providers can be used for structured Plan, Code, and Review work.
 
-OpenAI, Anthropic, and experimental ChatGPT Subscription models with the required capabilities can also use the native read-only source tools. Model capabilities vary, so not every model supports source exploration, vision, structured output, or every project type.
+Model capabilities vary, so not every model supports source exploration, vision, structured output, or every project type.
 
 ### Experimental ChatGPT Subscription support
 
