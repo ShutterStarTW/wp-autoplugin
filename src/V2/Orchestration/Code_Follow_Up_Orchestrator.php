@@ -366,6 +366,8 @@ final class Code_Follow_Up_Orchestrator {
 
 		$metadata  = (array) $run['change_instructions'];
 		$prompt    = new Code_Follow_Up_Compliance_Prompt();
+		$run_files = $runs->files( (int) $run['id'] );
+		$topology  = $this->topology_diff( (array) $base['project_manifest'], (array) $run['target_manifest'], $run_files );
 		$source    = array_map(
 			static fn( array $file ): array => [
 				'path'      => (string) $file['path'],
@@ -390,7 +392,9 @@ final class Code_Follow_Up_Orchestrator {
 				(string) ( $metadata['resolved_request'] ?? '' ),
 				(array) ( $metadata['acceptance_criteria'] ?? [] ),
 				$target,
+				(array) $base['project_manifest'],
 				(array) $run['target_manifest'],
+				$topology,
 				$source
 			),
 			[
@@ -815,6 +819,36 @@ final class Code_Follow_Up_Orchestrator {
 			];
 		}
 		return $files;
+	}
+
+	/**
+	 * Build a source-free manifest topology diff for the independent compliance pass.
+	 *
+	 * @param array<string, mixed>             $parent_manifest
+	 * @param array<string, mixed>             $candidate_manifest
+	 * @param array<int, array<string, mixed>> $run_files
+	 * @return array<string, mixed>
+	 */
+	private function topology_diff( array $parent_manifest, array $candidate_manifest, array $run_files ): array {
+		$parent    = array_column( (array) ( $parent_manifest['files'] ?? [] ), null, 'path' );
+		$candidate = array_column( (array) ( $candidate_manifest['files'] ?? [] ), null, 'path' );
+		$changed   = [];
+		foreach ( array_intersect( array_keys( $parent ), array_keys( $candidate ) ) as $path ) {
+			if (
+				(string) ( $parent[ $path ]['type'] ?? '' ) !== (string) ( $candidate[ $path ]['type'] ?? '' )
+				|| (string) ( $parent[ $path ]['operation'] ?? 'add' ) !== (string) ( $candidate[ $path ]['operation'] ?? 'add' )
+			) {
+				$changed[] = $path;
+			}
+		}
+
+		return [
+			'manifest_added_paths'   => array_values( array_diff( array_keys( $candidate ), array_keys( $parent ) ) ),
+			'manifest_removed_paths' => array_values( array_diff( array_keys( $parent ), array_keys( $candidate ) ) ),
+			'action_changed_paths'   => $changed,
+			'main_file_changed'      => (string) ( $parent_manifest['main_file'] ?? '' ) !== (string) ( $candidate_manifest['main_file'] ?? '' ),
+			'generated_paths'        => array_values( array_unique( array_map( static fn( array $file ): string => (string) ( $file['path'] ?? '' ), $run_files ) ) ),
+		];
 	}
 
 	/** @return array<int,array<string,mixed>>|\WP_Error */

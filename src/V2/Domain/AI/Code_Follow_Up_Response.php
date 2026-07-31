@@ -59,6 +59,29 @@ final class Code_Follow_Up_Response {
 		if ( is_wp_error( $base ) ) {
 			return new \WP_Error( 'code_follow_up_base_manifest', __( 'The current revision manifest is invalid.', 'wp-autoplugin' ), [ 'retryable' => false ] );
 		}
+		$base_paths         = array_column( $base['files'], null, 'path' );
+		$explicit_deletions = [];
+		if ( 'project' === $base['scope'] ) {
+			foreach ( $decoded['changes'] as $change ) {
+				$operation = is_array( $change ) ? sanitize_key( (string) ( $change['operation'] ?? $change['action'] ?? '' ) ) : '';
+				if ( 'delete' !== $operation ) {
+					continue;
+				}
+				$path        = trim( (string) ( $change['path'] ?? '' ) );
+				$instruction = trim( (string) ( $change['instruction'] ?? '' ) );
+				if ( '' === $path || ! isset( $base_paths[ $path ] ) ) {
+					return $this->error( 'code_follow_up_delete_path', __( 'Every project deletion must explicitly identify an existing staged file.', 'wp-autoplugin' ) );
+				}
+				if ( '' !== $instruction ) {
+					return $this->error( 'code_follow_up_delete_instruction', __( 'An explicit project deletion must not include a generation instruction.', 'wp-autoplugin' ) );
+				}
+				if ( $path === $base['main_file'] ) {
+					return $this->error( 'code_follow_up_main_delete', __( 'The project main file cannot be deleted by a Code follow-up.', 'wp-autoplugin' ) );
+				}
+				$explicit_deletions[ $path ] = true;
+			}
+		}
+
 		$candidate = $decoded['manifest'];
 		foreach ( [ 'scope', 'artifact_kind', 'operation' ] as $identity ) {
 			$candidate[ $identity ] = $base[ $identity ];
@@ -72,20 +95,48 @@ final class Code_Follow_Up_Response {
 				$candidate[ $identity ] = $base[ $identity ] ?? '';
 			}
 		}
+		if ( 'project' === $base['scope'] ) {
+			$candidate_files = $this->merge_project_manifest_files(
+				is_array( $candidate['files'] ?? null ) ? $candidate['files'] : [],
+				$base['files'],
+				$explicit_deletions
+			);
+			if ( is_wp_error( $candidate_files ) ) {
+				return $candidate_files;
+			}
+			$candidate['files'] = $candidate_files;
+		}
 		$manifest = $validator->manifest( $candidate );
 		if ( is_wp_error( $manifest ) ) {
 			return $this->error( 'code_follow_up_manifest', $manifest->get_error_message() );
 		}
 
-		$base_paths   = array_column( $base['files'], null, 'path' );
 		$target_paths = array_column( $manifest['files'], null, 'path' );
 		$instructions = [];
+		$seen_changes = [];
 		$total_bytes  = 0;
 		foreach ( $decoded['changes'] as $change ) {
 			$path        = is_array( $change ) ? trim( (string) ( $change['path'] ?? '' ) ) : '';
+			$operation   = is_array( $change ) ? sanitize_key( (string) ( $change['operation'] ?? $change['action'] ?? '' ) ) : '';
 			$instruction = is_array( $change ) ? trim( (string) ( $change['instruction'] ?? '' ) ) : '';
-			if ( '' === $path || ! isset( $target_paths[ $path ] ) || isset( $instructions[ $path ] ) || '' === $instruction || strlen( $instruction ) > self::MAX_INSTRUCTION_BYTES ) {
+			if ( '' === $path || isset( $seen_changes[ $path ] ) ) {
+				return $this->error( 'code_follow_up_instruction', __( 'Every change action must be bounded, unique, and identify one project file.', 'wp-autoplugin' ) );
+			}
+			$seen_changes[ $path ] = true;
+			if ( 'project' === $base['scope'] && 'delete' === $operation ) {
+				continue;
+			}
+			if ( '' !== $operation && ! in_array( $operation, [ 'add', 'update' ], true ) ) {
+				return $this->error( 'code_follow_up_operation', __( 'A generated Code follow-up action must use add or update; project deletion requires an explicit delete action without an instruction.', 'wp-autoplugin' ) );
+			}
+			if ( '' === $path || ! isset( $target_paths[ $path ] ) || '' === $instruction || strlen( $instruction ) > self::MAX_INSTRUCTION_BYTES ) {
 				return $this->error( 'code_follow_up_instruction', __( 'Every change instruction must be bounded, unique, and identify a desired file.', 'wp-autoplugin' ) );
+			}
+			if ( 'project' === $base['scope'] && '' !== $operation ) {
+				$expected_operation = isset( $base_paths[ $path ] ) ? 'update' : 'add';
+				if ( $expected_operation !== $operation ) {
+					return $this->error( 'code_follow_up_operation', __( 'Every explicit add or update action must match whether the project file already exists.', 'wp-autoplugin' ) );
+				}
 			}
 			if ( ! in_array( $target_paths[ $path ]['type'], Code_Validator::GENERATED_TYPES, true ) ) {
 				return $this->error( 'code_follow_up_target_type', __( 'AI Code follow-ups can generate only PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, and plain-text files.', 'wp-autoplugin' ) );
@@ -102,7 +153,7 @@ final class Code_Follow_Up_Response {
 		}
 
 		$added   = array_values( array_diff( array_keys( $target_paths ), array_keys( $base_paths ) ) );
-		$deleted = array_values( array_diff( array_keys( $base_paths ), array_keys( $target_paths ) ) );
+		$deleted = array_values( array_filter( array_keys( $base_paths ), static fn( string $path ): bool => isset( $explicit_deletions[ $path ] ) ) );
 		foreach ( $added as $path ) {
 			if ( ! isset( $instructions[ $path ] ) ) {
 				return $this->error( 'code_follow_up_new_file_instruction', sprintf( __( 'The new file %s requires a generation instruction.', 'wp-autoplugin' ), $path ) );
@@ -156,6 +207,47 @@ final class Code_Follow_Up_Response {
 				'deleted_paths' => $deleted,
 			],
 		];
+	}
+
+	/**
+	 * Preserve omitted complete-project files and remove only explicit deletions.
+	 *
+	 * @param array<int, mixed>               $candidate_files Provider-returned desired rows.
+	 * @param array<int, array<string, mixed>> $base_files      Current complete project rows.
+	 * @param array<string, bool>              $deletions       Explicit provider delete actions.
+	 * @return array<int, mixed>|\WP_Error
+	 */
+	private function merge_project_manifest_files( array $candidate_files, array $base_files, array $deletions ) {
+		$base_paths        = array_column( $base_files, null, 'path' );
+		$candidate_indexes = [];
+		foreach ( $candidate_files as $index => $file ) {
+			$path = is_array( $file ) ? trim( (string) ( $file['path'] ?? '' ) ) : '';
+			if ( '' === $path ) {
+				continue;
+			}
+			if ( isset( $candidate_indexes[ $path ] ) ) {
+				return $this->error( 'code_follow_up_manifest_duplicate', __( 'The desired project manifest contains a duplicate file path.', 'wp-autoplugin' ) );
+			}
+			$candidate_indexes[ $path ] = $index;
+		}
+
+		$files = [];
+		foreach ( $base_files as $file ) {
+			$path = (string) $file['path'];
+			if ( isset( $deletions[ $path ] ) ) {
+				continue;
+			}
+			$files[] = isset( $candidate_indexes[ $path ] ) ? $candidate_files[ $candidate_indexes[ $path ] ] : $file;
+		}
+		foreach ( $candidate_files as $file ) {
+			$path = is_array( $file ) ? trim( (string) ( $file['path'] ?? '' ) ) : '';
+			if ( ( '' !== $path && isset( $base_paths[ $path ] ) ) || isset( $deletions[ $path ] ) ) {
+				continue;
+			}
+			$files[] = $file;
+		}
+
+		return $files;
 	}
 
 	/**

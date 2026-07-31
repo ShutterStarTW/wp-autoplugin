@@ -5,7 +5,7 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Versioned prompts for questions and topology-aware Code follow-ups. */
 final class New_Plugin_Code_Follow_Up_Prompt {
 	public const SLUG    = 'new-plugin-code-follow-up';
-	public const VERSION = 8;
+	public const VERSION = 9;
 
 	public function analysis_instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
@@ -24,9 +24,9 @@ For a question return:
 {"outcome":"answer","content":"A concise Markdown answer grounded only in the supplied project."}
 
 For a change request return:
-{"outcome":"changes","content":"A concise Markdown change summary.","resolved_request":"One concrete statement of the newest requested result, with contextual references resolved.","acceptance_criteria":["Observable requirement the generated revision must satisfy."],"manifest":{"plugin_name":"...","main_file":"root-file.php","files":[{"path":"relative/path.php","type":"php","description":"Purpose."}]},"changes":[{"path":"relative/path.php","instruction":"Specific bounded implementation instruction that directly satisfies the resolved request."}]}
+{"outcome":"changes","content":"A concise Markdown change summary.","resolved_request":"One concrete statement of the newest requested result, with contextual references resolved.","acceptance_criteria":["Observable requirement the generated revision must satisfy."],"manifest":{"plugin_name":"...","main_file":"root-file.php","files":[{"path":"relative/path.php","type":"php","description":"Purpose."}]},"changes":[{"path":"relative/path.php","operation":"update","instruction":"Specific bounded implementation instruction that directly satisfies the resolved request."}]}
 
-For a change, provide one resolved_request and one to eight concrete, testable acceptance_criteria derived from the newest message and its clear conversational antecedent. The manifest is the complete desired live project after the change. Omitting an existing path deletes it. A renamed or moved file is a deletion plus a new file. Every new file must have one change instruction. Include retained files in changes only when their complete contents must be regenerated. Retained unlisted files are copied unchanged. Use only safe relative PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, and plain-text paths. Keep 1-20 files, exactly one root-level PHP main_file, and one Plugin Name header in that main file only. Do not propose build artifacts, dependencies, binaries, or filesystem operations. A change request must materially alter content or topology.
+For a change, provide one resolved_request and one to eight concrete, testable acceptance_criteria derived from the newest message and its clear conversational antecedent. The manifest describes the desired retained and new project files after the change. Omitting an existing path never deletes it; the server preserves omitted parent files. Deleting an existing file requires a changes row with operation:"delete" and no instruction, and the path should be omitted from the manifest. A renamed or moved file requires one explicit delete row plus one new manifest file and an operation:"add" instruction. Every new file must have one operation:"add" change instruction. Every regenerated existing file must have one operation:"update" change instruction. Include retained files in changes only when their complete contents must be regenerated; all other retained files are copied unchanged. Never delete, rename, or replace a file unless the administrator's newest request requires that topology change. Use only safe relative PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, and plain-text paths. Keep 1-20 live files, exactly one root-level PHP main_file, and one Plugin Name header in that main file only. Do not propose build artifacts, dependencies, binaries, or filesystem operations. A change request must materially alter content or topology.
 PROMPT;
 	}
 

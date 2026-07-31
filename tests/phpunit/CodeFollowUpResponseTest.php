@@ -40,7 +40,7 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base ) );
 	}
 
-	public function test_normalizes_add_update_delete_and_main_file_last(): void {
+	public function test_normalizes_explicit_add_update_delete_and_main_file_last(): void {
 		$response = wp_json_encode(
 			[
 				'outcome'             => 'changes',
@@ -57,9 +57,10 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 					],
 				],
 				'changes'             => [
-					[ 'path' => 'assets/app.js', 'instruction' => 'Update the existing behavior.' ],
-					[ 'path' => 'assets/admin.js', 'instruction' => 'Create the admin behavior.' ],
-					[ 'path' => 'example.php', 'instruction' => 'Enqueue the admin script.' ],
+					[ 'path' => 'assets/app.js', 'operation' => 'update', 'instruction' => 'Update the existing behavior.' ],
+					[ 'path' => 'assets/admin.js', 'operation' => 'add', 'instruction' => 'Create the admin behavior.' ],
+					[ 'path' => 'assets/style.css', 'operation' => 'delete' ],
+					[ 'path' => 'example.php', 'operation' => 'update', 'instruction' => 'Enqueue the admin script.' ],
 				],
 			]
 		);
@@ -72,6 +73,49 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 		$this->assertSame( 'Replace the stylesheet with an admin script.', $result['resolved_request'] );
 		$this->assertCount( 1, $result['acceptance_criteria'] );
 		$this->assertSame( 'example.php', $result['files'][ count( $result['files'] ) - 1 ]['path'] );
+	}
+
+	public function test_omitted_complete_project_files_are_retained_without_explicit_delete_actions(): void {
+		$response = [
+			'outcome'             => 'changes',
+			'content'             => 'Add a Media Library entry point.',
+			'resolved_request'    => 'Add a Media Library entry point to the existing plugin.',
+			'acceptance_criteria' => [ 'The main plugin file registers the requested Media Library control.' ],
+			'manifest'            => [
+				'plugin_name' => 'Example',
+				'main_file'   => 'example.php',
+				'files'       => [ [ 'path' => 'example.php', 'type' => 'php', 'description' => 'Bootstrap and Media Library integration.' ] ],
+			],
+			'changes'             => [
+				[ 'path' => 'example.php', 'operation' => 'update', 'instruction' => 'Register the requested Media Library control.' ],
+			],
+		];
+
+		$result = ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( [ 'assets/app.js', 'assets/style.css', 'example.php' ], array_column( $result['manifest']['files'], 'path' ) );
+		$this->assertSame( [], $result['change_set']['deleted_paths'] );
+		$this->assertSame( [ 'example.php' ], $result['change_set']['updated_paths'] );
+	}
+
+	public function test_explicit_project_delete_action_requires_an_existing_non_main_path_without_instruction(): void {
+		$response = [
+			'outcome'             => 'changes',
+			'content'             => 'Remove an obsolete file.',
+			'resolved_request'    => 'Remove the obsolete stylesheet.',
+			'acceptance_criteria' => [ 'The obsolete stylesheet is absent.' ],
+			'manifest'            => $this->base,
+			'changes'             => [ [ 'path' => 'assets/style.css', 'operation' => 'delete', 'instruction' => 'Delete the file.' ] ],
+		];
+
+		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base ) );
+
+		$response['changes'] = [ [ 'path' => 'assets/missing.css', 'operation' => 'delete' ] ];
+		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base ) );
+
+		$response['changes'] = [ [ 'path' => 'example.php', 'operation' => 'delete' ] ];
+		$this->assertWPError( ( new Code_Follow_Up_Response() )->parse( wp_json_encode( $response ), $this->base ) );
 	}
 
 	public function test_rejects_new_file_without_instruction_and_noop_change(): void {

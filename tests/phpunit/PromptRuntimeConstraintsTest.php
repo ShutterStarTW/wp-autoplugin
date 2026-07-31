@@ -11,6 +11,7 @@ use WP_Autoplugin\V2\Domain\AI\Prompts\New_Plugin_Plan_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\Review_Prompt;
 use WP_Autoplugin\V2\Domain\AI\Prompts\WordPress_Runtime_Constraints;
 use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
+use WP_Autoplugin\V2\Orchestration\Code_Follow_Up_Orchestrator;
 use WP_Autoplugin\V2\Orchestration\Source_Agent;
 
 /** Ensures all active v2 Plan and Code prompts share the deployment constraints. */
@@ -153,6 +154,90 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 			$this->assertStringContainsString( '"change it"', $prompt );
 			$this->assertStringContainsString( 'Never ignore the requested change', $prompt );
 		}
+	}
+
+	public function test_complete_project_follow_ups_require_explicit_delete_actions(): void {
+		$prompts = [
+			( new New_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Extension_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
+		];
+
+		foreach ( $prompts as $prompt ) {
+			$this->assertStringContainsString( 'Omitting an existing', $prompt );
+			$this->assertStringContainsString( 'never deletes it', $prompt );
+			$this->assertStringContainsString( 'operation:"delete"', $prompt );
+			$this->assertStringContainsString( 'unless the administrator', $prompt );
+		}
+	}
+
+	public function test_compliance_input_includes_parent_manifest_and_topology_diff(): void {
+		$parent_manifest = [
+			'main_file' => 'example.php',
+			'files'     => [
+				[ 'path' => 'assets/app.js', 'type' => 'js' ],
+				[ 'path' => 'example.php', 'type' => 'php' ],
+			],
+		];
+		$candidate_manifest = [
+			'main_file' => 'example.php',
+			'files'     => [ [ 'path' => 'example.php', 'type' => 'php' ] ],
+		];
+		$topology_diff = [
+			'manifest_added_paths'   => [],
+			'manifest_removed_paths' => [ 'assets/app.js' ],
+			'action_changed_paths'   => [],
+			'main_file_changed'      => false,
+			'generated_paths'        => [ 'example.php' ],
+		];
+		$input = json_decode(
+			( new Code_Follow_Up_Compliance_Prompt() )->input(
+				'Add a button.',
+				[],
+				'Add the requested button.',
+				[ 'The button is visible.' ],
+				[],
+				$parent_manifest,
+				$candidate_manifest,
+				$topology_diff,
+				[ [ 'path' => 'example.php', 'type' => 'php', 'operation' => 'add', 'content' => '<?php' ] ]
+			),
+			true
+		);
+
+		$this->assertSame( $parent_manifest, $input['parent_manifest'] );
+		$this->assertSame( $topology_diff, $input['topology_diff'] );
+		$this->assertSame( $candidate_manifest, $input['candidate_manifest'] );
+	}
+
+	public function test_compliance_topology_diff_is_derived_from_parent_and_candidate_manifests(): void {
+		$method = new ReflectionMethod( Code_Follow_Up_Orchestrator::class, 'topology_diff' );
+		$method->setAccessible( true );
+		$diff = $method->invoke(
+			new Code_Follow_Up_Orchestrator(),
+			[
+				'main_file' => 'example.php',
+				'files'     => [
+					[ 'path' => 'assets/app.js', 'type' => 'js', 'operation' => 'add' ],
+					[ 'path' => 'assets/style.css', 'type' => 'css', 'operation' => 'add' ],
+					[ 'path' => 'example.php', 'type' => 'php', 'operation' => 'add' ],
+				],
+			],
+			[
+				'main_file' => 'new-main.php',
+				'files'     => [
+					[ 'path' => 'assets/app.js', 'type' => 'js', 'operation' => 'update' ],
+					[ 'path' => 'example.php', 'type' => 'php', 'operation' => 'add' ],
+					[ 'path' => 'new-main.php', 'type' => 'php', 'operation' => 'add' ],
+				],
+			],
+			[ [ 'path' => 'new-main.php' ], [ 'path' => 'assets/app.js' ] ]
+		);
+
+		$this->assertSame( [ 'new-main.php' ], $diff['manifest_added_paths'] );
+		$this->assertSame( [ 'assets/style.css' ], $diff['manifest_removed_paths'] );
+		$this->assertSame( [ 'assets/app.js' ], $diff['action_changed_paths'] );
+		$this->assertTrue( $diff['main_file_changed'] );
+		$this->assertSame( [ 'new-main.php', 'assets/app.js' ], $diff['generated_paths'] );
 	}
 
 	public function test_extension_follow_up_preserves_conversation_references_without_approving_the_old_plan(): void {
