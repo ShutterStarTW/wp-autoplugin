@@ -188,7 +188,7 @@ final class Plan_Response {
 				return new \WP_Error( 'plan_agent_structure_invalid', __( 'The provider returned an invalid Plan file map. No Plan artifact was changed.', 'wp-autoplugin' ) );
 			}
 			$path        = is_string( $file['path'] ?? null ) ? $this->relative_path( $file['path'] ) : '';
-			$type        = is_string( $file['type'] ?? null ) ? sanitize_key( $file['type'] ) : '';
+			$type        = Code_Validator::type_from_path( $path );
 			$action      = is_string( $file['action'] ?? null ) ? sanitize_key( $file['action'] ) : '';
 			$description = is_string( $file['description'] ?? null ) ? trim( $file['description'] ) : '';
 			if ( '' === $path || isset( $paths[ $path ] ) || ! in_array( $type, Code_Validator::GENERATED_TYPES, true ) || ! in_array( $action, [ 'add', 'update', 'delete' ], true ) || '' === $description ) {

@@ -170,6 +170,28 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_plan_and_follow_up_contracts_leave_file_type_derivation_to_the_server(): void {
+		$method = new ReflectionMethod( Source_Agent::class, 'instructions' );
+		$method->setAccessible( true );
+		$run     = [ 'tool_calls' => 0, 'source_bytes' => 0 ];
+		$prompts = [
+			( new New_Plugin_Plan_Prompt() )->initial_instructions(),
+			( new New_Plugin_Plan_Prompt() )->follow_up_instructions(),
+			( new New_Plugin_Plan_Prompt() )->structure_instructions(),
+			$method->invoke( new Source_Agent(), $run, 'plan', false, 'modify', false ),
+			$method->invoke( new Source_Agent(), $run, 'plan', false, 'hook_extension', false ),
+			( new New_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Extension_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),
+			( new Existing_Target_Code_Follow_Up_Prompt() )->analysis_instructions(),
+		];
+
+		foreach ( $prompts as $prompt ) {
+			$this->assertStringContainsString( 'server derives each file type from its path', $prompt );
+			$this->assertStringContainsString( 'do not return a type field', $prompt );
+			$this->assertStringNotContainsString( '"type":', $prompt );
+		}
+	}
+
 	public function test_compliance_input_includes_parent_manifest_and_topology_diff(): void {
 		$parent_manifest = [
 			'main_file' => 'example.php',

@@ -106,6 +106,14 @@ final class Code_Follow_Up_Response {
 			}
 			$candidate['files'] = $candidate_files;
 		}
+		if ( is_array( $candidate['files'] ?? null ) ) {
+			foreach ( $candidate['files'] as &$file ) {
+				if ( is_array( $file ) ) {
+					$file['type'] = Code_Validator::type_from_path( (string) ( $file['path'] ?? '' ) );
+				}
+			}
+			unset( $file );
+		}
 		$manifest = $validator->manifest( $candidate );
 		if ( is_wp_error( $manifest ) ) {
 			return $this->error( 'code_follow_up_manifest', $manifest->get_error_message() );

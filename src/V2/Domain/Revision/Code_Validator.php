@@ -11,6 +11,12 @@ final class Code_Validator {
 	public const GENERATED_TYPES       = [ 'php', 'js', 'css', 'json', 'html', 'svg', 'xml', 'md', 'txt' ];
 	private const SUPPORTED_TYPES      = [ 'php', 'js', 'jsx', 'ts', 'tsx', 'css', 'scss', 'json', 'html', 'svg', 'xml', 'md', 'txt' ];
 
+	/** Derive the canonical AI-generated file type from its path extension. */
+	public static function type_from_path( string $path ): string {
+		$type = strtolower( (string) pathinfo( wp_normalize_path( trim( $path ) ), PATHINFO_EXTENSION ) );
+		return in_array( $type, self::GENERATED_TYPES, true ) ? $type : '';
+	}
+
 	/**
 	 * Normalize and validate structured Plan metadata before billable work.
 	 *
@@ -46,12 +52,16 @@ final class Code_Validator {
 		$files = [];
 		foreach ( $raw as $file ) {
 			$action = is_array( $file ) ? sanitize_key( (string) ( $file['action'] ?? '' ) ) : '';
-			$type   = is_array( $file ) ? sanitize_key( (string) ( $file['type'] ?? '' ) ) : '';
-			if ( 'add' !== $action || ! in_array( $type, self::GENERATED_TYPES, true ) ) {
+			$path   = is_array( $file ) ? (string) ( $file['path'] ?? '' ) : '';
+			$type   = self::type_from_path( $path );
+			if ( '' === $type ) {
+				return $this->unsupported_plan_extension( $path );
+			}
+			if ( 'add' !== $action ) {
 				return new \WP_Error( 'code_plan_manifest_invalid', __( 'The Plan file map is invalid. Regenerate the Plan before generating Code.', 'wp-autoplugin' ) );
 			}
 			$files[] = [
-				'path'        => is_array( $file ) ? $file['path'] ?? '' : '',
+				'path'        => $path,
 				'type'        => $type,
 				'description' => is_array( $file ) ? $file['description'] ?? '' : '',
 				'operation'   => 'add',
@@ -377,12 +387,13 @@ final class Code_Validator {
 		}
 		$files = [];
 		foreach ( $raw as $file ) {
-			$type = is_array( $file ) ? sanitize_key( (string) ( $file['type'] ?? '' ) ) : '';
-			if ( ! in_array( $type, self::GENERATED_TYPES, true ) ) {
-				return new \WP_Error( 'code_plan_manifest_invalid', __( 'The Plan file map is invalid. Regenerate the Plan before generating Code.', 'wp-autoplugin' ) );
+			$path = is_array( $file ) ? (string) ( $file['path'] ?? '' ) : '';
+			$type = self::type_from_path( $path );
+			if ( '' === $type ) {
+				return $this->unsupported_plan_extension( $path );
 			}
 			$files[] = [
-				'path'        => is_array( $file ) ? $file['path'] ?? '' : '',
+				'path'        => $path,
 				'type'        => $type,
 				'description' => is_array( $file ) ? $file['description'] ?? '' : '',
 				'operation'   => is_array( $file ) ? $file['action'] ?? '' : '',
@@ -399,6 +410,17 @@ final class Code_Validator {
 				'target_ref'    => $target_ref,
 				'files'         => $files,
 			]
+		);
+	}
+
+	private function unsupported_plan_extension( string $path ): \WP_Error {
+		return new \WP_Error(
+			'code_plan_file_extension_invalid',
+			sprintf(
+				/* translators: %s: bounded Plan-relative file path. */
+				__( 'The Plan file "%s" has an unsupported extension. Use PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain text.', 'wp-autoplugin' ),
+				substr( $path, 0, 500 )
+			)
 		);
 	}
 

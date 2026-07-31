@@ -37,6 +37,29 @@ final class PlanResponseTest extends WP_UnitTestCase {
 		$this->assertSame( [ 'content' => 'The current Plan already covers that.', 'outcome' => 'answer' ], $result );
 	}
 
+	public function test_derives_file_types_from_paths_and_ignores_model_supplied_values(): void {
+		$response = wp_json_encode(
+			[
+				'outcome'    => 'artifact',
+				'content'    => '# Prompt settings Plan',
+				'structured' => [
+					'project_structure' => [
+						'directories' => [ 'views' ],
+						'files'       => [
+							[ 'path' => 'views/page-settings.php', 'type' => 'html', 'description' => 'Update the settings view.', 'action' => 'update' ],
+							[ 'path' => 'views/page-prompts.php', 'description' => 'Add the prompt editor view.', 'action' => 'add' ],
+						],
+					],
+				],
+			]
+		);
+
+		$result = ( new Plan_Response() )->parse( (string) $response );
+
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( [ 'php', 'php' ], array_column( $result['structured']['project_structure']['files'], 'type' ) );
+	}
+
 	public function test_links_follow_up_artifact_to_parent_plan(): void {
 		$response = wp_json_encode(
 			[

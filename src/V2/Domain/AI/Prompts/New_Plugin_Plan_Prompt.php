@@ -5,7 +5,7 @@ namespace WP_Autoplugin\V2\Domain\AI\Prompts;
 /** Builds the versioned direct prompts for a new-plugin Plan. */
 final class New_Plugin_Plan_Prompt {
 	public const SLUG    = 'new-plugin-plan';
-	public const VERSION = 6;
+	public const VERSION = 7;
 
 	public function initial_instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
@@ -16,9 +16,9 @@ You are a WordPress plugin implementation planning agent. Prepare a complete imp
 $runtime_constraints
 
 Return only one valid JSON object with no Markdown fence in this shape:
-{"outcome":"artifact","content":"complete Plan in Markdown","structured":{"plugin_name":"Name of the new plugin","main_file":"plugin-slug.php","project_structure":{"directories":["relative/directory/"],"files":[{"path":"plugin-slug.php","type":"php","description":"brief purpose","action":"add"}]}}}
+{"outcome":"artifact","content":"complete Plan in Markdown","structured":{"plugin_name":"Name of the new plugin","main_file":"plugin-slug.php","project_structure":{"directories":["relative/directory/"],"files":[{"path":"plugin-slug.php","description":"brief purpose","action":"add"}]}}}
 
-The Markdown Plan must describe the intended behavior, architecture, data flow, security considerations, and implementation steps in enough detail for a later coding task. The project structure must be minimal but complete. main_file must name one root-level PHP file in project_structure.files. It must contain at least one PHP file, every action must be "add", file type must be "php", "js", "css", "json", "html", "svg", "xml", "md", or "txt", and every path must be relative to the new plugin root and unique. Do not include source code.
+The Markdown Plan must describe the intended behavior, architecture, data flow, security considerations, and implementation steps in enough detail for a later coding task. The project structure must be minimal but complete. main_file must name one root-level .php file in project_structure.files. It must contain at least one .php file, every action must be "add", and every path must be relative to the new plugin root, unique, and end in .php, .js, .css, .json, .html, .svg, .xml, .md, or .txt. The server derives each file type from its path; do not return a type field. Do not include source code.
 PROMPT;
 	}
 
@@ -38,9 +38,9 @@ For a question, request for explanation, or ambiguity, return only:
 {"outcome":"answer","content":"concise Markdown answer"}
 
 Only when the administrator clearly requests a change to the Plan or its implementation requirements, return a complete replacement artifact using only:
-{"outcome":"artifact","content":"complete replacement Plan in Markdown","structured":{"plugin_name":"Name of the new plugin","main_file":"plugin-slug.php","project_structure":{"directories":["relative/directory/"],"files":[{"path":"plugin-slug.php","type":"php","description":"brief purpose","action":"add"}]}}}
+{"outcome":"artifact","content":"complete replacement Plan in Markdown","structured":{"plugin_name":"Name of the new plugin","main_file":"plugin-slug.php","project_structure":{"directories":["relative/directory/"],"files":[{"path":"plugin-slug.php","description":"brief purpose","action":"add"}]}}}
 
-A replacement artifact must contain the entire updated Plan and file map, not a patch or partial response. main_file must name one root-level PHP file in the file map. It must contain at least one PHP file, every action must be "add", file type must be "php", "js", "css", "json", "html", "svg", "xml", "md", or "txt", and every path must be relative to the new plugin root and unique. Do not include source code or a Markdown fence around the JSON.
+A replacement artifact must contain the entire updated Plan and file map, not a patch or partial response. main_file must name one root-level .php file in the file map. It must contain at least one .php file, every action must be "add", and every path must be relative to the new plugin root, unique, and end in .php, .js, .css, .json, .html, .svg, .xml, .md, or .txt. The server derives each file type from its path; do not return a type field. Do not include source code or a Markdown fence around the JSON.
 PROMPT;
 	}
 
@@ -77,9 +77,9 @@ You are regenerating the validated file map for an administrator-edited Plan for
 $runtime_constraints
 
 Return only one valid JSON object with no Markdown fence in this shape:
-{"outcome":"artifact","content":"the complete administrator-edited Plan in Markdown","structured":{"plugin_name":"Name of the new plugin","main_file":"plugin-slug.php","project_structure":{"directories":["relative/directory/"],"files":[{"path":"plugin-slug.php","type":"php","description":"brief purpose","action":"add"}]}}}
+{"outcome":"artifact","content":"the complete administrator-edited Plan in Markdown","structured":{"plugin_name":"Name of the new plugin","main_file":"plugin-slug.php","project_structure":{"directories":["relative/directory/"],"files":[{"path":"plugin-slug.php","description":"brief purpose","action":"add"}]}}}
 
-Preserve the supplied Markdown Plan as the artifact content. Derive a minimal but complete file map from it. main_file must name one root-level PHP file in the file map. The structure must contain at least one PHP file, every action must be "add", file type must be "php", "js", "css", "json", "html", "svg", "xml", "md", or "txt", and every path must be relative to the new plugin root and unique. Do not include source code.
+Preserve the supplied Markdown Plan as the artifact content. Derive a minimal but complete file map from it. main_file must name one root-level .php file in the file map. The structure must contain at least one .php file, every action must be "add", and every path must be relative to the new plugin root, unique, and end in .php, .js, .css, .json, .html, .svg, .xml, .md, or .txt. The server derives each file type from its path; do not return a type field. Do not include source code.
 PROMPT;
 	}
 

@@ -357,6 +357,51 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 		$this->assertSame( '', $plan['main_file'] );
 	}
 
+	public function test_existing_plugin_preflight_derives_types_for_legacy_plan_rows(): void {
+		$plan = $this->validator->plan(
+			[
+				'project_structure' => [
+					'files' => [
+						[ 'path' => 'views/page-settings.php', 'type' => 'html', 'action' => 'update', 'description' => 'Update the settings view.' ],
+						[ 'path' => 'views/page-prompts.php', 'action' => 'add', 'description' => 'Add the prompt editor view.' ],
+					],
+				],
+			],
+			[
+				'operation'       => 'modify',
+				'target_kind'     => 'plugin',
+				'target_ref'      => 'superdraft/superdraft.php',
+				'project_name'    => 'Superdraft',
+				'target_metadata' => [ 'kind' => 'plugin', 'ref' => 'superdraft/superdraft.php', 'name' => 'Superdraft' ],
+			]
+		);
+
+		$this->assertFalse( is_wp_error( $plan ) );
+		$this->assertSame( [ 'php', 'php' ], array_column( $plan['files'], 'type' ) );
+		$this->assertSame( [ 'update', 'add' ], array_column( $plan['files'], 'operation' ) );
+	}
+
+	public function test_plan_preflight_identifies_the_unsupported_extension_path(): void {
+		$plan = $this->validator->plan(
+			[
+				'project_structure' => [
+					'files' => [ [ 'path' => 'assets/archive.zip', 'action' => 'add', 'description' => 'Unsupported archive.' ] ],
+				],
+			],
+			[
+				'operation'       => 'modify',
+				'target_kind'     => 'plugin',
+				'target_ref'      => 'fixture/fixture.php',
+				'project_name'    => 'Fixture',
+				'target_metadata' => [ 'kind' => 'plugin', 'ref' => 'fixture/fixture.php', 'name' => 'Fixture' ],
+			]
+		);
+
+		$this->assertWPError( $plan );
+		$this->assertSame( 'code_plan_file_extension_invalid', $plan->get_error_code() );
+		$this->assertStringContainsString( 'assets/archive.zip', $plan->get_error_message() );
+	}
+
 	public function test_existing_theme_plan_rejects_parent_source_namespace_as_an_edit_path(): void {
 		$plan = $this->validator->plan(
 			[

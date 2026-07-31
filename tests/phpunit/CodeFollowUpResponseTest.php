@@ -84,7 +84,7 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 			'manifest'            => [
 				'plugin_name' => 'Example',
 				'main_file'   => 'example.php',
-				'files'       => [ [ 'path' => 'example.php', 'type' => 'php', 'description' => 'Bootstrap and Media Library integration.' ] ],
+				'files'       => [ [ 'path' => 'example.php', 'type' => 'html', 'description' => 'Bootstrap and Media Library integration.' ] ],
 			],
 			'changes'             => [
 				[ 'path' => 'example.php', 'operation' => 'update', 'instruction' => 'Register the requested Media Library control.' ],
@@ -95,6 +95,7 @@ final class CodeFollowUpResponseTest extends WP_UnitTestCase {
 
 		$this->assertFalse( is_wp_error( $result ) );
 		$this->assertSame( [ 'assets/app.js', 'assets/style.css', 'example.php' ], array_column( $result['manifest']['files'], 'path' ) );
+		$this->assertSame( [ 'js', 'css', 'php' ], array_column( $result['manifest']['files'], 'type' ) );
 		$this->assertSame( [], $result['change_set']['deleted_paths'] );
 		$this->assertSame( [ 'example.php' ], $result['change_set']['updated_paths'] );
 	}
