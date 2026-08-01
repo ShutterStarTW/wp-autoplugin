@@ -11,6 +11,7 @@ use WP_Autoplugin\V2\Infrastructure\Database\Job_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Plan_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Review_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Revision_Repository;
+use WP_Autoplugin\V2\Infrastructure\Database\Revision_Intent_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Usage_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Project_Repository;
 use WP_Autoplugin\V2\Infrastructure\Database\Prompt_Attachment_Repository;
@@ -205,6 +206,9 @@ final class Review_Orchestrator {
 			}
 			$jobs->event( (int) $job['id'], 'review_retry', __( 'The reviewer response was invalid or retryable; retrying.', 'wp-autoplugin' ), [ 'attempt' => $attempt + 1 ], 'warning' );
 			$input .= "\n\nThe previous response failed strict validation. Return the complete exact JSON contract again.";
+			if ( is_wp_error( $response ) && str_starts_with( (string) $response->get_error_code(), 'review_' ) ) {
+				$input .= ' Validation feedback: ' . substr( wp_strip_all_tags( $response->get_error_message() ), 0, 500 );
+			}
 		}
 
 		if ( ! is_array( $parsed ) ) {
@@ -279,18 +283,14 @@ final class Review_Orchestrator {
 	private function context( array $workspace, array $revision, ?array $parent, Job_Repository $jobs ) {
 		$plan            = ( new Plan_Repository() )->find( (int) ( $revision['plan_id'] ?? 0 ) );
 		$files           = [];
-		$parent_files    = [];
 		$parent_revision = null;
 		if ( ! empty( $revision['parent_revision_id'] ) ) {
 			$parent_revision = ( new Revision_Repository() )->find( (int) $revision['parent_revision_id'] );
-			foreach ( (array) ( $parent_revision['files'] ?? [] ) as $file ) {
-				$parent_files[ (string) $file['path'] ] = (string) $file['content'];
-			}
 		}
+		$predecessor_changes = $this->predecessor_changes( $parent_revision, $revision );
 		foreach ( (array) $revision['files'] as $file ) {
-			$before               = null !== ( $file['base_content'] ?? null ) ? (string) $file['base_content'] : ( $parent_files[ $file['path'] ] ?? null );
-			$file['base_content'] = $before;
-			$files[]              = [
+			$before  = null !== ( $file['base_content'] ?? null ) ? (string) $file['base_content'] : null;
+			$files[] = [
 				'id'           => (int) $file['id'],
 				'path'         => (string) $file['path'],
 				'change_type'  => (string) $file['change_type'],
@@ -299,6 +299,10 @@ final class Review_Orchestrator {
 			];
 		}
 		$revision['files'] = $files;
+		$intent            = ( new Revision_Intent_Repository() )->for_revision( (int) $revision['id'] );
+		if ( is_wp_error( $intent ) ) {
+			return $intent;
+		}
 		$target_tree       = null;
 		if ( 'changes' === ( $revision['project_manifest']['scope'] ?? '' ) ) {
 			try {
@@ -350,19 +354,24 @@ final class Review_Orchestrator {
 				),
 			],
 			'root_plugin_instructions' => $root_plugin_instructions,
-				'plan'                     => [
-					'plan_id'    => (int) ( $plan['id'] ?? 0 ),
-					'content'    => (string) ( $plan['content'] ?? '' ),
-					'structured' => (array) ( $plan['structured'] ?? [] ),
-				],
+			'plan'                     => [
+				'plan_id'    => (int) ( $plan['id'] ?? 0 ),
+				'content'    => (string) ( $plan['content'] ?? '' ),
+				'structured' => (array) ( $plan['structured'] ?? [] ),
+			],
+			'effective_requirements'   => $intent,
 			'revision'                 => [
-				'id'                 => (int) $revision['id'],
-				'number'             => (int) $revision['revision_number'],
-				'parent_revision_id' => $revision['parent_revision_id'],
-				'manifest'           => $revision['project_manifest'],
-				'files'              => $files,
-				'parent_changes'     => $this->parent_changes( $parent_revision, $revision ),
-				'target_tree'        => $target_tree,
+				'id'                        => (int) $revision['id'],
+				'number'                    => (int) $revision['revision_number'],
+				'origin'                    => (string) $revision['origin'],
+				'summary'                   => (string) ( $revision['summary'] ?? '' ),
+				'source_job_id'             => $revision['source_job_id'],
+				'parent_revision_id'        => $revision['parent_revision_id'],
+				'restored_from_revision_id' => $revision['restored_from_revision_id'],
+				'manifest'                  => $revision['project_manifest'],
+				'files'                     => $files,
+				'predecessor_changes'       => $predecessor_changes,
+				'target_tree'               => $target_tree,
 			],
 			'previous_report'          => $parent ? [
 				'id'          => (int) $parent['id'],
@@ -375,7 +384,7 @@ final class Review_Orchestrator {
 	}
 
 	/** Describe only the source changes between a parent and successor revision. */
-	private function parent_changes( ?array $parent, array $revision ): array {
+	private function predecessor_changes( ?array $parent, array $revision ): array {
 		if ( ! $parent ) {
 			return [];
 		}

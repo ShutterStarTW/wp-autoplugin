@@ -169,6 +169,34 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_review_prompt_uses_revision_intent_and_current_review_request_precedence(): void {
+		$prompt       = new Review_Prompt();
+		$instructions = $prompt->instructions( true, true );
+
+		$this->assertStringContainsString( 'resolved_request and acceptance_criteria are an administrator-approved functional amendment', $instructions );
+		$this->assertStringContainsString( 'let a later amendment override any conflicting baseline detail', $instructions );
+		$this->assertStringContainsString( 'Never report intentional divergence covered by an accepted amendment as a defect', $instructions );
+		$this->assertStringContainsString( 'current_review_request is non-empty, it is the authoritative administrator direction', $instructions );
+		$this->assertStringContainsString( 'exact complete source text from that selected side and range', $instructions );
+
+		$context = [
+			'workspace'              => [ 'request' => 'Create a Settings page.' ],
+			'plan'                   => [ 'plan_id' => 7, 'content' => 'Use Settings.', 'structured' => [] ],
+			'effective_requirements' => [
+				'revision_id'           => 13,
+				'plan_id'               => 7,
+				'accepted_code_changes' => [ [ 'resolved_request' => 'Move the page under Superdraft.' ] ],
+			],
+			'revision'               => [ 'id' => 13, 'files' => [] ],
+		];
+		$input   = $prompt->input( $context, [], [], 'Reconsider the menu-placement finding.' );
+		$payload = json_decode( substr( $input, strpos( $input, '{' ) ), true );
+
+		$this->assertSame( $context['effective_requirements'], $payload['effective_requirements'] );
+		$this->assertSame( 'Reconsider the menu-placement finding.', $payload['current_review_request'] );
+		$this->assertArrayNotHasKey( 'message', $payload );
+	}
+
 	public function test_complete_project_follow_ups_require_explicit_delete_actions(): void {
 		$prompts = [
 			( new New_Plugin_Code_Follow_Up_Prompt() )->analysis_instructions(),

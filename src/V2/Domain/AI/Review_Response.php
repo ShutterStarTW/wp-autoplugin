@@ -4,11 +4,12 @@ namespace WP_Autoplugin\V2\Domain\AI;
 
 /** Validates one complete, revision-anchored Review response. */
 final class Review_Response {
-	private const PRIORITIES     = [ 'P0', 'P1', 'P2', 'P3' ];
-	private const CATEGORIES     = [ 'security', 'correctness', 'compatibility', 'performance', 'maintainability' ];
-	private const DISPOSITIONS   = [ 'open', 'resolved', 'retracted' ];
-	private const MAX_FINDINGS   = 20;
-	private const MAX_TEXT_BYTES = 32768;
+	private const PRIORITIES         = [ 'P0', 'P1', 'P2', 'P3' ];
+	private const CATEGORIES         = [ 'security', 'correctness', 'compatibility', 'performance', 'maintainability' ];
+	private const DISPOSITIONS       = [ 'open', 'resolved', 'retracted' ];
+	private const MAX_FINDINGS       = 20;
+	private const MAX_TEXT_BYTES     = 32768;
+	private const MAX_EVIDENCE_BYTES = 8192;
 
 	/**
 	 * @param array<string, mixed>             $revision Revision with private file contents.
@@ -129,7 +130,7 @@ final class Review_Response {
 
 	/** @param array<string, mixed> $raw @param array<int, string> $extra */
 	private function finding( array $raw, array $revision, array $extra = [] ) {
-		$required = [ 'priority', 'category', 'title', 'body', 'suggested_fix', 'path', 'side', 'start_line', 'end_line' ];
+		$required = [ 'priority', 'category', 'title', 'body', 'suggested_fix', 'path', 'side', 'start_line', 'end_line', 'evidence' ];
 		$allowed  = array_merge( $required, $extra );
 		if ( array_diff( array_keys( $raw ), $allowed ) || array_diff( $required, array_keys( $raw ) ) ) {
 			return $this->error( 'review_finding_shape', __( 'A Review finding contains unsupported fields.', 'wp-autoplugin' ) );
@@ -144,7 +145,7 @@ final class Review_Response {
 		}
 		$path = is_string( $raw['path'] ?? null ) ? trim( str_replace( '\\', '/', $raw['path'] ) ) : '';
 		if ( '' === $path ) {
-			if ( null !== $raw['path'] || null !== $raw['side'] || null !== $raw['start_line'] || null !== $raw['end_line'] ) {
+			if ( null !== $raw['path'] || null !== $raw['side'] || null !== $raw['start_line'] || null !== $raw['end_line'] || null !== $raw['evidence'] ) {
 				return $this->error( 'review_finding_project_location', __( 'A project-level Review finding must use null source location fields.', 'wp-autoplugin' ) );
 			}
 			return [
@@ -183,7 +184,11 @@ final class Review_Response {
 		if ( $start < 1 || $end < $start || $end > $count || $end - $start > 50 ) {
 			return $this->error( 'review_finding_lines', __( 'A Review finding references an invalid source line range.', 'wp-autoplugin' ) );
 		}
-		$slice = array_slice( (array) $lines, $start - 1, $end - $start + 1 );
+		$slice    = array_slice( (array) $lines, $start - 1, $end - $start + 1 );
+		$evidence = implode( "\n", $slice );
+		if ( ! is_string( $raw['evidence'] ?? null ) || strlen( $evidence ) > self::MAX_EVIDENCE_BYTES || ! hash_equals( $evidence, (string) $raw['evidence'] ) ) {
+			return $this->error( 'review_finding_evidence', __( 'A Review finding must include the exact source text from its selected side and line range.', 'wp-autoplugin' ) );
+		}
 		return [
 			'priority'      => $priority,
 			'category'      => $category,
@@ -194,7 +199,7 @@ final class Review_Response {
 			'side'          => $side,
 			'start_line'    => $start,
 			'end_line'      => $end,
-			'anchor_hash'   => hash( 'sha256', implode( "\n", $slice ) ),
+			'anchor_hash'   => hash( 'sha256', $evidence ),
 		];
 	}
 
