@@ -62,14 +62,11 @@ final class ReviewResponseTest extends WP_UnitTestCase {
 		$this->assertWPError( $parser->parse( $this->report_with( $this->finding( 'example.php', 'base', 99 ) ), $this->revision ) );
 	}
 
-	public function test_source_findings_require_exact_selected_evidence(): void {
-		$finding             = $this->finding( 'example.php', 'staged', 3 );
-		$finding['evidence'] = "\treturn 1;";
+	public function test_source_findings_derive_the_anchor_from_the_selected_source(): void {
+		$result = ( new Review_Response() )->parse( $this->report_with( $this->finding( 'example.php', 'base', 3 ) ), $this->revision );
 
-		$error = ( new Review_Response() )->parse( $this->report_with( $finding ), $this->revision );
-
-		$this->assertWPError( $error );
-		$this->assertSame( 'review_finding_evidence', $error->get_error_code() );
+		$this->assertFalse( is_wp_error( $result ) );
+		$this->assertSame( hash( 'sha256', "\treturn 1;" ), $result['new_findings'][0]['anchor_hash'] );
 	}
 
 	public function test_project_findings_require_explicit_null_location_fields(): void {
@@ -123,16 +120,6 @@ final class ReviewResponseTest extends WP_UnitTestCase {
 
 	/** @return array<string, mixed> */
 	private function finding( string $path, string $side, int $line ): array {
-		$evidence = null;
-		foreach ( $this->revision['files'] as $file ) {
-			if ( $path !== $file['path'] ) {
-				continue;
-			}
-			$source   = 'base' === $side ? (string) $file['base_content'] : (string) $file['content'];
-			$lines    = preg_split( '/\r\n|\r|\n/', $source ) ?: [];
-			$evidence = $lines[ $line - 1 ] ?? '';
-			break;
-		}
 		return [
 			'priority'      => 'P1',
 			'category'      => 'correctness',
@@ -143,7 +130,6 @@ final class ReviewResponseTest extends WP_UnitTestCase {
 			'side'          => $side,
 			'start_line'    => $line,
 			'end_line'      => $line,
-			'evidence'      => $evidence,
 		];
 	}
 

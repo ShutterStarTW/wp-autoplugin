@@ -177,7 +177,8 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( 'let a later amendment override any conflicting baseline detail', $instructions );
 		$this->assertStringContainsString( 'Never report intentional divergence covered by an accepted amendment as a defect', $instructions );
 		$this->assertStringContainsString( 'current_review_request is non-empty, it is the authoritative administrator direction', $instructions );
-		$this->assertStringContainsString( 'exact complete source text from that selected side and range', $instructions );
+		$this->assertStringContainsString( 'Every displayed source line begins with its canonical one-based label', $instructions );
+		$this->assertStringContainsString( 'The server derives the canonical evidence and anchor from that location', $instructions );
 
 		$context = [
 			'workspace'              => [ 'request' => 'Create a Settings page.' ],
@@ -187,13 +188,27 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 				'plan_id'               => 7,
 				'accepted_code_changes' => [ [ 'resolved_request' => 'Move the page under Superdraft.' ] ],
 			],
-			'revision'               => [ 'id' => 13, 'files' => [] ],
+			'revision'               => [
+				'id'    => 13,
+				'files' => [
+					[
+						'path'         => 'plugin.php',
+						'change_type'  => 'update',
+						'content'      => "<?php\r\nreturn 2;\r\n",
+						'base_content' => "<?php\nreturn 1;\n",
+					],
+				],
+			],
 		];
 		$input   = $prompt->input( $context, [], [], 'Reconsider the menu-placement finding.' );
 		$payload = json_decode( substr( $input, strpos( $input, '{' ) ), true );
 
 		$this->assertSame( $context['effective_requirements'], $payload['effective_requirements'] );
 		$this->assertSame( 'Reconsider the menu-placement finding.', $payload['current_review_request'] );
+		$this->assertSame( "L1|<?php\nL2|return 2;\nL3|", $payload['revision']['files'][0]['staged_source'] );
+		$this->assertSame( "L1|<?php\nL2|return 1;\nL3|", $payload['revision']['files'][0]['base_source'] );
+		$this->assertArrayNotHasKey( 'content', $payload['revision']['files'][0] );
+		$this->assertArrayNotHasKey( 'base_content', $payload['revision']['files'][0] );
 		$this->assertArrayNotHasKey( 'message', $payload );
 	}
 
