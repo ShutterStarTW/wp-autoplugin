@@ -7,7 +7,7 @@ use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
 /** Builds one bounded prompt for each approved installed-target file change. */
 final class Existing_Target_Code_Prompt {
 	public const SLUG    = 'existing-target-code';
-	public const VERSION = 8;
+	public const VERSION = 9;
 
 	public function instructions( string $operation = 'add' ): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
@@ -15,7 +15,7 @@ final class Existing_Target_Code_Prompt {
 
 		if ( 'update' === $operation ) {
 			return <<<PROMPT
-You are implementing one approved targeted edit in an existing PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text file in a WordPress plugin or theme. Use the supplied current file as the authoritative baseline. Return only the smallest exact search/replace operations needed to implement the approved Plan; never return, rewrite, or reproduce the complete file. Every search string must be copied byte-for-byte from the supplied current content, contain enough surrounding context to occur exactly once, and must not cover the entire file. All searches are matched against the original file and therefore must not overlap. Preserve unrelated behavior, formatting, comments, line endings, and content. JSON must remain syntactically valid; SVG and XML must remain well-formed XML; HTML may remain a document or fragment according to the original file. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. For plugin targets, the main_file must retain exactly one populated Plugin Name header and supporting PHP files must not add one. If target metadata includes parent_theme, treat it only as inherited read-only context; every response path and edit remains relative to the selected child-theme target. Never change any unplanned path.
+You are implementing one approved targeted edit in an existing PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text file in a WordPress plugin or theme. Use the supplied current file as the authoritative baseline. Return only the smallest exact search/replace operations needed to implement the approved Plan; never return, rewrite, or reproduce the complete file. Every search string must be copied byte-for-byte from the supplied current content, contain enough surrounding context to occur exactly once, and must not cover the entire file. All searches are matched against the original file and therefore must not overlap. If validation feedback reports zero matches, recopy that search from the supplied source including exact indentation and whitespace. If it reports multiple matches, extend that search with unchanged surrounding context that makes it unique. Preserve unrelated behavior, formatting, comments, line endings, and content. JSON must remain syntactically valid; SVG and XML must remain well-formed XML; HTML may remain a document or fragment according to the original file. Follow WordPress security, escaping, sanitization, nonce, capability, internationalization, and coding conventions where applicable. For plugin targets, the main_file must retain exactly one populated Plugin Name header and supporting PHP files must not add one. If target metadata includes parent_theme, treat it only as inherited read-only context; every response path and edit remains relative to the selected child-theme target. Never change any unplanned path.
 
 $plugin_instructions
 

@@ -79,6 +79,19 @@ final class PromptRuntimeConstraintsTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_existing_target_update_prompt_explains_exact_match_retry_feedback(): void {
+		$prompts = [
+			( new Existing_Target_Code_Prompt() )->instructions( 'update' ),
+			( new Existing_Target_Code_Follow_Up_Prompt() )->file_instructions( 'update' ),
+		];
+
+		foreach ( $prompts as $prompt ) {
+			$this->assertStringContainsString( 'reports zero matches', $prompt );
+			$this->assertStringContainsString( 'reports multiple matches', $prompt );
+			$this->assertStringContainsString( 'exact indentation and whitespace', $prompt );
+		}
+	}
+
 	public function test_plan_and_code_prompts_allow_supported_non_code_files(): void {
 		$prompts = [
 			( new New_Plugin_Plan_Prompt() )->initial_instructions(),

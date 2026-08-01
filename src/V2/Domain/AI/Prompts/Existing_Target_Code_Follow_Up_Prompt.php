@@ -7,7 +7,7 @@ use WP_Autoplugin\V2\Domain\Target\Plugin_Instructions;
 /** Versioned questions and staged A/M/D follow-ups for an installed target. */
 final class Existing_Target_Code_Follow_Up_Prompt {
 	public const SLUG    = 'existing-target-code-follow-up';
-	public const VERSION = 8;
+	public const VERSION = 9;
 
 	public function analysis_instructions(): string {
 		$runtime_constraints = WordPress_Runtime_Constraints::instructions();
@@ -60,7 +60,7 @@ PROMPT;
 		$priority            = Code_Follow_Up_Priority::generation_instructions();
 		if ( 'update' === $operation ) {
 			return <<<PROMPT
-Implement one bounded update to a staged WordPress target file. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","replacements":[{"search":"exact existing block","replace":"replacement block"}]}. Return 1-20 unique, non-overlapping exact replacements. Do not wrap the JSON response in a Markdown fence; Markdown replacement content may contain fenced examples encoded inside JSON strings. Each search must occur exactly once in the supplied effective content. Do not replace the whole file. Preserve all unrelated content. PHP must remain parseable without execution, JSON must remain syntactically valid, and SVG and XML must remain well-formed XML. Never modify any other path.
+Implement one bounded update to a staged WordPress target file. Return exactly one valid JSON object with exactly these keys: {"path":"the/exact/requested-path.ext","replacements":[{"search":"exact existing block","replace":"replacement block"}]}. Return 1-20 unique, non-overlapping exact replacements. Do not wrap the JSON response in a Markdown fence; Markdown replacement content may contain fenced examples encoded inside JSON strings. Each search must occur exactly once in the supplied effective content. If validation feedback reports zero matches, recopy that search including exact indentation and whitespace. If it reports multiple matches, extend that search with unchanged surrounding context that makes it unique. Do not replace the whole file. Preserve all unrelated content. PHP must remain parseable without execution, JSON must remain syntactically valid, and SVG and XML must remain well-formed XML. Never modify any other path.
 
 $priority
 

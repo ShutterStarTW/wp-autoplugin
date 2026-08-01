@@ -238,7 +238,7 @@ final class Code_Validator {
 		$issues  = [];
 		$payload = 0;
 		$seen    = [];
-		foreach ( $decoded['replacements'] as $replacement ) {
+		foreach ( $decoded['replacements'] as $replacement_index => $replacement ) {
 			if (
 				! is_array( $replacement )
 				|| array_diff( array_keys( $replacement ), [ 'search', 'replace' ] )
@@ -269,7 +269,22 @@ final class Code_Validator {
 			}
 			$matches = substr_count( $original, $search );
 			if ( 1 !== $matches ) {
-				$issues[] = $this->issue( $path, 0, 'search_match_count', __( 'Each search block must occur exactly once in the original target file.', 'wp-autoplugin' ) );
+				$message = 0 === $matches
+					? sprintf(
+						/* translators: %d: one-based replacement index. */
+						__( 'Replacement %d did not match the original target file. Recopy its search text byte-for-byte from the supplied source, including whitespace.', 'wp-autoplugin' ),
+						$replacement_index + 1
+					)
+					: sprintf(
+						/* translators: 1: one-based replacement index, 2: number of source matches. */
+						__( 'Replacement %1$d matched %2$d locations in the original target file. Include more unchanged surrounding context so it matches exactly once.', 'wp-autoplugin' ),
+						$replacement_index + 1,
+						$matches
+					);
+				$issue                      = $this->issue( $path, 0, 'search_match_count', $message );
+				$issue['replacement_index'] = $replacement_index + 1;
+				$issue['match_count']        = $matches;
+				$issues[]                    = $issue;
 				continue;
 			}
 			$start   = (int) strpos( $original, $search );

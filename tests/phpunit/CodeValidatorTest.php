@@ -188,14 +188,27 @@ final class CodeValidatorTest extends WP_UnitTestCase {
 				'replacements' => [ [ 'search' => 'return 1;', 'replace' => 'return 2;' ] ],
 			]
 		);
+		$missing = wp_json_encode(
+			[
+				'path'         => 'functions.php',
+				'replacements' => [ [ 'search' => 'return 3;', 'replace' => 'return 2;' ] ],
+			]
+		);
 
-		$whole_result = $this->validator->update_response( (string) $whole, $expected, $manifest, $original );
+		$whole_result     = $this->validator->update_response( (string) $whole, $expected, $manifest, $original );
 		$ambiguous_result = $this->validator->update_response( (string) $ambiguous, $expected, $manifest, $original );
+		$missing_result   = $this->validator->update_response( (string) $missing, $expected, $manifest, $original );
 
 		$this->assertWPError( $whole_result );
 		$this->assertSame( 'whole_file_replace', $whole_result->get_error_data()['issues'][0]['code'] );
 		$this->assertWPError( $ambiguous_result );
 		$this->assertSame( 'search_match_count', $ambiguous_result->get_error_data()['issues'][0]['code'] );
+		$this->assertSame( 1, $ambiguous_result->get_error_data()['issues'][0]['replacement_index'] );
+		$this->assertSame( 2, $ambiguous_result->get_error_data()['issues'][0]['match_count'] );
+		$this->assertStringContainsString( 'matched 2 locations', $ambiguous_result->get_error_message() );
+		$this->assertWPError( $missing_result );
+		$this->assertSame( 0, $missing_result->get_error_data()['issues'][0]['match_count'] );
+		$this->assertStringContainsString( 'did not match', $missing_result->get_error_message() );
 	}
 
 	public function test_update_response_preserves_valid_json(): void {

@@ -8,8 +8,17 @@ final class Code_Run_Repository extends Repository {
 	 * @param array<int, array<string, mixed>> $files Ordered normalized manifest.
 	 * @return array<string, mixed>
 	 */
-	public function create( int $job_id, int $plan_id, ?int $parent_revision_id, string $provider, string $model, string $effort, string $prompt_slug, int $prompt_version, array $files, string $mode = 'generate', ?array $target_manifest = null ): array {
-		$now = $this->now();
+	public function create( int $job_id, int $plan_id, ?int $parent_revision_id, string $provider, string $model, string $effort, string $prompt_slug, int $prompt_version, array $files, string $mode = 'generate', ?array $target_manifest = null, array $completed_seed = [] ): array {
+		$now                = $this->now();
+		$next_file_index    = 0;
+		$normalized_files   = array_values( $files );
+		foreach ( $normalized_files as $sequence => $file ) {
+			$operation = sanitize_key( (string) ( $file['operation'] ?? 'add' ) );
+			if ( 'delete' !== $operation && ! is_string( $completed_seed[ $sequence ] ?? null ) ) {
+				break;
+			}
+			$next_file_index = $sequence + 1;
+		}
 		$this->wpdb->query( 'START TRANSACTION' );
 		try {
 			$this->wpdb->insert(
@@ -21,6 +30,7 @@ final class Code_Run_Repository extends Repository {
 					'status'             => 'active',
 					'mode'               => sanitize_key( $mode ),
 					'phase'              => 'files',
+					'next_file_index'    => $next_file_index,
 					'provider'           => sanitize_key( $provider ),
 					'model'              => sanitize_text_field( $model ),
 					'effort'             => sanitize_key( $effort ),
@@ -35,8 +45,9 @@ final class Code_Run_Repository extends Repository {
 			if ( ! $run_id ) {
 				throw new \RuntimeException( __( 'Could not initialize Code generation.', 'wp-autoplugin' ) );
 			}
-			foreach ( array_values( $files ) as $sequence => $file ) {
+			foreach ( $normalized_files as $sequence => $file ) {
 				$operation = sanitize_key( (string) ( $file['operation'] ?? 'add' ) );
+				$seed      = is_string( $completed_seed[ $sequence ] ?? null ) ? $completed_seed[ $sequence ] : null;
 				$inserted  = $this->wpdb->insert(
 					Installer::table( 'code_run_files' ),
 					[
@@ -46,7 +57,9 @@ final class Code_Run_Repository extends Repository {
 						'type'           => $file['type'],
 						'description'    => $file['description'],
 						'operation'      => $operation,
-						'status'         => 'delete' === $operation ? 'completed' : 'pending',
+						'status'         => 'delete' === $operation || null !== $seed ? 'completed' : 'pending',
+						'content'        => $seed,
+						'content_hash'   => null !== $seed ? hash( 'sha256', $seed ) : null,
 						'error_metadata' => $this->json( [] ),
 						'created_at'     => $now,
 						'updated_at'     => $now,
@@ -122,6 +135,45 @@ final class Code_Run_Repository extends Repository {
 			ARRAY_A
 		);
 		return array_map( [ $this, 'hydrate_file' ], $rows );
+	}
+
+	/**
+	 * Return recent failed runs from the same project and Plan whose global instructions match the new job.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function failed_candidates_for_resume( int $job_id, int $plan_id ): array {
+		$runs = Installer::table( 'code_runs' );
+		$jobs = Installer::table( 'jobs' );
+		$rows = $this->wpdb->get_results(
+			$this->wpdb->prepare(
+				"SELECT previous_run.* FROM $runs previous_run
+				INNER JOIN $jobs previous_job ON previous_job.id = previous_run.job_id
+				INNER JOIN $jobs current_job ON current_job.id = %d
+				WHERE previous_job.project_id = current_job.project_id
+					AND previous_job.status = %s
+					AND previous_run.status = %s
+					AND previous_run.plan_id = %d
+					AND previous_run.job_id <> current_job.id
+					AND previous_job.global_instructions_hash <=> current_job.global_instructions_hash
+				ORDER BY previous_run.id DESC
+				LIMIT 5",
+				$job_id,
+				'failed',
+				'failed',
+				$plan_id
+			),
+			ARRAY_A
+		); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Internal allow-listed tables are interpolated before preparation.
+
+		return array_map(
+			function ( array $row ): array {
+				$run          = $this->hydrate( $row );
+				$run['files'] = $this->files( (int) $run['id'] );
+				return $run;
+			},
+			(array) $rows
+		);
 	}
 
 	/** Safe progress data; intentionally excludes generated source. */
@@ -453,6 +505,52 @@ final class Code_Run_Repository extends Repository {
 		}
 	}
 
+	/** Persist the final failed-file diagnostics while retaining earlier validated files for a compatible retry. */
+	public function fail_file( int $run_id, int $sequence, string $token, string $message, array $issues = [] ): bool {
+		$this->wpdb->query( 'START TRANSACTION' );
+		try {
+			$file_updated = $this->wpdb->update(
+				Installer::table( 'code_run_files' ),
+				[
+					'status'         => 'failed',
+					'content'        => null,
+					'content_hash'   => null,
+					'error_metadata' => $this->json(
+						[
+							'message' => substr( $message, 0, 500 ),
+							'issues'  => $issues,
+						]
+					),
+					'updated_at'     => $this->now(),
+				],
+				[
+					'run_id'   => $run_id,
+					'sequence' => $sequence,
+				]
+			);
+			if ( false === $file_updated ) {
+				throw new \RuntimeException( __( 'Could not save the failed Code file state.', 'wp-autoplugin' ) );
+			}
+			$updated = $this->wpdb->query(
+				$this->wpdb->prepare(
+					'UPDATE ' . Installer::table( 'code_runs' ) . ' SET generation = generation + 1, retry_count = retry_count + 1, last_error = %s, lease_token = NULL, lease_expires_at = NULL, updated_at = %s WHERE id = %d AND lease_token = %s',
+					substr( $message, 0, 500 ),
+					$this->now(),
+					$run_id,
+					$token
+				)
+			);
+			if ( 1 !== $updated ) {
+				throw new \RuntimeException( __( 'The Code generation lease expired before the failed file could be saved.', 'wp-autoplugin' ) );
+			}
+			$this->wpdb->query( 'COMMIT' );
+			return true;
+		} catch ( \Throwable $error ) {
+			$this->wpdb->query( 'ROLLBACK' );
+			throw $error;
+		}
+	}
+
 	/** Save bounded retry state for the analysis request. */
 	public function retry_analysis( int $run_id, string $token, string $message ): bool {
 		$query = $this->wpdb->prepare(
@@ -480,7 +578,18 @@ final class Code_Run_Repository extends Repository {
 		);
 	}
 
-	/** Scrub temporary source on every terminal path. */
+	/** Remove temporary generated source after it has been staged or copied into a successor run. */
+	public function scrub_contents( int $run_id ): void {
+		$this->wpdb->query(
+			$this->wpdb->prepare(
+				'UPDATE ' . Installer::table( 'code_run_files' ) . ' SET content = NULL, updated_at = %s WHERE run_id = %d',
+				$this->now(),
+				$run_id
+			)
+		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
+	}
+
+	/** Preserve only a validated prefix after failure; scrub every other terminal run. */
 	public function terminate_by_job( int $job_id, string $status, string $message = '' ): void {
 		$run = $this->find_by_job( $job_id );
 		if ( ! $run ) {
@@ -498,7 +607,15 @@ final class Code_Run_Repository extends Repository {
 			],
 			[ 'id' => $run['id'] ]
 		);
-		if ( 'failed' === $status ) {
+		$incomplete = (int) $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT COUNT(*) FROM ' . Installer::table( 'code_run_files' ) . ' WHERE run_id = %d AND status <> %s',
+				$run['id'],
+				'completed'
+			)
+		);
+		$preserve_prefix = 'failed' === $status && $incomplete > 0 && in_array( (string) $run['mode'], [ 'generate', 'regenerate' ], true );
+		if ( $preserve_prefix ) {
 			$this->wpdb->query(
 				$this->wpdb->prepare(
 					'UPDATE ' . Installer::table( 'code_run_files' ) . ' SET status = %s, error_metadata = %s, updated_at = %s WHERE run_id = %d AND status = %s',
@@ -510,9 +627,18 @@ final class Code_Run_Repository extends Repository {
 				)
 			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
 		}
-		$this->wpdb->query(
-			$this->wpdb->prepare( 'UPDATE ' . Installer::table( 'code_run_files' ) . ' SET content = NULL, updated_at = %s WHERE run_id = %d', $this->now(), $run['id'] )
-		); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
+		if ( $preserve_prefix ) {
+			$this->wpdb->query(
+				$this->wpdb->prepare(
+					'UPDATE ' . Installer::table( 'code_run_files' ) . ' SET content = NULL, updated_at = %s WHERE run_id = %d AND status <> %s',
+					$this->now(),
+					$run['id'],
+					'completed'
+				)
+			); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- Prepared immediately above.
+		} else {
+			$this->scrub_contents( (int) $run['id'] );
+		}
 	}
 
 	/** @param array<string, mixed> $row */

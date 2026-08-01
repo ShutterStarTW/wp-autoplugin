@@ -110,6 +110,8 @@ final class Code_Orchestrator {
 			}
 			$parent = 'regenerate' === ( $job['payload']['mode'] ?? '' ) ? (int) ( $job['payload']['parent_revision_id'] ?? 0 ) : null;
 			$prompt = $this->prompt_metadata( $workspace );
+			$mode   = (string) ( $job['payload']['mode'] ?? 'generate' );
+			$resume = $this->resume_seed( $runs, (int) $job['id'], $plan_id, $parent ?: null, $mode, $capability, $prompt, $manifest );
 			$run    = $runs->create(
 				(int) $job['id'],
 				$plan_id,
@@ -120,18 +122,30 @@ final class Code_Orchestrator {
 				$prompt['slug'],
 				$prompt['version'],
 				$manifest['files'],
-				(string) ( $job['payload']['mode'] ?? 'generate' ),
-				$manifest
+				$mode,
+				$manifest,
+				$resume['contents']
 			);
+			if ( $resume['run_id'] ) {
+				$runs->scrub_contents( $resume['run_id'] );
+			}
 			$jobs->event(
 				(int) $job['id'],
 				'code_initialized',
-				__( 'Code generation initialized from the approved Plan.', 'wp-autoplugin' ),
+				$resume['contents']
+					? sprintf(
+						/* translators: %d: number of previously validated files reused. */
+						_n( 'Code generation resumed with %d previously validated file.', 'Code generation resumed with %d previously validated files.', count( $resume['contents'] ), 'wp-autoplugin' ),
+						count( $resume['contents'] )
+					)
+					: __( 'Code generation initialized from the approved Plan.', 'wp-autoplugin' ),
 				[
-					'files_count' => count( $manifest['files'] ),
-					'provider'    => $run['provider'],
-					'model'       => $run['model'],
-					'effort'      => $run['effort'],
+					'files_count'        => count( $manifest['files'] ),
+					'provider'           => $run['provider'],
+					'model'              => $run['model'],
+					'effort'             => $run['effort'],
+					'resumed_from_job'   => $resume['job_id'] ?: null,
+					'reused_files_count' => count( $resume['contents'] ),
 				]
 			);
 		} else {
@@ -371,6 +385,72 @@ final class Code_Orchestrator {
 		return $snapshot;
 	}
 
+	/**
+	 * Reuse only validated files from a failed run with the same immutable inputs and coder contract.
+	 *
+	 * @param array<string, mixed> $capability Selected coder identity.
+	 * @param array<string, mixed> $prompt     Versioned coder prompt identity.
+	 * @param array<string, mixed> $manifest   Newly normalized target manifest and baseline.
+	 * @return array{run_id:int,job_id:int,contents:array<int,string>}
+	 */
+	private function resume_seed( Code_Run_Repository $runs, int $job_id, int $plan_id, ?int $parent_revision_id, string $mode, array $capability, array $prompt, array $manifest ): array {
+		$empty = [
+			'run_id'   => 0,
+			'job_id'   => 0,
+			'contents' => [],
+		];
+		foreach ( $runs->failed_candidates_for_resume( $job_id, $plan_id ) as $candidate ) {
+			if (
+				$mode !== (string) ( $candidate['mode'] ?? '' )
+				|| (int) ( $parent_revision_id ?? 0 ) !== (int) ( $candidate['parent_revision_id'] ?? 0 )
+				|| (string) ( $capability['provider'] ?? '' ) !== (string) ( $candidate['provider'] ?? '' )
+				|| (string) ( $capability['model'] ?? '' ) !== (string) ( $candidate['model'] ?? '' )
+				|| (string) ( $capability['effort'] ?? '' ) !== (string) ( $candidate['effort'] ?? '' )
+				|| (string) ( $prompt['slug'] ?? '' ) !== (string) ( $candidate['prompt_slug'] ?? '' )
+				|| (int) ( $prompt['version'] ?? 0 ) !== (int) ( $candidate['prompt_version'] ?? 0 )
+				|| $manifest !== (array) ( $candidate['target_manifest'] ?? [] )
+			) {
+				continue;
+			}
+
+			$expected_files  = array_values( (array) ( $manifest['files'] ?? [] ) );
+			$candidate_files = array_values( (array) ( $candidate['files'] ?? [] ) );
+			if ( count( $expected_files ) !== count( $candidate_files ) ) {
+				continue;
+			}
+			$contents   = [];
+			$remaining  = false;
+			$compatible = true;
+			foreach ( $expected_files as $sequence => $expected ) {
+				$file = $candidate_files[ $sequence ];
+				foreach ( [ 'path', 'type', 'description', 'operation' ] as $field ) {
+					if ( (string) ( $expected[ $field ] ?? '' ) !== (string) ( $file[ $field ] ?? '' ) ) {
+						$compatible = false;
+						break 2;
+					}
+				}
+				if ( 'delete' === ( $expected['operation'] ?? '' ) ) {
+					continue;
+				}
+				$content = $file['content'] ?? null;
+				$hash    = (string) ( $file['content_hash'] ?? '' );
+				if ( 'completed' === ( $file['status'] ?? '' ) && is_string( $content ) && '' !== $hash && hash_equals( $hash, hash( 'sha256', $content ) ) ) {
+					$contents[ $sequence ] = $content;
+				} else {
+					$remaining = true;
+				}
+			}
+			if ( $compatible && $remaining && $contents ) {
+				return [
+					'run_id'   => (int) $candidate['id'],
+					'job_id'   => (int) $candidate['job_id'],
+					'contents' => $contents,
+				];
+			}
+		}
+		return $empty;
+	}
+
 	private function supports( array $workspace ): bool {
 		$operation = (string) ( $workspace['operation'] ?? '' );
 		$kind      = (string) ( $workspace['target_kind'] ?? '' );
@@ -532,7 +612,7 @@ final class Code_Orchestrator {
 			( new Queue() )->schedule( (int) $job['id'], $next_generation, 2 ** (int) $run['retry_count'] );
 			return [ '_continuation' => true ];
 		}
-		$runs->release( (int) $run['id'], $token );
+		$runs->fail_file( (int) $run['id'], $index, $token, $error->get_error_message(), $issues );
 		return $error;
 	}
 
