@@ -115,6 +115,75 @@ final class PluginReleaseServicesTest extends WP_UnitTestCase {
 		$this->assertFalse( is_plugin_active( $slug . '/' . $main_file ) );
 	}
 
+	public function test_existing_plugin_package_omits_node_modules_with_symbolic_links(): void {
+		if ( ! class_exists( ZipArchive::class ) ) {
+			$this->markTestSkipped( 'ZipArchive is required to inspect the completed package.' );
+		}
+
+		$slug          = $this->unique_slug( 'node-modules' );
+		$main_file     = $slug . '.php';
+		$main          = "<?php\n/**\n * Plugin Name: Node Modules Release Fixture\n * Version: 1.0.0\n */\n";
+		$helper_before = "<?php\nreturn 'before';\n";
+		$helper_after  = "<?php\nreturn 'after';\n";
+		$root          = $this->install_plugin(
+			$slug,
+			[
+				$main_file           => $main,
+				'helper.php'         => $helper_before,
+				'vendor/runtime.php' => "<?php\nreturn 'runtime';\n",
+			]
+		);
+		wp_mkdir_p( $root . '/node_modules/.bin' );
+		file_put_contents( $root . '/node_modules/tool.js', 'development dependency' );
+		if ( ! function_exists( 'symlink' ) || ! @symlink( '../tool.js', $root . '/node_modules/.bin/tool' ) ) {
+			$this->markTestSkipped( 'Symbolic links are unavailable in this test environment.' );
+		}
+
+		$target_ref = $slug . '/' . $main_file;
+		$metadata   = [
+			'kind' => 'plugin',
+			'ref'  => $target_ref,
+			'name' => 'Node Modules Release Fixture',
+		];
+		$builder    = new Package_Builder();
+		$complete   = $builder->fingerprint_target( $target_ref );
+		$this->assertFalse( is_wp_error( $complete ), is_wp_error( $complete ) ? $complete->get_error_message() : '' );
+		$this->assertSame( 3, $complete['files'] );
+		$revision = [
+			'project_manifest' => [
+				'scope'                       => 'changes',
+				'artifact_kind'               => 'plugin',
+				'target_fingerprint'          => ( new Source_Tools( $metadata ) )->tree_fingerprint(),
+				'complete_target_fingerprint' => $complete['fingerprint'],
+			],
+			'files'            => [
+				[
+					'path'              => 'helper.php',
+					'change_type'       => 'update',
+					'base_content_hash' => hash( 'sha256', $helper_before ),
+					'content'           => $helper_after,
+				],
+			],
+		];
+		$workspace = [
+			'target_ref'      => $target_ref,
+			'target_metadata' => $metadata,
+			'project_name'    => 'Node Modules Release Fixture',
+		];
+		$built = $builder->build( $workspace, $revision, 'replacement' );
+
+		$this->assertFalse( is_wp_error( $built ), is_wp_error( $built ) ? $built->get_error_message() : '' );
+		$this->package_paths[] = $built['path'];
+		$zip                   = new ZipArchive();
+		$this->assertTrue( $zip->open( $built['path'] ) );
+		for ( $index = 0; $index < $zip->numFiles; ++$index ) {
+			$this->assertStringNotContainsString( '/node_modules/', (string) $zip->getNameIndex( $index ) );
+		}
+		$this->assertSame( "<?php\nreturn 'runtime';\n", $zip->getFromName( $slug . '/vendor/runtime.php' ) );
+		$this->assertSame( $helper_after, $zip->getFromName( $slug . '/helper.php' ) );
+		$zip->close();
+	}
+
 	public function test_direct_plugin_change_and_rollback_are_drift_safe(): void {
 		if ( ! is_writable( WP_PLUGIN_DIR ) || is_multisite() || ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS ) ) {
 			$this->markTestSkipped( 'Direct plugin mutation is intentionally unavailable in this environment.' );

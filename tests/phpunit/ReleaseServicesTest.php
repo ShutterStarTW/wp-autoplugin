@@ -90,7 +90,29 @@ final class ReleaseServicesTest extends WP_UnitTestCase {
 			$this->markTestSkipped( 'Symbolic links are unavailable in this test environment.' );
 		}
 
-		$this->assertWPError( ( new Package_Builder() )->scan_tree( $this->directory ) );
+		$result = ( new Package_Builder() )->scan_tree( $this->directory );
+		$this->assertWPError( $result );
+		$this->assertSame( 'release_symlink', $result->get_error_code() );
+		$this->assertStringContainsString( 'linked.php', $result->get_error_message() );
+	}
+
+	public function test_source_fingerprint_omits_node_modules_with_symbolic_links(): void {
+		file_put_contents( $this->directory . '/source.php', '<?php' );
+		wp_mkdir_p( $this->directory . '/node_modules/.bin' );
+		file_put_contents( $this->directory . '/node_modules/tool.js', 'tool' );
+		if ( ! function_exists( 'symlink' ) || ! @symlink( '../tool.js', $this->directory . '/node_modules/.bin/tool' ) ) {
+			$this->markTestSkipped( 'Symbolic links are unavailable in this test environment.' );
+		}
+
+		$builder = new Package_Builder();
+		$first   = $builder->scan_tree( $this->directory, true );
+		$this->assertFalse( is_wp_error( $first ), is_wp_error( $first ) ? $first->get_error_message() : '' );
+		$this->assertSame( 1, $first['files'] );
+
+		file_put_contents( $this->directory . '/node_modules/tool.js', 'changed tool' );
+		$second = $builder->scan_tree( $this->directory, true );
+		$this->assertFalse( is_wp_error( $second ), is_wp_error( $second ) ? $second->get_error_message() : '' );
+		$this->assertSame( $first['fingerprint'], $second['fingerprint'] );
 	}
 
 	public function test_complete_tree_fingerprint_includes_binary_assets_but_excludes_vcs_metadata(): void {

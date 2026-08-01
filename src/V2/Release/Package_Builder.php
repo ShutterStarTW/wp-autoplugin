@@ -7,7 +7,7 @@ use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 
 /** Builds bounded, revision-exact private plugin ZIP archives. */
 final class Package_Builder {
-	private const VCS = [ '.git', '.svn', '.hg' ];
+	private const SOURCE_EXCLUDED_DIRECTORIES = [ '.git', '.svn', '.hg', 'node_modules' ];
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function build( array $workspace, array $revision, string $mode, string $destination_slug = '' ) {
@@ -161,7 +161,7 @@ final class Package_Builder {
 	}
 
 	/** @return array{fingerprint:string,files:int,size:int}|\WP_Error */
-	public function scan_tree( string $root, bool $exclude_vcs = false, bool $enforce_limits = true ) {
+	public function scan_tree( string $root, bool $exclude_source_directories = false, bool $enforce_limits = true ) {
 		$root_real = realpath( $root );
 		if ( false === $root_real || ! is_dir( $root_real ) ) {
 			return new \WP_Error( 'release_tree_missing', __( 'The release tree is unavailable.', 'wp-autoplugin' ) );
@@ -171,16 +171,27 @@ final class Package_Builder {
 		$max_file  = max( 1, (int) apply_filters( 'wp_autoplugin_v2_release_max_file_bytes', 67108864 ) );
 		$rows      = [];
 		$total     = 0;
-		$iterator  = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $root_real, \FilesystemIterator::SKIP_DOTS ) );
+		$directory = new \RecursiveDirectoryIterator( $root_real, \FilesystemIterator::SKIP_DOTS );
+		if ( $exclude_source_directories ) {
+			$directory = new \RecursiveCallbackFilterIterator(
+				$directory,
+				static fn( \SplFileInfo $file ): bool => ! $file->isDir() || ! in_array( $file->getFilename(), self::SOURCE_EXCLUDED_DIRECTORIES, true )
+			);
+		}
+		$iterator = new \RecursiveIteratorIterator( $directory );
 		foreach ( $iterator as $file ) {
+			$relative = ltrim( substr( wp_normalize_path( $file->getPathname() ), strlen( trailingslashit( wp_normalize_path( $root_real ) ) ) ), '/' );
 			if ( $file->isLink() ) {
-				return new \WP_Error( 'release_symlink', __( 'Release packages cannot contain symbolic links.', 'wp-autoplugin' ) );
+				return new \WP_Error(
+					'release_symlink',
+					sprintf(
+						/* translators: %s: release-relative symbolic-link path. */
+						__( 'Release packages cannot contain the symbolic link "%s".', 'wp-autoplugin' ),
+						substr( $relative, 0, 500 )
+					)
+				);
 			}
 			if ( ! $file->isFile() ) {
-				continue;
-			}
-			$relative = ltrim( substr( wp_normalize_path( $file->getPathname() ), strlen( trailingslashit( wp_normalize_path( $root_real ) ) ) ), '/' );
-			if ( $exclude_vcs && array_intersect( self::VCS, explode( '/', $relative ) ) ) {
 				continue;
 			}
 			$this->relative( $relative );
@@ -203,7 +214,7 @@ final class Package_Builder {
 		];
 	}
 
-	/** Fingerprint the complete bounded installed plugin or theme tree, excluding only VCS metadata. */
+	/** Fingerprint the complete distributable target tree, excluding VCS metadata and node_modules. */
 	public function fingerprint_target( string $target_ref, bool $enforce_limits = true, string $artifact_kind = 'plugin' ) {
 		$root = $this->target_root( $target_ref, $artifact_kind );
 		if ( is_wp_error( $root ) ) {
@@ -282,16 +293,24 @@ final class Package_Builder {
 			}
 			return copy( $source, $destination . '/' . basename( $source ) ) ? true : new \WP_Error( 'release_copy', __( 'The installed plugin could not be copied.', 'wp-autoplugin' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy -- Private bounded package staging.
 		}
-		$root     = trailingslashit( wp_normalize_path( $source ) );
-		$iterator = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $source, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::SELF_FIRST );
+		$root      = trailingslashit( wp_normalize_path( $source ) );
+		$directory = new \RecursiveDirectoryIterator( $source, \FilesystemIterator::SKIP_DOTS );
+		$filter    = new \RecursiveCallbackFilterIterator(
+			$directory,
+			static fn( \SplFileInfo $item ): bool => ! $item->isDir() || ! in_array( $item->getFilename(), self::SOURCE_EXCLUDED_DIRECTORIES, true )
+		);
+		$iterator = new \RecursiveIteratorIterator( $filter, \RecursiveIteratorIterator::SELF_FIRST );
 		foreach ( $iterator as $item ) {
 			$relative = ltrim( substr( wp_normalize_path( $item->getPathname() ), strlen( $root ) ), '/' );
-			$parts    = explode( '/', $relative );
-			if ( array_intersect( self::VCS, $parts ) ) {
-				continue;
-			}
 			if ( $item->isLink() ) {
-				return new \WP_Error( 'release_symlink', __( 'Plugin packages cannot contain symbolic links.', 'wp-autoplugin' ) );
+				return new \WP_Error(
+					'release_symlink',
+					sprintf(
+						/* translators: %s: plugin-relative symbolic-link path. */
+						__( 'Plugin packages cannot contain the symbolic link "%s".', 'wp-autoplugin' ),
+						substr( $relative, 0, 500 )
+					)
+				);
 			}
 			$target = $destination . '/' . $relative;
 			if ( $item->isDir() ) {

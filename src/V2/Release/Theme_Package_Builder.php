@@ -6,7 +6,7 @@ use WP_Autoplugin\V2\Domain\Target\Source_Tools;
 
 /** Builds bounded, revision-exact private theme ZIP archives. */
 final class Theme_Package_Builder {
-	private const VCS = [ '.git', '.svn', '.hg' ];
+	private const SOURCE_EXCLUDED_DIRECTORIES = [ '.git', '.svn', '.hg', 'node_modules' ];
 
 	/** @return array<string,mixed>|\WP_Error */
 	public function build( array $workspace, array $revision, string $mode, string $destination_slug = '' ) {
@@ -209,15 +209,24 @@ final class Theme_Package_Builder {
 	}
 
 	private function copy_target( string $source, string $destination ) {
-		$root     = trailingslashit( wp_normalize_path( $source ) );
-		$iterator = new \RecursiveIteratorIterator( new \RecursiveDirectoryIterator( $source, \FilesystemIterator::SKIP_DOTS ), \RecursiveIteratorIterator::SELF_FIRST );
+		$root      = trailingslashit( wp_normalize_path( $source ) );
+		$directory = new \RecursiveDirectoryIterator( $source, \FilesystemIterator::SKIP_DOTS );
+		$filter    = new \RecursiveCallbackFilterIterator(
+			$directory,
+			static fn( \SplFileInfo $item ): bool => ! $item->isDir() || ! in_array( $item->getFilename(), self::SOURCE_EXCLUDED_DIRECTORIES, true )
+		);
+		$iterator = new \RecursiveIteratorIterator( $filter, \RecursiveIteratorIterator::SELF_FIRST );
 		foreach ( $iterator as $item ) {
 			$relative = ltrim( substr( wp_normalize_path( $item->getPathname() ), strlen( $root ) ), '/' );
-			if ( array_intersect( self::VCS, explode( '/', $relative ) ) ) {
-				continue;
-			}
 			if ( $item->isLink() ) {
-				return new \WP_Error( 'release_theme_symlink', __( 'Theme packages cannot contain symbolic links.', 'wp-autoplugin' ) );
+				return new \WP_Error(
+					'release_theme_symlink',
+					sprintf(
+						/* translators: %s: theme-relative symbolic-link path. */
+						__( 'Theme packages cannot contain the symbolic link "%s".', 'wp-autoplugin' ),
+						substr( $relative, 0, 500 )
+					)
+				);
 			}
 			$target = $destination . '/' . $relative;
 			if ( $item->isDir() ) {
