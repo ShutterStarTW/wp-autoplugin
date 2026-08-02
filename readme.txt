@@ -9,26 +9,54 @@ Requires PHP: 8.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-A local-first AI workspace for planning, creating, reviewing, and safely promoting WordPress plugin changes.
+A local-first AI workspace for planning, coding, reviewing, and deploying WordPress plugin and theme changes.
 
 == Description ==
 
-WP-Autoplugin v2 is a durable WordPress development workspace for new plugins and changes involving installed plugins or themes.
+WP-Autoplugin brings an agentic coding workflow into WordPress. It can explore installed code, prepare a Plan, generate or revise code, review one exact revision, and release the result as a new plugin, a fork, or an approved plugin or theme change.
 
-**Current v2 capabilities:**
+WP-Autoplugin is free and bring-your-own-key. Connect OpenAI, Anthropic, Google Gemini, xAI, or a compatible API endpoint and choose the models used at each stage. An optional experimental ChatGPT Subscription connection can use the connected account's Codex allowance instead of an OpenAI API key.
 
-* Durable projects, workspace tabs, jobs, events, revisions, reviews, and usage records.
-* AI planning, source inspection, code generation, follow-up changes, and explanations.
-* Automatic root-level AGENTS.md project guidance across every AI stage for installed-plugin work.
-* Site-wide Custom instructions with private, immutable snapshots for every future AI job.
-* Immutable staged revisions with source, diff, history, manual editing, and restore tools.
-* Structured AI Review reports and finding-resolution workflows.
-* Explicit plugin packaging, installation, activation, forks, direct modification, and rollback where supported.
-* OpenAI, Anthropic, Google Gemini, xAI, custom OpenAI-compatible endpoints, and an experimental ChatGPT Subscription connection.
-* Default, Planner, Coder, and Reviewer model roles with supported reasoning-effort controls.
-* Local-first storage and administrator-only v2 REST resources.
+Use WP-Autoplugin to:
 
-AI output never writes directly to a target. Generated code is validated and staged before an administrator can explicitly promote it. Closing a workspace tab does not delete or cancel its durable work.
+* Create a complete WordPress plugin from a description.
+* Diagnose, explain, fix, or extend an installed plugin or theme.
+* Build a separate extension plugin around real actions and filters without editing the target.
+* Continue Plan, Code, Review, and Explain conversations across reloads.
+* Inspect staged changes, edit files, compare diffs, and restore earlier revisions.
+* Package, install, fork, apply, or roll back supported revisions.
+
+Version 2 is a complete rewrite for WordPress 6.6+ and PHP 8.2+. It replaces the separate v1 workflows with one durable Plan -> Code -> Review workspace.
+
+= Workspace and revisions =
+
+Supported models explore existing plugins and themes through bounded, read-only tools for metadata, file trees, line ranges, source search, and hook discovery. Child-theme work can inspect its installed parent separately as read-only context.
+
+Focused operations can change exact source ranges instead of rewriting whole files. Generated results are validated and stored as immutable staged revisions; manual edits and restores create successors rather than overwriting history.
+
+Projects retain their tabs, jobs, Plans, conversations, revisions, Reviews, usage, and releases across reloads. Closing a tab does not delete the project or cancel work. Vision-capable models also accept verified JPEG, PNG, and WebP prompt images.
+
+AI Review binds a verdict, manual tests, and actionable P0-P3 findings to one revision. Findings can be discussed, dismissed, reopened, fixed, and verified; the Review becomes stale when code changes.
+
+= Safe release choices =
+
+AI output never writes directly to a target. Code must first pass validation and enter a staged revision. Depending on the project, an administrator can then:
+
+* Build an exact-revision ZIP or install a new plugin inactive.
+* Install an inactive plugin fork, then switch to it separately.
+* Build replacement plugin/theme ZIPs or install an inactive theme copy.
+* Directly modify a plugin or inactive theme after confirmation.
+* Roll back the latest supported direct change if affected files have not drifted.
+
+Release rechecks paths, baselines, fingerprints, headers, requirements, and destination identity. Direct changes store complete before-and-after records before writing and attempt immediate restoration on failure. Upstream updates remain enabled and may overwrite them.
+
+Review is advisory but strongly recommended. Release without a current all-clear Review requires an explicit recorded override.
+
+Theme releases never convert a parent theme into a child theme, activate or switch themes, or copy Customizer, Site Editor, global-style, template, or other database-held settings. Direct theme modification and rollback are blocked while the theme is active or is the parent of the active child theme.
+
+= Models and instructions =
+
+Settings provides Default, Planner, Coder, and Reviewer model roles with supported reasoning controls. Capabilities vary by model. Installed plugins may provide bounded root-level AGENTS.md guidance, while site-wide Custom instructions define persistent conventions. Safety and response contracts take precedence, followed by the current request, AGENTS.md, Custom instructions, and built-in defaults. Usage is recorded by provider, model, and job.
 
 The v1 flow-specific admin pages, AJAX workers, and simple/complex mode switch have been removed. AI Response Language is not supported by v2 at this time.
 
@@ -36,7 +64,7 @@ The v1 flow-specific admin pages, AJAX workers, and simple/complex mode switch h
 
 1. Upload and activate WP-Autoplugin.
 2. Open WP-Autoplugin > Settings.
-3. Configure at least one provider and select a default model.
+3. Configure at least one provider and select a default model, or connect the experimental ChatGPT Subscription provider.
 4. Open WP-Autoplugin > Workspace and create a project.
 
 == Frequently Asked Questions ==
@@ -45,13 +73,9 @@ The v1 flow-specific admin pages, AJAX workers, and simple/complex mode switch h
 
 Configure a supported provider such as OpenAI, Anthropic, Google Gemini, or xAI, add a compatible custom endpoint, or connect the experimental ChatGPT Subscription provider. Provider charges or subscription limits may apply.
 
-= Where are credentials stored? =
+= Does AI write directly to installed plugins or themes? =
 
-API credentials remain in WordPress options on your server. ChatGPT OAuth tokens are encrypted with WordPress salts. Secrets are not returned through v2 REST resources or stored in jobs, revisions, usage, or browser bootstrap data.
-
-= Does AI write directly to installed plugins? =
-
-No. AI-generated source is stored in a validated staged revision. Supported release actions require explicit administrator approval, WordPress capability checks, target conflict checks, and durable rollback data.
+No. AI source is validated and staged first. Releases require administrator approval, appropriate capabilities, and conflict checks. Direct changes also store before-and-after files for supported rollback; ZIPs, installations, activations, and fork switches are recorded but are not file-rollback points.
 
 = Is generated code production-ready? =
 
@@ -61,49 +85,73 @@ AI-generated code should be reviewed and tested on a staging site before product
 
 Yes. Settings provides a Default model plus optional Planner, Coder, and Reviewer overrides. Models with supported reasoning controls also expose an effort selector.
 
+== Privacy and Data ==
+
+WP-Autoplugin needs no WP-Autoplugin account. Credentials, job snapshots, revisions, Reviews, releases, and project history remain on the WordPress site.
+
+AI providers receive only required request content, which may include instructions, relevant source, images, AGENTS.md, Custom instructions, conversation, and staged artifacts. Connection tests and model discovery send the configured credential.
+
+ChatGPT OAuth tokens are encrypted at rest using WordPress salts. Secrets are not returned through v2 REST resources or stored in jobs, revisions, usage records, or browser bootstrap data.
+
+Uninstall cleanup is enabled by default and can be disabled for later reinstall. It removes WP-Autoplugin data, credentials, history, and temporary packages, but never deletes or reverts created or modified plugins/themes.
+
 == External Services ==
 
-WP-Autoplugin sends task instructions, relevant source context, and optional images only to providers configured by an administrator.
+External AI services are used only after administrator configuration. Tests and discovery send credentials; AI jobs send the content described above. Provider charges, policies, and limits apply.
 
-Site-wide Custom instructions saved by an administrator are included with every future AI job. They override built-in implementation defaults but not safety, response contracts, the current request, or a more-specific root AGENTS.md. They remain in private durable job history, are not intended for secrets, and are sent to the selected provider with the rest of the job context.
+Custom instructions are sent with every future AI-producing job and are not intended for secrets.
 
 **OpenAI**
 
-* API-key requests use OpenAI API services.
-* The optional experimental ChatGPT connection sends device authorization and token requests to `https://auth.openai.com`, and model discovery and AI requests to `https://chatgpt.com/backend-api/codex`.
-* ChatGPT OAuth tokens are exchanged and refreshed server-side, encrypted at rest, and never exposed through v2 REST responses.
-* [Terms of Use](https://openai.com/policies/terms-of-use/)
+* API-key connection tests and model requests use `https://api.openai.com`.
+* Experimental ChatGPT authorization uses `https://auth.openai.com`; model discovery and AI use `https://chatgpt.com/backend-api/codex`.
+* [OpenAI API service](https://platform.openai.com/)
+* [OpenAI Services Agreement](https://openai.com/policies/services-agreement/)
+* [ChatGPT Terms of Use](https://openai.com/policies/terms-of-use/)
 * [Privacy Policy](https://openai.com/policies/privacy-policy/)
 
 **Anthropic**
 
-* [Terms of Service](https://www.anthropic.com/terms-of-service)
-* [Privacy Policy](https://www.anthropic.com/privacy-policy)
+* Connection tests and model requests use `https://api.anthropic.com`.
+* [Claude API service](https://console.anthropic.com/)
+* [Commercial Terms of Service](https://www.anthropic.com/legal/commercial-terms)
+* [Privacy Policy](https://www.anthropic.com/legal/privacy)
 
 **Google Generative Language API**
 
-* [Terms of Service](https://policies.google.com/terms)
-* [Generative AI Additional Terms](https://policies.google.com/terms/generative-ai)
+* Connection tests and model requests use `https://generativelanguage.googleapis.com`.
+* [Gemini API service](https://ai.google.dev/gemini-api)
+* [Gemini API Additional Terms of Service](https://ai.google.dev/gemini-api/terms)
 * [Privacy Policy](https://policies.google.com/privacy)
 
 **xAI**
 
-* [Terms of Service](https://x.ai/legal/terms-of-service)
-* [Privacy Policy](https://x.ai/legal/privacy-policy)
+* Connection tests and model requests use `https://api.x.ai`.
+* [xAI API service](https://x.ai/api)
+* [Enterprise Terms of Service](https://x.ai/legal/terms-of-service-enterprise)
+* [Data Processing Addendum](https://x.ai/legal/data-processing-addendum)
 
-Custom OpenAI-compatible endpoints are governed by the administrator's chosen service.
+**Custom OpenAI-compatible endpoints**
+
+AI jobs send credentials and request content to the administrator-supplied HTTPS endpoint. Its operator's policies apply.
+
+**GitHub updates**
+
+Update and plugin-information checks query `https://api.github.com` and read headers/readme from `https://raw.githubusercontent.com`. The User-Agent contains the plugin version and site home URL. Installing an update downloads its verified commit archive from `https://github.com`.
+
+* [WP-Autoplugin repository on GitHub](https://github.com/WP-Autoplugin/wp-autoplugin)
+* [GitHub Terms of Service](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service)
+* [GitHub General Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)
 
 == Changelog ==
 
 = 2.0.0 =
 
-* Replaced the v1 admin application with the native v2 workspace, menu, settings, model registry, provider transports, orchestration, and release services.
-* Removed v1 flow pages, AJAX workers, provider adapters, admin assets, simple/complex generation mode, and AI Response Language registration.
-* Added durable Plan, Code, Review, Explain, revision, package, promotion, and rollback workflows.
-* Added native read-only source agents for supported models.
-* Added bounded root-level AGENTS.md instructions for installed-plugin projects.
-* Added bounded site-wide Custom instructions with explicit precedence and immutable per-job snapshots.
-* Added v2 settings assets and Settings API persistence for credentials, model roles, effort, custom endpoints, and the experimental ChatGPT Subscription provider.
+* Replaced v1 with the native durable Plan, Code, Review, and Explain workspace.
+* Added bounded source agents, focused edits, image prompts, immutable revisions, conversations, usage, and finding workflows.
+* Added revision-exact plugin/theme ZIPs, inactive installs/copies, plugin activation/fork switching, and conflict-safe direct modification/rollback.
+* Added root AGENTS.md and site-wide Custom instructions with explicit precedence and immutable job snapshots.
+* Added model roles, reasoning effort, custom endpoints, uninstall cleanup, and experimental ChatGPT Subscription support.
 
 == License ==
 
