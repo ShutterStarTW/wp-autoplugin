@@ -14,9 +14,9 @@ final class GitHubUpdaterTest extends WP_UnitTestCase {
 	public function test_real_plugin_header_declares_release_and_update_metadata(): void {
 		$plugin = get_plugin_data( WP_AUTOPLUGIN_DIR . 'wp-autoplugin.php', false, false );
 
-		$this->assertSame( '2.0.0', $plugin['Version'] );
+		$this->assertSame( '2.0.1', $plugin['Version'] );
 		$this->assertSame( '6.6', $plugin['RequiresWP'] );
-		$this->assertSame( '8.2', $plugin['RequiresPHP'] );
+		$this->assertSame( '8.0', $plugin['RequiresPHP'] );
 		$this->assertSame( 'https://wp-autoplugin.com/updates/wp-autoplugin', $plugin['UpdateURI'] );
 	}
 
@@ -35,7 +35,7 @@ final class GitHubUpdaterTest extends WP_UnitTestCase {
 		$update  = $updater->filter_update(
 			false,
 			[
-				'Version'   => '2.0.0',
+				'Version'   => '2.0.1',
 				'UpdateURI' => 'https://wp-autoplugin.com/updates/wp-autoplugin',
 			],
 			plugin_basename( WP_AUTOPLUGIN_DIR . 'wp-autoplugin.php' )
@@ -45,7 +45,7 @@ final class GitHubUpdaterTest extends WP_UnitTestCase {
 		$this->assertSame( '2.1.0', $update['version'] );
 		$this->assertSame( '6.6', $update['requires'] );
 		$this->assertSame( '7.0', $update['tested'] );
-		$this->assertSame( '8.2', $update['requires_php'] );
+		$this->assertSame( '8.0', $update['requires_php'] );
 		$this->assertSame( 'https://github.com/WP-Autoplugin/wp-autoplugin/archive/' . self::SHA . '.zip', $update['package'] );
 		$this->assertCount( 4, $this->requests );
 		$this->assertStringEndsWith( '/releases/latest', $this->requests[0]['url'] );
@@ -76,7 +76,7 @@ final class GitHubUpdaterTest extends WP_UnitTestCase {
 			$this->updater()->filter_update(
 				false,
 				[
-					'Version'   => '2.0.0',
+					'Version'   => '2.0.1',
 					'UpdateURI' => 'https://wp-autoplugin.com/updates/wp-autoplugin',
 				],
 				plugin_basename( WP_AUTOPLUGIN_DIR . 'wp-autoplugin.php' )
@@ -87,7 +87,7 @@ final class GitHubUpdaterTest extends WP_UnitTestCase {
 		$metadata             = $this->updater()->filter_update(
 			false,
 			[
-				'Version'   => '2.0.0',
+				'Version'   => '2.0.1',
 				'UpdateURI' => 'https://wp-autoplugin.com/updates/wp-autoplugin',
 			],
 			plugin_basename( WP_AUTOPLUGIN_DIR . 'wp-autoplugin.php' )
@@ -195,7 +195,7 @@ final class GitHubUpdaterTest extends WP_UnitTestCase {
 		} elseif ( str_contains( $url, '/commits/' ) ) {
 			$body = wp_json_encode( [ 'sha' => self::SHA ] );
 		} elseif ( str_ends_with( $url, '/wp-autoplugin.php' ) ) {
-			$body = "<?php\n/**\n * Plugin Name: WP-Autoplugin\n * Version: {$this->remote_version}\n * Requires at least: 6.6\n * Requires PHP: 8.2\n */";
+			$body = "<?php\n/**\n * Plugin Name: WP-Autoplugin\n * Version: {$this->remote_version}\n * Requires at least: 6.6\n * Requires PHP: 8.0\n */";
 		} else {
 			$body = "=== WP-Autoplugin ===\nTested up to: 7.0\n\n== Description ==\n\n**Remote** description. <script>alert(1)</script>\n\n== Changelog ==\n\n= 2.1.0 =\n\n* One change.\n";
 		}

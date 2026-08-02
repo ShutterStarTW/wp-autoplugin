@@ -15,7 +15,7 @@ Use it to:
 * understand an unfamiliar codebase through an ongoing conversation; and
 * review, test, package, install, fork, apply, or roll back changes from one workspace.
 
-Version 2 is a complete rewrite for WordPress 6.6+ and PHP 8.2+. It replaces the separate v1 workflows with one durable **Plan → Code → Review** workspace built for real development work: exploring source code, making focused changes, iterating safely, and deciding exactly how a finished revision should be released.
+Version 2 is a complete rewrite for WordPress 6.6+ and PHP 8.0+. It replaces the separate v1 workflows with one durable **Plan → Code → Review** workspace built for real development work: exploring source code, making focused changes, iterating safely, and deciding exactly how a finished revision should be released.
 
 ![Annotated overview of the WP-Autoplugin workspace](assets/screenshots/workspace-overview.png)
 
