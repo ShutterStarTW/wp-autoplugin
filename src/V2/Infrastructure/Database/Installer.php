@@ -5,9 +5,8 @@ namespace WP_Autoplugin\V2\Infrastructure\Database;
 /**
  * Creates the v2 operational schema.
  *
- * V2 has not shipped, so this is intentionally a clean baseline rather than a
- * chain of compatibility migrations. Development databases must be reset when
- * this schema changes incompatibly.
+ * The declarative schema is the v2.0.0 release baseline. Future schema changes
+ * must remain additive and compatible with records created by public releases.
  */
 final class Installer {
 	public const SCHEMA_VERSION = '15';

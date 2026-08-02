@@ -3,8 +3,8 @@ Contributors: balazspiller
 Donate link: https://wp-autoplugin.com
 Tags: ai, plugin generator, development, wordpress, automation
 Requires at least: 6.6
-Tested up to: 6.9
-Stable tag: 2.0.0-dev
+Tested up to: 7.0
+Stable tag: 2.0.0
 Requires PHP: 8.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -95,7 +95,7 @@ Custom OpenAI-compatible endpoints are governed by the administrator's chosen se
 
 == Changelog ==
 
-= 2.0.0-dev =
+= 2.0.0 =
 
 * Replaced the v1 admin application with the native v2 workspace, menu, settings, model registry, provider transports, orchestration, and release services.
 * Removed v1 flow pages, AJAX workers, provider adapters, admin assets, simple/complex generation mode, and AI Response Language registration.

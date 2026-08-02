@@ -3,9 +3,10 @@
  * Plugin Name: WP-Autoplugin
  * Plugin URI: https://wp-autoplugin.com
  * Description: A plugin that generates other plugins on-demand using AI.
- * Version: 2.0.0-dev
+ * Version: 2.0.0
  * Requires at least: 6.6
  * Requires PHP: 8.2
+ * Update URI: https://wp-autoplugin.com/updates/wp-autoplugin
  * Author: Balázs Piller
  * Author URI: https://wp-autoplugin.com
  * Text Domain: wp-autoplugin
@@ -13,7 +14,7 @@
  *
  * @package WP-Autoplugin
  * @since 1.0.0
- * @version 2.0.0-dev
+ * @version 2.0.0
  * @link https://wp-autoplugin.com
  * @license GPL-2.0+
  * @license https://www.gnu.org/licenses/gpl-2.0.html
@@ -27,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define constants.
-define( 'WP_AUTOPLUGIN_VERSION', '2.0.0-dev' );
+define( 'WP_AUTOPLUGIN_VERSION', '2.0.0' );
 define( 'WP_AUTOPLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WP_AUTOPLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

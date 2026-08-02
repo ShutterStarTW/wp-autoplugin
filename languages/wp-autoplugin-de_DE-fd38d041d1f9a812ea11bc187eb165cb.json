@@ -1,5 +1,5 @@
 {
-    "translation-revision-date": "2026-07-28 16:00+0200",
+    "translation-revision-date": "2026-08-02 20:20+0200",
     "generator": "WP-CLI\/2.11.0",
     "source": "assets\/v2\/build\/index.tsx.js",
     "domain": "messages",
@@ -136,8 +136,8 @@
             "Effort": [
                 "Aufwand"
             ],
-            "This Plan requires a configured OpenAI, Anthropic, or ChatGPT Subscription model with native source tools.": [
-                "Dieser Plan erfordert ein konfiguriertes OpenAI-, Anthropic- oder ChatGPT-Abonnementmodell mit nativen Quelltools."
+            "This Plan requires a configured OpenAI, Anthropic, Gemini 3, or ChatGPT Subscription model with native source tools.": [
+                "Dieser Plan erfordert ein konfiguriertes Modell von OpenAI, Anthropic, Gemini 3 oder ChatGPT Subscription mit nativen Quellwerkzeugen."
             ],
             "Configure this model provider before using it.": [
                 "Konfigurieren Sie diesen Modellanbieter, bevor Sie ihn verwenden."
@@ -233,6 +233,9 @@
             "New project": [
                 "Neues Projekt"
             ],
+            "Drag to reorder this workspace tab": [
+                "Ziehen, um diesen Arbeitsbereich-Tab neu anzuordnen"
+            ],
             "Close %s workspace": [
                 "Arbeitsbereich %s schlie\u00dfen"
             ],
@@ -248,8 +251,8 @@
             "Distraction-free mode": [
                 "Ablenkungsfreier Modus"
             ],
-            "Browse every project, switch to an open workspace, or reopen a closed one.": [
-                "Durchsuchen Sie alle Projekte, wechseln Sie zu einem ge\u00f6ffneten Arbeitsbereich oder \u00f6ffnen Sie einen geschlossenen erneut."
+            "Browse every project, switch to an open workspace, reopen a closed one, or permanently delete its history.": [
+                "Durchsuchen Sie alle Projekte, wechseln Sie zu einem ge\u00f6ffneten Arbeitsbereich, \u00f6ffnen Sie einen geschlossenen erneut oder l\u00f6schen Sie seinen Verlauf dauerhaft."
             ],
             "Search projects": [
                 "Projekte durchsuchen"
@@ -300,11 +303,29 @@
             "Reopen": [
                 "Erneut \u00f6ffnen"
             ],
+            "Delete %s": [
+                "%s l\u00f6schen"
+            ],
+            "Delete": [
+                "L\u00f6schen"
+            ],
             "Loading more projects\u2026": [
                 "Weitere Projekte werden geladen\u2026"
             ],
             "Load more projects": [
                 "Weitere Projekte laden"
+            ],
+            "Delete \u201c%s\u201d?": [
+                "\u201e%s\u201c l\u00f6schen?"
+            ],
+            "This permanently deletes all workspaces, jobs, conversations, revisions, reviews, and release history for this project.": [
+                "Dadurch werden alle Arbeitsbereiche, Auftr\u00e4ge, Unterhaltungen, Revisionen, Reviews und der Ver\u00f6ffentlichungsverlauf dieses Projekts dauerhaft gel\u00f6scht."
+            ],
+            "Installed plugins and themes will not be removed or reverted. This action cannot be undone.": [
+                "Installierte Plugins und Themes werden weder entfernt noch zur\u00fcckgesetzt. Diese Aktion kann nicht r\u00fcckg\u00e4ngig gemacht werden."
+            ],
+            "Delete project": [
+                "Projekt l\u00f6schen"
             ],
             "%d job total": [
                 "%d Auftrag insgesamt",
@@ -387,8 +408,35 @@
             "Implementation plan": [
                 "Implementierungsplan"
             ],
-            "Saved with this plan job": [
-                "Mit diesem Planauftrag gespeichert"
+            "Loading historical Plan\u2026": [
+                "Historischer Plan wird geladen \u2026"
+            ],
+            "Plan Markdown": [
+                "Plan-Markdown"
+            ],
+            "Loading Plan history\u2026": [
+                "Planverlauf wird geladen \u2026"
+            ],
+            "Plan %d": [
+                "Plan %d"
+            ],
+            "Plan history": [
+                "Planverlauf"
+            ],
+            "Current": [
+                "Aktuell"
+            ],
+            "Restore this Plan as a new latest Plan?": [
+                "Diesen Plan als neuen neuesten Plan wiederherstellen?"
+            ],
+            "Restore as latest": [
+                "Als neueste wiederherstellen"
+            ],
+            "Plan %1$d \u00b7 %2$s": [
+                "Plan %1$d \u00b7 %2$s"
+            ],
+            "Saved Plan artifact": [
+                "Gespeichertes Plan-Artefakt"
             ],
             "Save plan": [
                 "Plan speichern"
@@ -396,17 +444,20 @@
             "Edit plan": [
                 "Plan bearbeiten"
             ],
+            "Retrying plan": [
+                "Plan wird erneut versucht"
+            ],
             "Updating project structure": [
                 "Projektstruktur wird aktualisiert"
-            ],
-            "Plan Markdown": [
-                "Plan-Markdown"
             ],
             "Open Code to explicitly generate a validated staged revision from this Plan.": [
                 "\u00d6ffnen Sie Code, um aus diesem Plan ausdr\u00fccklich eine validierte bereitgestellte Revision zu erstellen."
             ],
             "Continue to Code": [
                 "Mit Code fortfahren"
+            ],
+            "Restore this Plan or select the current Plan to continue the Plan conversation.": [
+                "Stellen Sie diesen Plan wieder her oder w\u00e4hlen Sie den aktuellen Plan aus, um die Plan-Unterhaltung fortzusetzen."
             ],
             "Project structure": [
                 "Projektstruktur"
@@ -462,9 +513,6 @@
             "Restore this revision as a new latest revision?": [
                 "Diese Revision als neue neueste Revision wiederherstellen?"
             ],
-            "Restore as latest": [
-                "Als neueste wiederherstellen"
-            ],
             "Loading file\u2026": [
                 "Datei wird geladen\u2026"
             ],
@@ -492,8 +540,8 @@
             "Revision %d": [
                 "Revision %d"
             ],
-            "Plan job #%d": [
-                "Planauftrag #%d"
+            "Plan #%d": [
+                "Plan Nr. %d"
             ],
             "Valid": [
                 "G\u00fcltig"
@@ -585,8 +633,8 @@
             "Ready to generate": [
                 "Bereit zum Generieren"
             ],
-            "Plan job #%1$d \u00b7 %2$d planned files": [
-                "Plan-Auftrag #%1$d \u00b7 %2$d geplante Dateien"
+            "Plan #%1$d \u00b7 %2$d planned files": [
+                "Plan Nr. %1$d \u00b7 %2$d geplante Dateien"
             ],
             "Complete the Plan before generating Code.": [
                 "Schlie\u00dfen Sie den Plan ab, bevor Sie Code generieren."

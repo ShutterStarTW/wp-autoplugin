@@ -1,5 +1,5 @@
 {
-    "translation-revision-date": "2026-07-28 16:00+0200",
+    "translation-revision-date": "2026-08-02 20:20+0200",
     "generator": "WP-CLI\/2.11.0",
     "source": "assets\/v2\/build\/index.tsx.js",
     "domain": "messages",
@@ -136,8 +136,8 @@
             "Effort": [
                 "Esfuerzo"
             ],
-            "This Plan requires a configured OpenAI, Anthropic, or ChatGPT Subscription model with native source tools.": [
-                "Este plan requiere un modelo configurado de OpenAI, Anthropic o una suscripci\u00f3n de ChatGPT con herramientas de origen nativas."
+            "This Plan requires a configured OpenAI, Anthropic, Gemini 3, or ChatGPT Subscription model with native source tools.": [
+                "Este Plan requiere un modelo configurado de OpenAI, Anthropic, Gemini 3 o Suscripci\u00f3n de ChatGPT con herramientas nativas de c\u00f3digo fuente."
             ],
             "Configure this model provider before using it.": [
                 "Configura este proveedor de modelos antes de usarlo."
@@ -233,6 +233,9 @@
             "New project": [
                 "Nuevo proyecto"
             ],
+            "Drag to reorder this workspace tab": [
+                "Arrastre para reordenar esta pesta\u00f1a del espacio de trabajo"
+            ],
             "Close %s workspace": [
                 "Cerrar el espacio de trabajo %s"
             ],
@@ -248,8 +251,8 @@
             "Distraction-free mode": [
                 "Modo sin distracciones"
             ],
-            "Browse every project, switch to an open workspace, or reopen a closed one.": [
-                "Explora todos los proyectos, cambia a un espacio de trabajo abierto o vuelve a abrir uno cerrado."
+            "Browse every project, switch to an open workspace, reopen a closed one, or permanently delete its history.": [
+                "Explore todos los proyectos, cambie a un espacio de trabajo abierto, vuelva a abrir uno cerrado o elimine permanentemente su historial."
             ],
             "Search projects": [
                 "Buscar proyectos"
@@ -300,11 +303,29 @@
             "Reopen": [
                 "Volver a abrir"
             ],
+            "Delete %s": [
+                "Eliminar %s"
+            ],
+            "Delete": [
+                "Eliminar"
+            ],
             "Loading more projects\u2026": [
                 "Cargando m\u00e1s proyectos\u2026"
             ],
             "Load more projects": [
                 "Cargar m\u00e1s proyectos"
+            ],
+            "Delete \u201c%s\u201d?": [
+                "\u00bfEliminar \u00ab%s\u00bb?"
+            ],
+            "This permanently deletes all workspaces, jobs, conversations, revisions, reviews, and release history for this project.": [
+                "Esto elimina permanentemente todos los espacios de trabajo, trabajos, conversaciones, revisiones, an\u00e1lisis y el historial de publicaciones de este proyecto."
+            ],
+            "Installed plugins and themes will not be removed or reverted. This action cannot be undone.": [
+                "Los plugins y temas instalados no se eliminar\u00e1n ni se revertir\u00e1n. Esta acci\u00f3n no se puede deshacer."
+            ],
+            "Delete project": [
+                "Eliminar proyecto"
             ],
             "%d job total": [
                 "%d trabajo en total",
@@ -387,8 +408,35 @@
             "Implementation plan": [
                 "Plan de implementaci\u00f3n"
             ],
-            "Saved with this plan job": [
-                "Guardado con este trabajo del plan"
+            "Loading historical Plan\u2026": [
+                "Cargando Plan hist\u00f3rico\u2026"
+            ],
+            "Plan Markdown": [
+                "Markdown del plan"
+            ],
+            "Loading Plan history\u2026": [
+                "Cargando historial de Planes\u2026"
+            ],
+            "Plan %d": [
+                "Plan %d"
+            ],
+            "Plan history": [
+                "Historial de Planes"
+            ],
+            "Current": [
+                "Actual"
+            ],
+            "Restore this Plan as a new latest Plan?": [
+                "\u00bfRestaurar este Plan como nuevo Plan m\u00e1s reciente?"
+            ],
+            "Restore as latest": [
+                "Restaurar como m\u00e1s reciente"
+            ],
+            "Plan %1$d \u00b7 %2$s": [
+                "Plan %1$d \u00b7 %2$s"
+            ],
+            "Saved Plan artifact": [
+                "Artefacto del Plan guardado"
             ],
             "Save plan": [
                 "Guardar plan"
@@ -396,17 +444,20 @@
             "Edit plan": [
                 "Editar plan"
             ],
+            "Retrying plan": [
+                "Reintentando el plan"
+            ],
             "Updating project structure": [
                 "Actualizando la estructura del proyecto"
-            ],
-            "Plan Markdown": [
-                "Markdown del plan"
             ],
             "Open Code to explicitly generate a validated staged revision from this Plan.": [
                 "Abre C\u00f3digo para generar expl\u00edcitamente una revisi\u00f3n preparada y validada a partir de este plan."
             ],
             "Continue to Code": [
                 "Continuar a C\u00f3digo"
+            ],
+            "Restore this Plan or select the current Plan to continue the Plan conversation.": [
+                "Restaure este Plan o seleccione el Plan actual para continuar la conversaci\u00f3n del Plan."
             ],
             "Project structure": [
                 "Estructura del proyecto"
@@ -462,9 +513,6 @@
             "Restore this revision as a new latest revision?": [
                 "\u00bfRestaurar esta revisi\u00f3n como una nueva revisi\u00f3n m\u00e1s reciente?"
             ],
-            "Restore as latest": [
-                "Restaurar como m\u00e1s reciente"
-            ],
             "Loading file\u2026": [
                 "Cargando archivo\u2026"
             ],
@@ -492,8 +540,8 @@
             "Revision %d": [
                 "Revisi\u00f3n %d"
             ],
-            "Plan job #%d": [
-                "Trabajo del plan n.\u00ba %d"
+            "Plan #%d": [
+                "Plan n.\u00ba %d"
             ],
             "Valid": [
                 "V\u00e1lido"
@@ -585,8 +633,8 @@
             "Ready to generate": [
                 "Listo para generar"
             ],
-            "Plan job #%1$d \u00b7 %2$d planned files": [
-                "Trabajo de planificaci\u00f3n n.\u00ba %1$d \u00b7 %2$d archivos planificados"
+            "Plan #%1$d \u00b7 %2$d planned files": [
+                "Plan n.\u00ba %1$d \u00b7 %2$d archivos planificados"
             ],
             "Complete the Plan before generating Code.": [
                 "Completa el plan antes de generar el c\u00f3digo."

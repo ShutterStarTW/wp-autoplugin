@@ -1,5 +1,5 @@
 {
-    "translation-revision-date": "2026-07-28 16:00+0200",
+    "translation-revision-date": "2026-08-02 20:20+0200",
     "generator": "WP-CLI\/2.11.0",
     "source": "assets\/v2\/build\/index.tsx.js",
     "domain": "messages",
@@ -136,8 +136,8 @@
             "Effort": [
                 "Er\u0151fesz\u00edt\u00e9s"
             ],
-            "This Plan requires a configured OpenAI, Anthropic, or ChatGPT Subscription model with native source tools.": [
-                "Ehhez a tervhez be\u00e1ll\u00edtott OpenAI-, Anthropic- vagy ChatGPT-el\u0151fizet\u00e9ses modell sz\u00fcks\u00e9ges nat\u00edv forr\u00e1sk\u00f3deszk\u00f6z\u00f6kkel."
+            "This Plan requires a configured OpenAI, Anthropic, Gemini 3, or ChatGPT Subscription model with native source tools.": [
+                "Ehhez a Tervhez egy be\u00e1ll\u00edtott OpenAI-, Anthropic-, Gemini 3- vagy ChatGPT Subscription-modell sz\u00fcks\u00e9ges nat\u00edv forr\u00e1seszk\u00f6z\u00f6kkel."
             ],
             "Configure this model provider before using it.": [
                 "A haszn\u00e1lat el\u0151tt \u00e1ll\u00edtsd be ezt a modellszolg\u00e1ltat\u00f3t."
@@ -233,6 +233,9 @@
             "New project": [
                 "\u00daj projekt"
             ],
+            "Drag to reorder this workspace tab": [
+                "H\u00fazza a munkater\u00fcletlap \u00e1trendez\u00e9s\u00e9hez"
+            ],
             "Close %s workspace": [
                 "%s munkater\u00fclet bez\u00e1r\u00e1sa"
             ],
@@ -248,8 +251,8 @@
             "Distraction-free mode": [
                 "Figyelemelterel\u00e9s-mentes m\u00f3d"
             ],
-            "Browse every project, switch to an open workspace, or reopen a closed one.": [
-                "B\u00f6ng\u00e9ssz az \u00f6sszes projekt k\u00f6z\u00f6tt, v\u00e1lts egy nyitott munkater\u00fcletre, vagy nyiss meg \u00fajra egy bez\u00e1rtat."
+            "Browse every project, switch to an open workspace, reopen a closed one, or permanently delete its history.": [
+                "B\u00f6ng\u00e9sszen az \u00f6sszes projekt k\u00f6z\u00f6tt, v\u00e1ltson megnyitott munkater\u00fcletre, nyisson meg \u00fajra egy bez\u00e1rtat, vagy t\u00f6r\u00f6lje v\u00e9glegesen az el\u0151zm\u00e9nyeit."
             ],
             "Search projects": [
                 "Projektek keres\u00e9se"
@@ -300,11 +303,29 @@
             "Reopen": [
                 "\u00dajb\u00f3li megnyit\u00e1s"
             ],
+            "Delete %s": [
+                "%s t\u00f6rl\u00e9se"
+            ],
+            "Delete": [
+                "T\u00f6rl\u00e9s"
+            ],
             "Loading more projects\u2026": [
                 "Tov\u00e1bbi projektek bet\u00f6lt\u00e9se\u2026"
             ],
             "Load more projects": [
                 "Tov\u00e1bbi projektek bet\u00f6lt\u00e9se"
+            ],
+            "Delete \u201c%s\u201d?": [
+                "T\u00f6rli ezt: \u201e%s\u201d?"
+            ],
+            "This permanently deletes all workspaces, jobs, conversations, revisions, reviews, and release history for this project.": [
+                "Ez v\u00e9glegesen t\u00f6rli a projekt \u00f6sszes munkater\u00fclet\u00e9t, feladat\u00e1t, besz\u00e9lget\u00e9s\u00e9t, v\u00e1ltozat\u00e1t, ellen\u0151rz\u00e9s\u00e9t \u00e9s kiad\u00e1si el\u0151zm\u00e9ny\u00e9t."
+            ],
+            "Installed plugins and themes will not be removed or reverted. This action cannot be undone.": [
+                "A telep\u00edtett b\u0151v\u00edtm\u00e9nyek \u00e9s sablonok nem lesznek elt\u00e1vol\u00edtva vagy vissza\u00e1ll\u00edtva. Ez a m\u0171velet nem vonhat\u00f3 vissza."
+            ],
+            "Delete project": [
+                "Projekt t\u00f6rl\u00e9se"
             ],
             "%d job total": [
                 "%d feladat \u00f6sszesen",
@@ -387,8 +408,35 @@
             "Implementation plan": [
                 "Megval\u00f3s\u00edt\u00e1si terv"
             ],
-            "Saved with this plan job": [
-                "Ezzel a tervfeladattal mentve"
+            "Loading historical Plan\u2026": [
+                "Kor\u00e1bbi Terv bet\u00f6lt\u00e9se\u2026"
+            ],
+            "Plan Markdown": [
+                "Terv Markdown-form\u00e1tumban"
+            ],
+            "Loading Plan history\u2026": [
+                "Tervel\u0151zm\u00e9nyek bet\u00f6lt\u00e9se\u2026"
+            ],
+            "Plan %d": [
+                "%d. Terv"
+            ],
+            "Plan history": [
+                "Tervel\u0151zm\u00e9nyek"
+            ],
+            "Current": [
+                "Jelenlegi"
+            ],
+            "Restore this Plan as a new latest Plan?": [
+                "Vissza\u00e1ll\u00edtja ezt a Tervet \u00faj legfrissebb Tervk\u00e9nt?"
+            ],
+            "Restore as latest": [
+                "Vissza\u00e1ll\u00edt\u00e1s leg\u00fajabbk\u00e9nt"
+            ],
+            "Plan %1$d \u00b7 %2$s": [
+                "%1$d. Terv \u00b7 %2$s"
+            ],
+            "Saved Plan artifact": [
+                "Mentett Terv-m\u0171term\u00e9k"
             ],
             "Save plan": [
                 "Terv ment\u00e9se"
@@ -396,17 +444,20 @@
             "Edit plan": [
                 "Terv szerkeszt\u00e9se"
             ],
+            "Retrying plan": [
+                "A terv \u00fajrapr\u00f3b\u00e1l\u00e1sa"
+            ],
             "Updating project structure": [
                 "A projektstrukt\u00fara friss\u00edt\u00e9se"
-            ],
-            "Plan Markdown": [
-                "Terv Markdown-form\u00e1tumban"
             ],
             "Open Code to explicitly generate a validated staged revision from this Plan.": [
                 "Nyisd meg a K\u00f3dot, hogy kifejezetten ellen\u0151rz\u00f6tt, el\u0151k\u00e9sz\u00edtett m\u00f3dos\u00edt\u00e1st hozz l\u00e9tre ebb\u0151l a tervb\u0151l."
             ],
             "Continue to Code": [
                 "Tov\u00e1bbl\u00e9p\u00e9s a K\u00f3dhoz"
+            ],
+            "Restore this Plan or select the current Plan to continue the Plan conversation.": [
+                "\u00c1ll\u00edtsa vissza ezt a Tervet, vagy v\u00e1lassza a jelenlegi Tervet a Terv-besz\u00e9lget\u00e9s folytat\u00e1s\u00e1hoz."
             ],
             "Project structure": [
                 "Projektstrukt\u00fara"
@@ -462,9 +513,6 @@
             "Restore this revision as a new latest revision?": [
                 "Vissza\u00e1ll\u00edtja ezt a v\u00e1ltozatot \u00faj leg\u00fajabb v\u00e1ltozatk\u00e9nt?"
             ],
-            "Restore as latest": [
-                "Vissza\u00e1ll\u00edt\u00e1s leg\u00fajabbk\u00e9nt"
-            ],
             "Loading file\u2026": [
                 "F\u00e1jl bet\u00f6lt\u00e9se\u2026"
             ],
@@ -492,8 +540,8 @@
             "Revision %d": [
                 "V\u00e1ltozat %d"
             ],
-            "Plan job #%d": [
-                "%d. sz\u00e1m\u00fa tervfeladat"
+            "Plan #%d": [
+                "%d. Terv"
             ],
             "Valid": [
                 "\u00c9rv\u00e9nyes"
@@ -585,8 +633,8 @@
             "Ready to generate": [
                 "Gener\u00e1l\u00e1sra k\u00e9sz"
             ],
-            "Plan job #%1$d \u00b7 %2$d planned files": [
-                "%1$d. sz\u00e1m\u00fa tervez\u00e9si feladat \u00b7 %2$d tervezett f\u00e1jl"
+            "Plan #%1$d \u00b7 %2$d planned files": [
+                "%1$d. Terv \u00b7 %2$d tervezett f\u00e1jl"
             ],
             "Complete the Plan before generating Code.": [
                 "Fejezd be a tervet a k\u00f3d gener\u00e1l\u00e1sa el\u0151tt."
