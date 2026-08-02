@@ -4,8 +4,8 @@ Donate link: https://wp-autoplugin.com
 Tags: ai, plugin generator, development, wordpress, automation
 Requires at least: 6.6
 Tested up to: 7.0
-Stable tag: 2.0.0
-Requires PHP: 8.2
+Stable tag: 2.0.1
+Requires PHP: 8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,7 +26,7 @@ Use WP-Autoplugin to:
 * Inspect staged changes, edit files, compare diffs, and restore earlier revisions.
 * Package, install, fork, apply, or roll back supported revisions.
 
-Version 2 is a complete rewrite for WordPress 6.6+ and PHP 8.2+. It replaces the separate v1 workflows with one durable Plan -> Code -> Review workspace.
+Version 2 is a complete rewrite for WordPress 6.6+ and PHP 8.0+. It replaces the separate v1 workflows with one durable Plan -> Code -> Review workspace.
 
 = Workspace and revisions =
 
@@ -144,6 +144,10 @@ Update and plugin-information checks query `https://api.github.com` and read hea
 * [GitHub General Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)
 
 == Changelog ==
+
+= 2.0.1 =
+
+* Lowered the minimum PHP requirement from 8.2 to 8.0.
 
 = 2.0.0 =
 

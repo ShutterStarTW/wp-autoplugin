@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: WP-Autoplugin 2.0.0\n"
+"Project-Id-Version: WP-Autoplugin 2.0.1\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/wp-autoplugin\n"
 "POT-Creation-Date: 2026-08-02T18:19:45+00:00\n"
 "PO-Revision-Date: 2026-08-02 20:20+0200\n"
