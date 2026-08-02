@@ -17,7 +17,7 @@ Use it to:
 
 Version 2 is a complete rewrite for WordPress 6.6+ and PHP 8.2+. It replaces the separate v1 workflows with one durable **Plan → Code → Review** workspace built for real development work: exploring source code, making focused changes, iterating safely, and deciding exactly how a finished revision should be released.
 
-> **Screenshot placeholder — The universal workspace (`workspace-overview.png`):** Annotated overview of a project with multiple workspace tabs, the Plan → Code → Review navigation, model and token-usage chips, and the current task. Suggested labels: “Durable workspace tabs”, “Chat at every stage”, “Per-stage model”, “Project usage”, and “Distraction-free mode”.
+![Annotated overview of the WP-Autoplugin workspace](assets/screenshots/workspace-overview.png)
 
 ## What WP-Autoplugin helps you do
 
@@ -68,7 +68,7 @@ The tool loop runs through PHP, JavaScript, the WordPress REST API, and durable 
 
 The loop is deliberately bounded. Agents receive a limited source scope and tool budget rather than unrestricted access to the WordPress installation.
 
-> **Screenshot placeholder — Agentic source exploration (`agent-activity.png`):** Show an existing-plugin Plan or Explain conversation with the Agent activity panel expanded. Annotate a source search, a targeted line-range read, hook discovery, model turns, and the final answer or Plan.
+![Annotated Agent activity panel showing source exploration](assets/screenshots/agent-activity.png)
 
 ### Focused edits instead of unnecessary rewrites
 
@@ -78,7 +78,7 @@ For existing plugins and themes, v2 can generate exact, bounded search-and-repla
 
 This reduces unrelated changes, makes diffs easier to review, and lowers the risk of the model accidentally replacing working code outside the requested scope.
 
-> **Screenshot placeholder — A targeted modification (`targeted-diff.png`):** Show the Code workspace in Changes view with an installed-plugin file selected and a small unified diff inside a larger file. Suggested labels: “Exact targeted replacement”, “Immutable baseline”, “Only planned paths staged”, “Add/Update/Delete summary”, and “Target-change protection”.
+![Annotated Code workspace showing a targeted modification](assets/screenshots/targeted-diff.png)
 
 ## One workspace for every project
 
@@ -179,7 +179,7 @@ You can:
 
 Because each Review is tied to a specific revision, an all-clear result cannot silently carry over after further edits. The workspace always shows whether the current code is still covered by the report.
 
-> **Screenshot placeholder — Structured Review (`review-findings.png`):** Show the Review master-detail interface with the verdict, finding rail, selected P0–P3 finding, source anchor, suggested fix, Fix controls, manual test cases, and Review conversation button.
+![Annotated Review workspace showing structured findings](assets/screenshots/review-findings.png)
 
 ## Continue the conversation at every stage
 
@@ -270,7 +270,7 @@ WP-Autoplugin does not:
 
 Direct theme changes are blocked while the theme is active or while it is the parent of the active child theme.
 
-> **Screenshot placeholder — Release workspace (`release-workspace.png`):** Show release actions beside the Review-generated manual testing checklist and recent activity. Annotate ZIP download, inactive install, Activate or Switch to fork, advanced direct modification, rollback, and Review readiness/override state.
+![Annotated release workspace showing release actions and safeguards](assets/screenshots/release-workspace.png)
 
 ## Providers and models
 
@@ -312,7 +312,7 @@ You can use one model for every stage or select models with different strengths 
 
 API usage may be billed by the selected provider.
 
-> **Screenshot placeholder — Models and instructions (`settings-models.png`):** Annotated Settings screenshot showing the ChatGPT Subscription connection, provider API-key test controls, Default/Planner/Coder/Reviewer model roles, reasoning effort, Custom instructions, and the uninstall data-retention option.
+![Annotated settings screen showing providers, models, and instructions](assets/screenshots/settings-models.png)
 
 ## Give agents project-specific instructions
 
