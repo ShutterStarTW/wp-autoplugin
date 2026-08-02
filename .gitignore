@@ -2,3 +2,7 @@
 CLAUDE.md
 AGENTS.md
 node_modules/
+docs/
+tests/vendor/
+.phpunit.result.cache
+.phpunit.cache/

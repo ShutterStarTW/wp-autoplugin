@@ -1,0 +1,20 @@
+{
+  "name": "wp-autoplugin-v2-admin",
+  "private": true,
+  "version": "2.0.0",
+  "scripts": {
+    "build": "wp-scripts build assets/v2/src/index.tsx assets/v2/src/settings.ts --output-path=assets/v2/build",
+    "start": "wp-scripts start assets/v2/src/index.tsx assets/v2/src/settings.ts --output-path=assets/v2/build",
+    "lint:js": "wp-scripts lint-js assets/v2/src",
+    "format": "wp-scripts format assets/v2/src"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^30.0.0"
+  },
+  "dependencies": {
+    "@wordpress/api-fetch": "^7.0.0",
+    "@wordpress/components": "^29.0.0",
+    "@wordpress/element": "^6.0.0",
+    "@wordpress/i18n": "^5.0.0"
+  }
+}

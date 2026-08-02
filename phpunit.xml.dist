@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+	bootstrap="tests/bootstrap.php"
+	colors="true"
+	backupGlobals="false"
+	beStrictAboutOutputDuringTests="true"
+	convertDeprecationsToExceptions="false"
+	convertNoticesToExceptions="true"
+	convertWarningsToExceptions="true"
+>
+	<testsuites>
+		<testsuite name="WP-Autoplugin">
+			<directory suffix="Test.php">tests/phpunit</directory>
+		</testsuite>
+	</testsuites>
+	<php>
+		<env name="WP_PHPUNIT__TESTS_CONFIG" value="tests/wp-tests-config.php"/>
+		<env name="WP_PHPUNIT__TABLE_PREFIX" value="wptests_"/>
+	</php>
+</phpunit>

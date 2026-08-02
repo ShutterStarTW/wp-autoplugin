@@ -1,0 +1,196 @@
+.wp-autoplugin-v2-settings {
+	max-width: 1080px;
+
+	h2 {
+		margin-top: 32px;
+	}
+
+	.form-table select {
+		min-width: 260px;
+	}
+
+	[hidden] {
+		display: none !important;
+	}
+
+	#toggle-specialized-models {
+		align-items: center;
+		display: inline-flex;
+		gap: 2px;
+		margin-top: 6px;
+		padding: 0;
+		text-decoration: none;
+
+		.dashicons {
+			font-size: 16px;
+			height: 18px;
+			width: 18px;
+		}
+	}
+
+	.wp-autoplugin-per-step-models {
+		background: #fff;
+		border: 1px solid #c3c4c7;
+		border-radius: 4px;
+		margin-bottom: 24px;
+		padding: 0 24px;
+	}
+
+	.wp-autoplugin-model-setting,
+	.wp-autoplugin-chatgpt-controls,
+	.wp-autoplugin-chatgpt-device {
+		align-items: center;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+
+	.wp-autoplugin-api-key-field {
+		align-items: flex-start;
+		display: flex;
+		gap: 8px;
+		max-width: 640px;
+
+		.regular-text {
+			flex: 1 1 auto;
+			max-width: none;
+		}
+
+		.button {
+			flex: 0 0 auto;
+		}
+
+		.is-success {
+			border-color: #008a20;
+			color: #008a20;
+			font-weight: 600;
+		}
+
+		.is-error {
+			border-color: #b32d2e;
+			color: #b32d2e;
+			font-weight: 600;
+		}
+	}
+
+	.wp-autoplugin-model-effort {
+		align-items: center;
+		display: inline-flex;
+		gap: 6px;
+
+		select {
+			min-width: 150px;
+		}
+	}
+
+	.wp-autoplugin-chatgpt-account::before {
+		content: "—";
+		margin-right: 8px;
+	}
+
+	.wp-autoplugin-chatgpt-status[data-state="connected"] {
+		color: #008a20;
+	}
+
+	.wp-autoplugin-chatgpt-status[data-state="error"],
+	.wp-autoplugin-chatgpt-notice.is-error {
+		color: #b32d2e;
+	}
+
+	.wp-autoplugin-chatgpt-status[data-state="disconnected"],
+	.wp-autoplugin-chatgpt-status[data-state="pending"] {
+		color: #646970;
+	}
+
+	.wp-autoplugin-chatgpt-device {
+		margin-top: 8px;
+	}
+
+	.wp-autoplugin-chatgpt-code {
+		font-size: 15px;
+		letter-spacing: 0.08em;
+		padding: 5px 9px;
+	}
+
+	.wp-autoplugin-chatgpt-notice {
+		margin: 6px 0 0;
+	}
+
+	#wp_autoplugin_custom_instructions ~ p {
+		font-size: 13px;
+	}
+
+	#custom-models-list {
+		margin: 18px 0;
+	}
+
+	.custom-model-item {
+		background: #fff;
+		border: 1px solid #c3c4c7;
+		border-radius: 4px;
+		margin-bottom: 12px;
+		padding: 15px;
+		position: relative;
+
+		> strong {
+			color: #1d2327;
+			font-size: 14px;
+		}
+
+		details {
+			margin: 10px 120px 0 0;
+		}
+
+		summary {
+			color: #2271b1;
+			cursor: pointer;
+			padding: 5px 0;
+		}
+
+		p {
+			color: #50575e;
+			margin: 8px 0;
+			overflow-wrap: anywhere;
+		}
+
+		.remove-model {
+			border-color: #b32d2e;
+			color: #b32d2e;
+			position: absolute;
+			right: 15px;
+			top: 12px;
+
+			&:hover {
+				background: #b32d2e;
+				color: #fff;
+			}
+		}
+	}
+
+	#add-custom-model-form {
+		background: #f6f7f7;
+		border: 1px solid #c3c4c7;
+		border-radius: 4px;
+		margin-bottom: 15px;
+		padding: 20px;
+
+		input,
+		textarea {
+			margin-bottom: 12px;
+			max-width: 760px;
+		}
+	}
+}
+
+@media screen and (max-width: 782px) {
+	.wp-autoplugin-v2-settings {
+		.wp-autoplugin-per-step-models {
+			padding: 0 14px;
+		}
+
+		.custom-model-item details {
+			margin-right: 0;
+			padding-top: 30px;
+		}
+	}
+}

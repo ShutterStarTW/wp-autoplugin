@@ -1,0 +1,1389 @@
+{
+    "translation-revision-date": "2026-08-02 20:20+0200",
+    "generator": "WP-CLI\/2.11.0",
+    "source": "assets\/v2\/build\/index.tsx.js",
+    "domain": "messages",
+    "locale_data": {
+        "messages": {
+            "": {
+                "domain": "messages",
+                "lang": "es_ES",
+                "plural-forms": "nplurals=2; plural=(n != 1);"
+            },
+            "model default": [
+                "modelo predeterminado"
+            ],
+            "Failed": [
+                "Error"
+            ],
+            "Preparing your workspace": [
+                "Preparando tu espacio de trabajo"
+            ],
+            "Restoring your projects and recent work\u2026": [
+                "Restaurando tus proyectos y trabajo reciente\u2026"
+            ],
+            "New plugin": [
+                "Nuevo plugin"
+            ],
+            "Plan": [
+                "Plan"
+            ],
+            "Explain": [
+                "Explicar"
+            ],
+            "WP-Autoplugin Fork": [
+                "WP-Autoplugin Fork"
+            ],
+            "Create": [
+                "Crear"
+            ],
+            "Start from a blank plugin.": [
+                "Empieza con un plugin vac\u00edo."
+            ],
+            "What should the plugin do?": [
+                "\u00bfQu\u00e9 debe hacer el plugin?"
+            ],
+            "Modify": [
+                "Modificar"
+            ],
+            "Add or change functionality.": [
+                "A\u00f1ade o cambia funcionalidades."
+            ],
+            "What would you like to change?": [
+                "\u00bfQu\u00e9 te gustar\u00eda cambiar?"
+            ],
+            "Fix a bug": [
+                "Corregir un error"
+            ],
+            "Diagnose and repair a problem.": [
+                "Diagnostica y soluciona un problema."
+            ],
+            "What problem should the AI fix?": [
+                "\u00bfQu\u00e9 problema debe solucionar la IA?"
+            ],
+            "Create extension": [
+                "Crear una extensi\u00f3n"
+            ],
+            "Build against discovered hooks.": [
+                "Crea una extensi\u00f3n basada en los hooks descubiertos."
+            ],
+            "What should the extension do?": [
+                "\u00bfQu\u00e9 debe hacer la extensi\u00f3n?"
+            ],
+            "Ask questions about the source.": [
+                "Haz preguntas sobre el c\u00f3digo fuente."
+            ],
+            "What would you like to know?": [
+                "\u00bfQu\u00e9 te gustar\u00eda saber?"
+            ],
+            "Preview unavailable": [
+                "Vista previa no disponible"
+            ],
+            "The selected model does not accept image prompts.": [
+                "El modelo seleccionado no acepta prompts con im\u00e1genes."
+            ],
+            "Attach no more than six images.": [
+                "Adjunta como m\u00e1ximo seis im\u00e1genes."
+            ],
+            "Use JPEG, PNG, or WebP images.": [
+                "Usa im\u00e1genes JPEG, PNG o WebP."
+            ],
+            "Each image must be 5 MiB or smaller.": [
+                "Cada imagen debe ocupar 5 MiB o menos."
+            ],
+            "Images may use at most 20 MiB in total.": [
+                "Las im\u00e1genes pueden ocupar un m\u00e1ximo total de 20 MiB."
+            ],
+            "Attach images": [
+                "Adjuntar im\u00e1genes"
+            ],
+            "The selected model does not accept image prompts. Remove the selected images or choose another model.": [
+                "El modelo seleccionado no acepta prompts con im\u00e1genes. Elimina las im\u00e1genes seleccionadas o elige otro modelo."
+            ],
+            "Remove %s": [
+                "Eliminar %s"
+            ],
+            "Provider settings": [
+                "Ajustes del proveedor"
+            ],
+            "Planner": [
+                "Planificador"
+            ],
+            "Coder": [
+                "Codificador"
+            ],
+            "Reviewer": [
+                "Revisor"
+            ],
+            "Choose model": [
+                "Elegir modelo"
+            ],
+            "%s model": [
+                "Modelo de %s"
+            ],
+            "Model": [
+                "Modelo"
+            ],
+            "Use Default Model (%s)": [
+                "Usar el modelo predeterminado (%s)"
+            ],
+            "unavailable": [
+                "no disponible"
+            ],
+            "Inherited: %1$s \u00b7 %2$s%3$s": [
+                "Heredado: %1$s \u00b7 %2$s%3$s"
+            ],
+            "Effort": [
+                "Esfuerzo"
+            ],
+            "This Plan requires a configured OpenAI, Anthropic, Gemini 3, or ChatGPT Subscription model with native source tools.": [
+                "Este Plan requiere un modelo configurado de OpenAI, Anthropic, Gemini 3 o Suscripci\u00f3n de ChatGPT con herramientas nativas de c\u00f3digo fuente."
+            ],
+            "Configure this model provider before using it.": [
+                "Configura este proveedor de modelos antes de usarlo."
+            ],
+            "Changes apply globally to future jobs. Queued, running, and completed jobs keep their saved model.": [
+                "Los cambios se aplican globalmente a los trabajos futuros. Los trabajos en cola, en ejecuci\u00f3n y completados conservan el modelo guardado."
+            ],
+            "Cancel": [
+                "Cancelar"
+            ],
+            "The model setting could not be saved.": [
+                "No se ha podido guardar la configuraci\u00f3n del modelo."
+            ],
+            "Apply": [
+                "Aplicar"
+            ],
+            "%s follow-up": [
+                "Seguimiento de %s"
+            ],
+            "Plan structure update": [
+                "Actualizaci\u00f3n de la estructura del plan"
+            ],
+            "Review fix": [
+                "Correcci\u00f3n de la revisi\u00f3n"
+            ],
+            "Code regeneration": [
+                "Regeneraci\u00f3n del c\u00f3digo"
+            ],
+            "Code generation": [
+                "Generaci\u00f3n de c\u00f3digo"
+            ],
+            "Token usage could not be loaded.": [
+                "No se ha podido cargar el uso de tokens."
+            ],
+            "Loading token usage": [
+                "Cargando el uso de tokens"
+            ],
+            "%1$s input tokens, %2$s output tokens. Click for token usage breakdown.": [
+                "%1$s tokens de entrada, %2$s tokens de salida. Haz clic para ver el desglose del uso de tokens."
+            ],
+            "Project token usage": [
+                "Uso de tokens del proyecto"
+            ],
+            "Totals include every recorded model request in this project, including retries and provider calls made by failed or cancelled jobs.": [
+                "Los totales incluyen todas las solicitudes de modelos registradas en este proyecto, incluidos los reintentos y las llamadas a proveedores realizadas por trabajos fallidos o cancelados."
+            ],
+            "Retry": [
+                "Reintentar"
+            ],
+            "Loading token usage\u2026": [
+                "Cargando el uso de tokens\u2026"
+            ],
+            "Input tokens": [
+                "Tokens de entrada"
+            ],
+            "Output tokens": [
+                "Tokens de salida"
+            ],
+            "No token usage data available yet.": [
+                "A\u00fan no hay datos de uso de tokens disponibles."
+            ],
+            "Usage by model": [
+                "Uso por modelo"
+            ],
+            "Jobs": [
+                "Trabajos"
+            ],
+            "Input": [
+                "Entrada"
+            ],
+            "Output": [
+                "Salida"
+            ],
+            "Executed AI jobs": [
+                "Trabajos de IA ejecutados"
+            ],
+            "%d job": [
+                "%d trabajo",
+                "%d trabajos"
+            ],
+            "Job": [
+                "Trabajo"
+            ],
+            "Status": [
+                "Estado"
+            ],
+            "#%1$d \u00b7 %2$s": [
+                "#%1$d \u00b7 %2$s"
+            ],
+            "Open workspaces": [
+                "Espacios de trabajo abiertos"
+            ],
+            "New project": [
+                "Nuevo proyecto"
+            ],
+            "Drag to reorder this workspace tab": [
+                "Arrastre para reordenar esta pesta\u00f1a del espacio de trabajo"
+            ],
+            "Close %s workspace": [
+                "Cerrar el espacio de trabajo %s"
+            ],
+            "Start a new project": [
+                "Iniciar un nuevo proyecto"
+            ],
+            "Workspace options": [
+                "Opciones del espacio de trabajo"
+            ],
+            "All projects": [
+                "Todos los proyectos"
+            ],
+            "Distraction-free mode": [
+                "Modo sin distracciones"
+            ],
+            "Browse every project, switch to an open workspace, reopen a closed one, or permanently delete its history.": [
+                "Explore todos los proyectos, cambie a un espacio de trabajo abierto, vuelva a abrir uno cerrado o elimine permanentemente su historial."
+            ],
+            "Search projects": [
+                "Buscar proyectos"
+            ],
+            "Search by project, request, or target": [
+                "Buscar por proyecto, solicitud u objetivo"
+            ],
+            "%d project": [
+                "%d proyecto",
+                "%d proyectos"
+            ],
+            "Loading projects\u2026": [
+                "Cargando proyectos\u2026"
+            ],
+            "No matching projects": [
+                "No hay proyectos coincidentes"
+            ],
+            "No projects yet": [
+                "A\u00fan no hay proyectos"
+            ],
+            "Try a different project name, request, or target.": [
+                "Prueba con otro nombre de proyecto, solicitud o destino."
+            ],
+            "Projects will appear here after you create a workspace.": [
+                "Los proyectos aparecer\u00e1n aqu\u00ed cuando crees un espacio de trabajo."
+            ],
+            "Reopen %s": [
+                "Volver a abrir %s"
+            ],
+            "Open %s": [
+                "Abrir %s"
+            ],
+            "Closed": [
+                "Cerrado"
+            ],
+            "Open": [
+                "Abierto"
+            ],
+            "Operation": [
+                "Operaci\u00f3n"
+            ],
+            "Target": [
+                "Destino"
+            ],
+            "Updated": [
+                "Actualizado"
+            ],
+            "Reopen": [
+                "Volver a abrir"
+            ],
+            "Delete %s": [
+                "Eliminar %s"
+            ],
+            "Delete": [
+                "Eliminar"
+            ],
+            "Loading more projects\u2026": [
+                "Cargando m\u00e1s proyectos\u2026"
+            ],
+            "Load more projects": [
+                "Cargar m\u00e1s proyectos"
+            ],
+            "Delete \u201c%s\u201d?": [
+                "\u00bfEliminar \u00ab%s\u00bb?"
+            ],
+            "This permanently deletes all workspaces, jobs, conversations, revisions, reviews, and release history for this project.": [
+                "Esto elimina permanentemente todos los espacios de trabajo, trabajos, conversaciones, revisiones, an\u00e1lisis y el historial de publicaciones de este proyecto."
+            ],
+            "Installed plugins and themes will not be removed or reverted. This action cannot be undone.": [
+                "Los plugins y temas instalados no se eliminar\u00e1n ni se revertir\u00e1n. Esta acci\u00f3n no se puede deshacer."
+            ],
+            "Delete project": [
+                "Eliminar proyecto"
+            ],
+            "%d job total": [
+                "%d trabajo en total",
+                "%d trabajos en total"
+            ],
+            "%d follow-up": [
+                "%d seguimiento",
+                "%d seguimientos"
+            ],
+            "%d retry": [
+                "%d reintento",
+                "%d reintentos"
+            ],
+            "Project progress": [
+                "Progreso del proyecto"
+            ],
+            "What would you like to work on?": [
+                "\u00bfEn qu\u00e9 te gustar\u00eda trabajar?"
+            ],
+            "What should the AI do?": [
+                "\u00bfQu\u00e9 deber\u00eda hacer la IA?"
+            ],
+            "No source files are changed until you approve a staged revision.": [
+                "Los archivos de origen no cambiar\u00e1n hasta que apruebes una revisi\u00f3n preparada."
+            ],
+            "No source files are changed until you approve a staged revision. You can then save it as new or overwrite the existing target.": [
+                "Los archivos de origen no cambiar\u00e1n hasta que apruebes una revisi\u00f3n preparada. Despu\u00e9s puedes guardarla como nueva o sobrescribir el destino existente."
+            ],
+            "Create plan": [
+                "Crear plan"
+            ],
+            "%d files": [
+                "%d archivos"
+            ],
+            "Request": [
+                "Solicitud"
+            ],
+            "Image-only request": [
+                "Solicitud solo con imagen"
+            ],
+            "Workspace stages": [
+                "Fases del espacio de trabajo"
+            ],
+            "Loading job\u2026": [
+                "Cargando trabajo\u2026"
+            ],
+            "Used: %s": [
+                "Usado: %s"
+            ],
+            "Running: %s": [
+                "En ejecuci\u00f3n: %s"
+            ],
+            "Job #%d": [
+                "Trabajo n.\u00ba %d"
+            ],
+            "%d%% complete": [
+                "%d%% completado"
+            ],
+            "Cancel job": [
+                "Cancelar trabajo"
+            ],
+            "Agent activity": [
+                "Actividad del agente"
+            ],
+            "%1$d model turns \u00b7 %2$d tool calls \u00b7 %3$s inspected": [
+                "%1$d turnos del modelo \u00b7 %2$d llamadas a herramientas \u00b7 %3$s inspeccionado"
+            ],
+            "Loading agent activity\u2026": [
+                "Cargando actividad del agente\u2026"
+            ],
+            "No agent activity metadata is available for this job.": [
+                "No hay metadatos de actividad del agente disponibles para este trabajo."
+            ],
+            "View details": [
+                "Ver detalles"
+            ],
+            "Retry plan": [
+                "Reintentar plan"
+            ],
+            "Implementation plan": [
+                "Plan de implementaci\u00f3n"
+            ],
+            "Loading historical Plan\u2026": [
+                "Cargando Plan hist\u00f3rico\u2026"
+            ],
+            "Plan Markdown": [
+                "Markdown del plan"
+            ],
+            "Loading Plan history\u2026": [
+                "Cargando historial de Planes\u2026"
+            ],
+            "Plan %d": [
+                "Plan %d"
+            ],
+            "Plan history": [
+                "Historial de Planes"
+            ],
+            "Current": [
+                "Actual"
+            ],
+            "Restore this Plan as a new latest Plan?": [
+                "\u00bfRestaurar este Plan como nuevo Plan m\u00e1s reciente?"
+            ],
+            "Restore as latest": [
+                "Restaurar como m\u00e1s reciente"
+            ],
+            "Plan %1$d \u00b7 %2$s": [
+                "Plan %1$d \u00b7 %2$s"
+            ],
+            "Saved Plan artifact": [
+                "Artefacto del Plan guardado"
+            ],
+            "Save plan": [
+                "Guardar plan"
+            ],
+            "Edit plan": [
+                "Editar plan"
+            ],
+            "Retrying plan": [
+                "Reintentando el plan"
+            ],
+            "Updating project structure": [
+                "Actualizando la estructura del proyecto"
+            ],
+            "Open Code to explicitly generate a validated staged revision from this Plan.": [
+                "Abre C\u00f3digo para generar expl\u00edcitamente una revisi\u00f3n preparada y validada a partir de este plan."
+            ],
+            "Continue to Code": [
+                "Continuar a C\u00f3digo"
+            ],
+            "Restore this Plan or select the current Plan to continue the Plan conversation.": [
+                "Restaure este Plan o seleccione el Plan actual para continuar la conversaci\u00f3n del Plan."
+            ],
+            "Project structure": [
+                "Estructura del proyecto"
+            ],
+            "Files proposed by this plan": [
+                "Archivos propuestos por este plan"
+            ],
+            "Unnamed file": [
+                "Archivo sin nombre"
+            ],
+            "This plan does not include a file structure.": [
+                "Este plan no incluye una estructura de archivos."
+            ],
+            "Regenerate every file using the latest Plan? This starts new billable model requests and preserves the current revision in history.": [
+                "\u00bfRegenerar todos los archivos usando el plan m\u00e1s reciente? Esto inicia nuevas solicitudes facturables al modelo y conserva la revisi\u00f3n actual en el historial."
+            ],
+            "Regenerate every planned target change using the latest Plan? This starts new billable model requests and preserves the current revision in history.": [
+                "\u00bfRegenerar todos los cambios de destino planificados usando el plan m\u00e1s reciente? Esto inicia nuevas solicitudes facturables al modelo y conserva la revisi\u00f3n actual en el historial."
+            ],
+            "PLANNED FILES": [
+                "ARCHIVOS PLANIFICADOS"
+            ],
+            "TARGET FILES": [
+                "ARCHIVOS DE DESTINO"
+            ],
+            "STAGED FILES": [
+                "ARCHIVOS PREPARADOS"
+            ],
+            "Generate again": [
+                "Generar de nuevo"
+            ],
+            "Regenerate all code": [
+                "Regenerar todo el c\u00f3digo"
+            ],
+            "Regenerate planned changes": [
+                "Regenerar cambios planificados"
+            ],
+            "Discard all unsaved changes in this edit session?": [
+                "\u00bfDescartar todos los cambios sin guardar de esta sesi\u00f3n de edici\u00f3n?"
+            ],
+            "Cancel edits": [
+                "Cancelar ediciones"
+            ],
+            "A newer revision exists. Your buffers are preserved; reload the latest revision before retrying.": [
+                "Existe una revisi\u00f3n m\u00e1s reciente. Tus b\u00faferes se conservan; vuelve a cargar la \u00faltima revisi\u00f3n antes de reintentarlo."
+            ],
+            "Save revision": [
+                "Guardar revisi\u00f3n"
+            ],
+            "Edit revision": [
+                "Editar revisi\u00f3n"
+            ],
+            "Restore this revision as a new latest revision?": [
+                "\u00bfRestaurar esta revisi\u00f3n como una nueva revisi\u00f3n m\u00e1s reciente?"
+            ],
+            "Loading file\u2026": [
+                "Cargando archivo\u2026"
+            ],
+            "This staged action deletes the target file. Open Changes to review the removed source.": [
+                "Esta acci\u00f3n preparada elimina el archivo de destino. Abre Cambios para revisar el origen eliminado."
+            ],
+            "Loading Code workspace\u2026": [
+                "Cargando espacio de trabajo de C\u00f3digo\u2026"
+            ],
+            "The Plan has changed since this revision.": [
+                "El plan ha cambiado desde esta revisi\u00f3n."
+            ],
+            "This revision\u2019s file structure differs from its Plan. Regenerate all code to return to the latest Plan structure.": [
+                "La estructura de archivos de esta revisi\u00f3n difiere de su plan. Regenera todo el c\u00f3digo para volver a la estructura del plan m\u00e1s reciente."
+            ],
+            "This revision\u2019s change set differs from its Plan. Regenerate the planned changes to return to the latest Plan structure.": [
+                "El conjunto de cambios de esta revisi\u00f3n difiere de su plan. Regenera los cambios planificados para volver a la estructura del plan m\u00e1s reciente."
+            ],
+            "Code generation ended without creating a revision. The existing revision remains unchanged.": [
+                "La generaci\u00f3n de c\u00f3digo termin\u00f3 sin crear una revisi\u00f3n. La revisi\u00f3n existente no ha cambiado."
+            ],
+            "Revision": [
+                "Revisi\u00f3n"
+            ],
+            "Revision %d": [
+                "Revisi\u00f3n %d"
+            ],
+            "Plan #%d": [
+                "Plan n.\u00ba %d"
+            ],
+            "Valid": [
+                "V\u00e1lido"
+            ],
+            "Expand project structure": [
+                "Expandir estructura del proyecto"
+            ],
+            "Collapse project structure": [
+                "Contraer estructura del proyecto"
+            ],
+            "Select a file": [
+                "Selecciona un archivo"
+            ],
+            "View": [
+                "Ver"
+            ],
+            "File view": [
+                "Vista de archivo"
+            ],
+            "Code": [
+                "C\u00f3digo"
+            ],
+            "Changes": [
+                "Cambios"
+            ],
+            "Validation: valid": [
+                "Validaci\u00f3n: v\u00e1lida"
+            ],
+            "Next: revision-bound Review": [
+                "Siguiente: revisi\u00f3n vinculada a la revisi\u00f3n"
+            ],
+            "Continue to Review": [
+                "Continuar a Revisi\u00f3n"
+            ],
+            "Select the latest revision to send a message.": [
+                "Selecciona la \u00faltima revisi\u00f3n para enviar un mensaje."
+            ],
+            "Save or cancel the edit session before sending a message.": [
+                "Guarda o cancela la sesi\u00f3n de edici\u00f3n antes de enviar un mensaje."
+            ],
+            "Wait for the active Code work to finish.": [
+                "Espera a que termine el trabajo activo de C\u00f3digo."
+            ],
+            "Configure a coder model to send a message.": [
+                "Configura un modelo de programaci\u00f3n para enviar un mensaje."
+            ],
+            "Revision ID %d": [
+                "ID de revisi\u00f3n %d"
+            ],
+            "Ask about or change the code": [
+                "Preguntar sobre el c\u00f3digo o cambiarlo"
+            ],
+            "Questions use the configured coder. Change requests may use multiple billable calls and create a new staged revision without writing to an installed target.": [
+                "Las preguntas usan el programador configurado. Las solicitudes de cambio pueden usar varias llamadas facturables y crear una nueva revisi\u00f3n preparada sin escribir en un destino instalado."
+            ],
+            "You": [
+                "T\u00fa"
+            ],
+            "Image-only message": [
+                "Mensaje solo con imagen"
+            ],
+            "Code assistant": [
+                "Asistente de c\u00f3digo"
+            ],
+            "Retry answer": [
+                "Reintentar respuesta"
+            ],
+            "Created %s.": [
+                "Creado %s."
+            ],
+            "The Code follow-up was cancelled.": [
+                "El seguimiento de C\u00f3digo se ha cancelado."
+            ],
+            "Current file context: %s": [
+                "Contexto del archivo actual: %s"
+            ],
+            "Message": [
+                "Mensaje"
+            ],
+            "Send": [
+                "Enviar"
+            ],
+            "The selected Coder does not accept image prompts. Remove the images or choose another model.": [
+                "El Coder seleccionado no acepta indicaciones con im\u00e1genes. Elimina las im\u00e1genes o elige otro modelo."
+            ],
+            "Ask a question or describe the exact change you want.": [
+                "Haz una pregunta o describe el cambio exacto que quieres."
+            ],
+            "Ready to generate": [
+                "Listo para generar"
+            ],
+            "Plan #%1$d \u00b7 %2$d planned files": [
+                "Plan n.\u00ba %1$d \u00b7 %2$d archivos planificados"
+            ],
+            "Complete the Plan before generating Code.": [
+                "Completa el plan antes de generar el c\u00f3digo."
+            ],
+            "This Plan needs a valid main plugin file and 1\u201320 added PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text files. Regenerate the Plan structure before generating Code.": [
+                "Este plan necesita un archivo de plugin principal v\u00e1lido y entre 1 y 20 archivos a\u00f1adidos de PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown o texto sin formato. Vuelve a generar la estructura del plan antes de generar el c\u00f3digo."
+            ],
+            "This Plan needs 1\u201320 valid Add, Update, or Delete actions for PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, or plain-text files. Regenerate the Plan structure before generating Code.": [
+                "Este plan necesita entre 1 y 20 acciones v\u00e1lidas de a\u00f1adir, actualizar o eliminar para archivos de PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown o texto sin formato. Vuelve a generar la estructura del plan antes de generar el c\u00f3digo."
+            ],
+            "Code generation ended without a revision. The Plan is unchanged and you can generate again.": [
+                "La generaci\u00f3n de c\u00f3digo ha terminado sin una revisi\u00f3n. El plan no ha cambiado y puedes volver a generarlo."
+            ],
+            "Generate Code": [
+                "Generar c\u00f3digo"
+            ],
+            "Generating staged revision": [
+                "Generando una revisi\u00f3n preparada"
+            ],
+            "Analyzing Code follow-up": [
+                "Analizando la continuaci\u00f3n del c\u00f3digo"
+            ],
+            "Checking the latest request": [
+                "Comprobando la solicitud m\u00e1s reciente"
+            ],
+            "Generating Code changes": [
+                "Generando cambios en el c\u00f3digo"
+            ],
+            "%1$d of %2$d files": [
+                "%1$d de %2$d archivos"
+            ],
+            "Analysis": [
+                "An\u00e1lisis"
+            ],
+            "Request compliance": [
+                "Cumplimiento de la solicitud"
+            ],
+            "Preparing generation\u2026": [
+                "Preparando la generaci\u00f3n\u2026"
+            ],
+            "%d tokens": [
+                "%d tokens"
+            ],
+            "Unsaved changes": [
+                "Cambios sin guardar"
+            ],
+            "Validation problem": [
+                "Problema de validaci\u00f3n"
+            ],
+            "No changes for this file.": [
+                "No hay cambios en este archivo."
+            ],
+            "%d problem": [
+                "%d problema",
+                "%d problemas"
+            ],
+            "Staged changes": [
+                "Cambios preparados"
+            ],
+            "Edited": [
+                "Editado"
+            ],
+            "Restored": [
+                "Restaurado"
+            ],
+            "AI generated": [
+                "Generado por IA"
+            ],
+            "The ZIP could not be downloaded.": [
+                "No se ha podido descargar el ZIP."
+            ],
+            "The ZIP was built, but its download could not be started.": [
+                "El ZIP se ha creado, pero no se ha podido iniciar la descarga."
+            ],
+            "Dismiss this issue? You can reopen it later.": [
+                "\u00bfQuieres descartar este problema? Puedes volver a abrirlo m\u00e1s tarde."
+            ],
+            "Optional dismissal reason": [
+                "Motivo opcional del descarte"
+            ],
+            "Proceed without current all-clear Review? Status: %1$s. Open findings: %2$s.": [
+                "\u00bfContinuar sin una revisi\u00f3n actualmente aprobada? Estado: %1$s. Hallazgos abiertos: %2$s."
+            ],
+            "none": [
+                "ninguno"
+            ],
+            "Loading Review\u2026": [
+                "Cargando la revisi\u00f3n\u2026"
+            ],
+            "Start Review": [
+                "Iniciar revisi\u00f3n"
+            ],
+            "Verify fixes": [
+                "Verificar correcciones"
+            ],
+            "Review latest": [
+                "Revisar la versi\u00f3n m\u00e1s reciente"
+            ],
+            "To change code, use Fix on an issue.": [
+                "Para cambiar el c\u00f3digo, usa \u00abCorregir\u00bb en un problema."
+            ],
+            "Review latest before asking another question.": [
+                "Revisa la versi\u00f3n m\u00e1s reciente antes de hacer otra pregunta."
+            ],
+            "The selected Reviewer does not accept image prompts. Remove the images or choose another model.": [
+                "El Reviewer seleccionado no acepta indicaciones con im\u00e1genes. Elimina las im\u00e1genes o elige otro modelo."
+            ],
+            "%d issue requires action": [
+                "%d problema requiere acci\u00f3n",
+                "%d problemas requieren acci\u00f3n"
+            ],
+            "%d previous issue": [
+                "%d problema anterior",
+                "%d problemas anteriores"
+            ],
+            "\u2713 %d earlier issue resolved": [
+                "\u2713 %d problema anterior resuelto",
+                "\u2713 %d problemas anteriores resueltos"
+            ],
+            "No follow-up questions yet. Ask the reviewer for clarification or reconsideration.": [
+                "Todav\u00eda no hay preguntas de seguimiento. Pide al revisor una aclaraci\u00f3n o que lo reconsidere."
+            ],
+            "The reviewer updated this report after the latest follow-up.": [
+                "El revisor ha actualizado este informe despu\u00e9s del \u00faltimo seguimiento."
+            ],
+            "The reviewer replied.": [
+                "El revisor ha respondido."
+            ],
+            "Follow-up #%1$d is %2$s.": [
+                "El seguimiento n.\u00ba %1$d est\u00e1 %2$s."
+            ],
+            "Review for Revision %d": [
+                "Revisi\u00f3n de la revisi\u00f3n %d"
+            ],
+            "Review": [
+                "Revisi\u00f3n"
+            ],
+            "Review the staged revision for issues before release.": [
+                "Revisa la revisi\u00f3n preparada para detectar problemas antes de publicarla."
+            ],
+            "%d earlier issue": [
+                "%d problema anterior",
+                "%d problemas anteriores"
+            ],
+            "Run review again": [
+                "Volver a ejecutar la revisi\u00f3n"
+            ],
+            "Fix issue": [
+                "Corregir el problema"
+            ],
+            "More fix options": [
+                "M\u00e1s opciones de correcci\u00f3n"
+            ],
+            "Fix this issue without review": [
+                "Corregir este problema sin revisi\u00f3n"
+            ],
+            "Fix all issues": [
+                "Corregir todos los problemas"
+            ],
+            "Complete Code before starting Review.": [
+                "Completa el c\u00f3digo antes de iniciar la revisi\u00f3n."
+            ],
+            "This Review is stale because a newer revision exists. Review latest before relying on its verdict.": [
+                "Esta revisi\u00f3n est\u00e1 desactualizada porque existe una revisi\u00f3n m\u00e1s reciente. Revisa la \u00faltima antes de confiar en su veredicto."
+            ],
+            "The Review did not complete. Try again or check the selected Reviewer configuration.": [
+                "La revisi\u00f3n no se ha completado. Int\u00e9ntalo de nuevo o comprueba la configuraci\u00f3n del revisor seleccionado."
+            ],
+            "No safe material fix was staged": [
+                "No se ha preparado ninguna correcci\u00f3n segura y sustancial"
+            ],
+            "The Review fix did not complete. The staged revision was not changed.": [
+                "La correcci\u00f3n de la revisi\u00f3n no se ha completado. La revisi\u00f3n preparada no se ha modificado."
+            ],
+            "Current findings": [
+                "Resultados actuales"
+            ],
+            "%1$d of %2$d": [
+                "%1$d de %2$d"
+            ],
+            "0 issues": [
+                "0 problemas"
+            ],
+            "Current Review findings": [
+                "Resultados de la revisi\u00f3n actual"
+            ],
+            "No current findings.": [
+                "No hay resultados actuales."
+            ],
+            "Please reconsider %1$s: %2$s": [
+                "Reconsidera %1$s: %2$s"
+            ],
+            "No issues to address": [
+                "No hay problemas que abordar"
+            ],
+            "The current Review has no unresolved findings.": [
+                "La revisi\u00f3n actual no tiene resultados sin resolver."
+            ],
+            "Review history": [
+                "Historial de revisiones"
+            ],
+            "Earlier reviewer reports remain available for reference.": [
+                "Los informes anteriores del revisor siguen disponibles como referencia."
+            ],
+            "View history": [
+                "Ver historial"
+            ],
+            "Latest reviewer follow-up": [
+                "\u00daltimo seguimiento del revisor"
+            ],
+            "Reviewer follow-up": [
+                "Seguimiento del revisor"
+            ],
+            "View conversation": [
+                "Ver conversaci\u00f3n"
+            ],
+            "Ask reviewer": [
+                "Preguntar al revisor"
+            ],
+            "Reviewer conversation": [
+                "Conversaci\u00f3n con el revisor"
+            ],
+            "Follow-up questions": [
+                "Preguntas de seguimiento"
+            ],
+            "Ask the reviewer to explain a finding or reconsider the current Review.": [
+                "Pide al revisor que explique un resultado o reconsidere la revisi\u00f3n actual."
+            ],
+            "Image-only question": [
+                "Pregunta solo con im\u00e1genes"
+            ],
+            "The review was updated.": [
+                "La revisi\u00f3n se ha actualizado."
+            ],
+            "Ask a follow-up": [
+                "Hacer una pregunta de seguimiento"
+            ],
+            "Ask a question, request reconsideration, or ask for another area to be inspected\u2026": [
+                "Haz una pregunta, solicita una reconsideraci\u00f3n o pide que se inspeccione otra \u00e1rea\u2026"
+            ],
+            "Modify the original inactive theme directly? Upstream updates remain enabled and may overwrite these changes. Rollback restores files only, not database or runtime side effects, and becomes unavailable if affected files drift.": [
+                "\u00bfModificar directamente el tema original inactivo? Las actualizaciones originales seguir\u00e1n activadas y podr\u00edan sobrescribir estos cambios. La reversi\u00f3n solo restaura los archivos, no los efectos secundarios de la base de datos ni del tiempo de ejecuci\u00f3n, y dejar\u00e1 de estar disponible si los archivos afectados cambian."
+            ],
+            "Modify the original plugin directly? Upstream updates remain enabled and may overwrite these changes. Rollback restores files only, not database or runtime side effects, and becomes unavailable if affected files drift.": [
+                "\u00bfModificar directamente el plugin original? Las actualizaciones originales seguir\u00e1n activadas y podr\u00edan sobrescribir estos cambios. La reversi\u00f3n solo restaura los archivos, no los efectos secundarios de la base de datos ni del tiempo de ejecuci\u00f3n, y dejar\u00e1 de estar disponible si los archivos afectados cambian."
+            ],
+            "Type %s to confirm": [
+                "Escribe %s para confirmar"
+            ],
+            "%s history": [
+                "Historial de %s"
+            ],
+            "Previous issues": [
+                "Problemas anteriores"
+            ],
+            "Review reports": [
+                "Informes de revisi\u00f3n"
+            ],
+            "Project-level finding": [
+                "Resultado del proyecto"
+            ],
+            "Suggested fix": [
+                "Correcci\u00f3n sugerida"
+            ],
+            "Reconsider": [
+                "Reconsiderar"
+            ],
+            "History": [
+                "Historial"
+            ],
+            "Dismiss": [
+                "Descartar"
+            ],
+            "Fix this issue": [
+                "Corregir este problema"
+            ],
+            "Fix without review": [
+                "Corregir sin revisi\u00f3n"
+            ],
+            "Select %s": [
+                "Seleccionar %s"
+            ],
+            "Fix": [
+                "Corregir"
+            ],
+            "Review release options": [
+                "Revisar las opciones de publicaci\u00f3n"
+            ],
+            "Package and deploy this plugin": [
+                "Empaquetar y desplegar este plugin"
+            ],
+            "Package and deploy these changes": [
+                "Empaquetar y desplegar estos cambios"
+            ],
+            "Package and deploy these theme changes": [
+                "Empaquetar y desplegar estos cambios del tema"
+            ],
+            "Review not run": [
+                "Revisi\u00f3n no ejecutada"
+            ],
+            "You can release this revision, but it has not been reviewed yet.": [
+                "Puedes publicar esta revisi\u00f3n, pero a\u00fan no se ha revisado."
+            ],
+            "%d unresolved review issue": [
+                "%d incidencia de revisi\u00f3n sin resolver",
+                "%d incidencias de revisi\u00f3n sin resolver"
+            ],
+            "You can release this revision, but it has not passed Review.": [
+                "Puedes publicar esta revisi\u00f3n, pero no ha superado la revisi\u00f3n."
+            ],
+            "Review cleared with dismissals": [
+                "Revisi\u00f3n superada con descartes"
+            ],
+            "Review passed": [
+                "Revisi\u00f3n superada"
+            ],
+            "This revision has no unresolved Review issues.": [
+                "Esta revisi\u00f3n no tiene incidencias de revisi\u00f3n sin resolver."
+            ],
+            "Review is out of date": [
+                "La revisi\u00f3n est\u00e1 desactualizada"
+            ],
+            "The available Review belongs to an earlier revision. Releasing requires confirmation.": [
+                "La revisi\u00f3n disponible corresponde a una revisi\u00f3n anterior. Para publicar, es necesario confirmarlo."
+            ],
+            "Review in progress": [
+                "Revisi\u00f3n en curso"
+            ],
+            "Release tools remain available while the current Review runs.": [
+                "Las herramientas de publicaci\u00f3n siguen disponibles mientras se ejecuta la revisi\u00f3n actual."
+            ],
+            "Review failed": [
+                "La revisi\u00f3n ha fallado"
+            ],
+            "The latest Review did not complete. Releasing requires confirmation.": [
+                "La \u00faltima revisi\u00f3n no se ha completado. Para publicar, es necesario confirmarlo."
+            ],
+            "Release \u00b7 Revision %d": [
+                "Publicar \u00b7 Revisi\u00f3n %d"
+            ],
+            "Release tools remain available regardless of Review status.": [
+                "Las herramientas de publicaci\u00f3n siguen disponibles independientemente del estado de la revisi\u00f3n."
+            ],
+            "Release actions": [
+                "Acciones de publicaci\u00f3n"
+            ],
+            "Installed. Click Activate to enable the plugin on this site.": [
+                "Instalado. Haz clic en \u00abActivar\u00bb para activar el plugin en este sitio."
+            ],
+            "Switch to fork": [
+                "Cambiar a la bifurcaci\u00f3n"
+            ],
+            "Activate": [
+                "Activar"
+            ],
+            "The theme copy was installed and left inactive. Preview or activate it from Appearance \u2192 Themes.": [
+                "La copia del tema se ha instalado y se ha dejado inactiva. Puedes previsualizarla o activarla desde Apariencia \u2192 Temas."
+            ],
+            "Open Themes": [
+                "Abrir temas"
+            ],
+            "This theme is active. ZIP download and copy installation remain available, but direct modification and rollback are blocked while it is in use.": [
+                "Este tema est\u00e1 activo. La descarga del ZIP y la instalaci\u00f3n de una copia siguen disponibles, pero la modificaci\u00f3n directa y la restauraci\u00f3n est\u00e1n bloqueadas mientras se use."
+            ],
+            "This theme is the parent of the active child theme. ZIP download and copy installation remain available, but direct modification and rollback are blocked while it is in use.": [
+                "Este tema es el tema principal del tema hijo activo. La descarga del ZIP y la instalaci\u00f3n de una copia siguen disponibles, pero la modificaci\u00f3n directa y la restauraci\u00f3n est\u00e1n bloqueadas mientras se use."
+            ],
+            "Install an inactive theme copy": [
+                "Instalar una copia inactiva del tema"
+            ],
+            "The copy remains a child of %s and preserves its Template header.": [
+                "La copia sigue siendo hija de %s y conserva su cabecera Template."
+            ],
+            "The copy is a complete standalone theme fork.": [
+                "La copia es un tema bifurcado independiente y completo."
+            ],
+            "Theme copy slug": [
+                "Slug de la copia del tema"
+            ],
+            "Download theme ZIP": [
+                "Descargar ZIP del tema"
+            ],
+            "Create a replacement package with the original theme slug for manual deployment.": [
+                "Crea un paquete de sustituci\u00f3n con el slug original del tema para desplegarlo manualmente."
+            ],
+            "Install as copy": [
+                "Instalar como copia"
+            ],
+            "Install the verified copy without activating or switching the current theme.": [
+                "Instala la copia verificada sin activar ni cambiar el tema actual."
+            ],
+            "Theme files only are released. Customizer, Site Editor, global styles, templates, and other database-held settings are not copied.": [
+                "Solo se publican los archivos del tema. No se copian el Personalizador, el Editor del sitio, los estilos globales, las plantillas ni otros ajustes almacenados en la base de datos."
+            ],
+            "Copy details": [
+                "Detalles"
+            ],
+            "Theme Name": [
+                "Nombre del tema"
+            ],
+            "Update URI": [
+                "URI de actualizaci\u00f3n"
+            ],
+            "Version": [
+                "Versi\u00f3n"
+            ],
+            "Patch version bump": [
+                "Incremento de versi\u00f3n de parche"
+            ],
+            "Advanced: modify original": [
+                "Avanzado: modificar el original"
+            ],
+            "Upstream theme updates may overwrite direct changes. File rollback cannot undo database or runtime side effects and is blocked whenever the theme is active or is the parent of the active child theme.": [
+                "Las actualizaciones del tema original pueden sobrescribir los cambios directos. La restauraci\u00f3n de archivos no puede deshacer los efectos secundarios de la base de datos ni del tiempo de ejecuci\u00f3n, y est\u00e1 bloqueada cuando el tema est\u00e1 activo o es el tema principal del tema hijo activo."
+            ],
+            "Modify original theme": [
+                "Modificar el tema original"
+            ],
+            "Download ZIP": [
+                "Descargar ZIP"
+            ],
+            "Create a portable ZIP package without changing this site.": [
+                "Crea un paquete ZIP port\u00e1til sin cambiar este sitio."
+            ],
+            "Install on this site": [
+                "Instalar en este sitio"
+            ],
+            "Install this revision on the current WordPress site. Activation remains a separate step.": [
+                "Instala esta revisi\u00f3n en el sitio de WordPress actual. La activaci\u00f3n es un paso independiente."
+            ],
+            "Recommended: release as a fork": [
+                "Recomendado: publicar como bifurcaci\u00f3n"
+            ],
+            "The fork and original share plugin data and must not be active together.": [
+                "La bifurcaci\u00f3n y el original comparten los datos del plugin y no deben estar activos a la vez."
+            ],
+            "Fork plugin slug": [
+                "Slug del plugin bifurcado"
+            ],
+            "Download fork ZIP": [
+                "Descargar el ZIP de la bifurcaci\u00f3n"
+            ],
+            "Create a separately named plugin package while leaving the original untouched.": [
+                "Crea un paquete de plugin con un nombre independiente sin modificar el original."
+            ],
+            "Install as fork": [
+                "Instalar como bifurcaci\u00f3n"
+            ],
+            "Install the fork on this site. Switching activation remains a separate step.": [
+                "Instala la bifurcaci\u00f3n en este sitio. El cambio de activaci\u00f3n es un paso independiente."
+            ],
+            "Fork details": [
+                "Detalles de la bifurcaci\u00f3n"
+            ],
+            "Plugin Name": [
+                "Nombre del plugin"
+            ],
+            "Advanced: replace or modify the original": [
+                "Avanzado: reemplazar o modificar el original"
+            ],
+            "The replacement ZIP is for manual deployment. Upstream updates may overwrite direct changes, and file rollback cannot undo database or runtime side effects.": [
+                "El ZIP de reemplazo es para el despliegue manual. Las actualizaciones del proyecto original pueden sobrescribir los cambios directos, y deshacer los archivos no puede revertir los efectos en la base de datos ni en tiempo de ejecuci\u00f3n."
+            ],
+            "Download replacement ZIP": [
+                "Descargar el ZIP de reemplazo"
+            ],
+            "Modify original": [
+                "Modificar el original"
+            ],
+            "The original plugin files were modified. Rollback remains available only while every affected file matches the promoted state.": [
+                "Los archivos del plugin original se han modificado. Deshacer sigue disponible solo mientras todos los archivos afectados coincidan con el estado publicado."
+            ],
+            "Rollback files": [
+                "Deshacer cambios en los archivos"
+            ],
+            "The original theme files were modified. Rollback remains available only while the theme is not in use and every affected file matches the promoted state.": [
+                "Los archivos del tema original se han modificado. Deshacer sigue disponible solo mientras el tema no est\u00e9 en uso y todos los archivos afectados coincidan con el estado publicado."
+            ],
+            "Rollback theme files": [
+                "Deshacer cambios en los archivos del tema"
+            ],
+            "Manual testing": [
+                "Pruebas manuales"
+            ],
+            "%1$d of %2$d complete": [
+                "%1$d de %2$d completadas"
+            ],
+            "Manual testing progress": [
+                "Progreso de las pruebas manuales"
+            ],
+            "These suggestions belong to an earlier revision. Review latest to refresh them before testing.": [
+                "Estas sugerencias pertenecen a una revisi\u00f3n anterior. Revisa la \u00faltima versi\u00f3n para actualizarlas antes de probar."
+            ],
+            "Expected:": [
+                "Esperado:"
+            ],
+            "Start Review to generate suggested manual checks for this revision.": [
+                "Inicia la revisi\u00f3n para generar comprobaciones manuales sugeridas para esta revisi\u00f3n."
+            ],
+            "Suggested manual checks will appear when Review completes.": [
+                "Las comprobaciones manuales sugeridas aparecer\u00e1n cuando termine la revisi\u00f3n."
+            ],
+            "Retry Review to generate suggested manual checks.": [
+                "Vuelve a intentar la revisi\u00f3n para generar comprobaciones manuales sugeridas."
+            ],
+            "Review latest to generate manual checks for this revision.": [
+                "Revisa la \u00faltima versi\u00f3n para generar comprobaciones manuales para esta revisi\u00f3n."
+            ],
+            "The current Review did not include any manual test cases.": [
+                "La revisi\u00f3n actual no incluy\u00f3 ning\u00fan caso de prueba manual."
+            ],
+            "Checklist progress is kept only for this browser session.": [
+                "El progreso de la lista de comprobaci\u00f3n se conserva solo durante esta sesi\u00f3n del navegador."
+            ],
+            "Release activity": [
+                "Actividad de publicaci\u00f3n"
+            ],
+            "Recent packages, installations, copies, direct changes, rollbacks, and errors.": [
+                "Paquetes, instalaciones, copias, cambios directos, acciones de deshacer y errores recientes."
+            ],
+            "Show recent": [
+                "Mostrar recientes"
+            ],
+            "View all": [
+                "Ver todo"
+            ],
+            "No release activity yet. Packages and deployments will appear here.": [
+                "Todav\u00eda no hay actividad de publicaci\u00f3n. Los paquetes y despliegues aparecer\u00e1n aqu\u00ed."
+            ],
+            "Release action failed": [
+                "La acci\u00f3n de publicaci\u00f3n ha fallado"
+            ],
+            "Release action cancelled": [
+                "La acci\u00f3n de publicaci\u00f3n se ha cancelado"
+            ],
+            "Theme ZIP created": [
+                "ZIP del tema creado"
+            ],
+            "Creating theme ZIP": [
+                "Creando el ZIP del tema"
+            ],
+            "ZIP package created": [
+                "Paquete ZIP creado"
+            ],
+            "Creating ZIP package": [
+                "Creando el paquete ZIP"
+            ],
+            "Plugin activated": [
+                "Plugin activado"
+            ],
+            "Switched to fork": [
+                "Se ha cambiado a la bifurcaci\u00f3n"
+            ],
+            "Theme files rolled back": [
+                "Se han deshecho los cambios en los archivos del tema"
+            ],
+            "Plugin files rolled back": [
+                "Se han deshecho los cambios en los archivos del plugin"
+            ],
+            "Theme copy installed": [
+                "Copia del tema instalada"
+            ],
+            "Installing theme copy": [
+                "Instalando la copia del tema"
+            ],
+            "Original theme modified": [
+                "Tema original modificado"
+            ],
+            "Modifying original theme": [
+                "Modificando el tema original"
+            ],
+            "Fork installed": [
+                "Bifurcaci\u00f3n instalada"
+            ],
+            "Installing fork": [
+                "Instalando la bifurcaci\u00f3n"
+            ],
+            "Original plugin modified": [
+                "Plugin original modificado"
+            ],
+            "Modifying original plugin": [
+                "Modificando el plugin original"
+            ],
+            "Plugin installed": [
+                "Plugin instalado"
+            ],
+            "Installing plugin": [
+                "Instalando el plugin"
+            ],
+            "The private ZIP is ready to download.": [
+                "El ZIP privado est\u00e1 listo para descargar."
+            ],
+            "Installed successfully and left inactive. Preview or activate it from Appearance \u2192 Themes.": [
+                "Se ha instalado correctamente y se ha dejado inactivo. Puedes previsualizarlo o activarlo desde Apariencia \u2192 Temas."
+            ],
+            "Installed successfully. Activation remains a separate action.": [
+                "Se ha instalado correctamente. La activaci\u00f3n sigue siendo una acci\u00f3n independiente."
+            ],
+            "The inactive original theme files now match this revision; drift-safe file rollback is available.": [
+                "Los archivos del tema original inactivo ahora coinciden con esta revisi\u00f3n; el rollback de archivos protegido frente a cambios externos est\u00e1 disponible."
+            ],
+            "The original plugin files now match this revision; drift-safe file rollback is available.": [
+                "Los archivos del plugin original ahora coinciden con esta revisi\u00f3n; el rollback de archivos protegido frente a cambios externos est\u00e1 disponible."
+            ],
+            "The direct theme file changes were restored.": [
+                "Se han restaurado los cambios directos en los archivos del tema."
+            ],
+            "The direct plugin file changes were restored.": [
+                "Se han restaurado los cambios directos en los archivos del plugin."
+            ],
+            "Release job #%1$d is %2$s.": [
+                "El trabajo de publicaci\u00f3n #%1$d est\u00e1 %2$s."
+            ],
+            "No issues": [
+                "Sin problemas"
+            ],
+            "Dismissed issues": [
+                "Problemas descartados"
+            ],
+            "Action required": [
+                "Se requiere una acci\u00f3n"
+            ],
+            "Stale": [
+                "Obsoleto"
+            ],
+            "In progress": [
+                "En curso"
+            ],
+            "Not started": [
+                "No iniciado"
+            ],
+            "Plan assistant": [
+                "Asistente del plan"
+            ],
+            "Plan updated. The new version is now active above.": [
+                "Plan actualizado. La nueva versi\u00f3n ya est\u00e1 activa arriba."
+            ],
+            "Ask about or change the plan": [
+                "Preguntar sobre el plan o cambiarlo"
+            ],
+            "Ask a follow-up question": [
+                "Hacer una pregunta de seguimiento"
+            ],
+            "Ask a question or request a change\u2026": [
+                "Haz una pregunta o solicita un cambio\u2026"
+            ],
+            "Ask a follow-up question\u2026": [
+                "Haz una pregunta de seguimiento\u2026"
+            ],
+            "Ask": [
+                "Preguntar"
+            ],
+            "The selected model does not accept image prompts. Remove the images or choose another model.": [
+                "El modelo seleccionado no acepta indicaciones con im\u00e1genes. Elimina las im\u00e1genes o elige otro modelo."
+            ],
+            "No job has been started for this stage yet.": [
+                "Todav\u00eda no se ha iniciado ning\u00fan trabajo para esta fase."
+            ],
+            "Plugin": [
+                "Plugin"
+            ],
+            "Theme": [
+                "Tema"
+            ],
+            "Chat": [
+                "Chat"
+            ],
+            "History available": [
+                "Historial disponible"
+            ],
+            "Needs attention": [
+                "Requiere atenci\u00f3n"
+            ],
+            "No messages": [
+                "Sin mensajes"
+            ],
+            "Complete": [
+                "Completo"
+            ],
+            "Incomplete": [
+                "Incompleto"
+            ],
+            "Define the work": [
+                "Definir el trabajo"
+            ],
+            "Build from the Plan": [
+                "Crear a partir del plan"
+            ],
+            "Assess staged Code": [
+                "Evaluar el c\u00f3digo preparado"
+            ],
+            "Plugins": [
+                "Plugins"
+            ],
+            "Themes": [
+                "Temas"
+            ],
+            "Choose a target": [
+                "Elegir un objetivo"
+            ],
+            "%d item": [
+                "%d elemento",
+                "%d elementos"
+            ],
+            "Search plugins": [
+                "Buscar plugins"
+            ],
+            "Search themes": [
+                "Buscar temas"
+            ],
+            "Search plugins\u2026": [
+                "Buscar plugins\u2026"
+            ],
+            "Search themes\u2026": [
+                "Buscar temas\u2026"
+            ],
+            "Available targets": [
+                "Objetivos disponibles"
+            ],
+            "Active": [
+                "Activos"
+            ],
+            "No matching targets.": [
+                "No hay objetivos coincidentes."
+            ],
+            "Selected plugin": [
+                "Plugin seleccionado"
+            ],
+            "Selected theme": [
+                "Tema seleccionado"
+            ],
+            "Files": [
+                "Archivos"
+            ],
+            "Lines": [
+                "L\u00edneas"
+            ],
+            "Tokens": [
+                "Tokens"
+            ],
+            "Hooks": [
+                "Hooks"
+            ],
+            "Choose an operation": [
+                "Elige una operaci\u00f3n"
+            ],
+            "%1$d input \u00b7 %2$d output tokens": [
+                "%1$d tokens de entrada \u00b7 %2$d tokens de salida"
+            ]
+        }
+    }
+}

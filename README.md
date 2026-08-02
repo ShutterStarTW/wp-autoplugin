@@ -1,323 +1,403 @@
 # WP-Autoplugin
 
-<p align="center">
-  <img src="https://wp-autoplugin.com/logo192.png" alt="WP-Autoplugin Logo" width="128">
-</p>
+WP-Autoplugin brings an agentic coding workflow into WordPress. From the WordPress admin, it can explore an existing codebase, understand how it works, plan a change, write or revise the code, review the result, and prepare it for release as a new plugin, a fork, or a direct modification of an installed plugin or theme.
 
-WP-Autoplugin is a free WordPress plugin that uses AI to assist in generating, fixing, and extending plugins on-demand. It enables users to quickly create functional plugins from simple descriptions, addressing specific needs without unnecessary bloat.
+It is completely free and bring-your-own-key: you can connect it directly to OpenAI, Anthropic, Google Gemini, xAI, or a compatible API endpoint and choose the models you want to use. It can also work with your ChatGPT subscription, using the subscription’s Codex credits instead of an OpenAI API key.
 
-- Generate plugins using AI
-- Fix and extend existing plugins
-- Full control over the generation process
-- Support for multiple AI models, and any OpenAI-compatible custom API
-- View the list of generated plugins for easy management
+In practical terms, it is similar to having **Claude Code or any other coding agent inside WordPress**, but with a workflow designed specifically for plugins and themes. It works with the code already installed on the site, keeps every generated revision recoverable, and never modifies a live target unless an administrator explicitly approves the release.
 
----
+Use it to:
 
-WP-Autoplugin offers practical solutions for various WordPress development scenarios:
+* create complete WordPress plugins from a description;
+* diagnose and fix an installed plugin or theme;
+* add features to existing code without rebuilding it from scratch;
+* create a separate extension plugin using the target’s hooks;
+* understand an unfamiliar codebase through an ongoing conversation; and
+* review, test, package, install, fork, apply, or roll back changes from one workspace.
 
-- **Lightweight Alternatives**: Create simple, focused plugins to replace large, feature-heavy plugins that may slow down your site or include unnecessary features and advertisements.
-- **Custom Solutions**: Develop site-specific plugins tailored to your unique requirements, eliminating the need for complex workarounds or multiple plugins.
-- **Developer Foundations**: Generate solid base plugins that developers can extend and build upon, streamlining the process of creating complex, custom plugins.
-- **Professional Multi-File Plugins**: Create sophisticated plugins with proper file structure, organization, and scalability using complex plugin mode.
+Version 2 is a complete rewrite for WordPress 6.6+ and PHP 8.2+. It replaces the separate v1 workflows with one durable **Plan → Code → Review** workspace built for real development work: exploring source code, making focused changes, iterating safely, and deciding exactly how a finished revision should be released.
 
-## Plugin Highlights
+![Annotated overview of the WP-Autoplugin workspace](assets/screenshots/workspace-overview.png)
 
-- **Completely Free**: No premium version, no ads, no account required.
-- **Privacy-Focused**: No data collection or external communication (except for the AI API you choose).
-- **BYOK (Bring Your Own Key)**: Use your own API key from the AI provider of your choice.
-- **Flexible AI Models**: Choose from a variety of AI models to suit your needs, or set up custom models.
-- **Use in Your Language**: The plugin is fully translatable and has built-in support for 10+ languages.
+## What WP-Autoplugin helps you do
 
-## How It Works
+### Build a new plugin without leaving WordPress
 
-1. **Describe Your Plugin**: Provide a description of the plugin you want to create.
-2. **AI Generation**: WP-Autoplugin uses AI to generate a development plan and write the code.
-3. **Review and Install**: Review the generated plan and code, make any necessary changes, and install the plugin with a single click.
+Describe the plugin you need, refine the Plan, generate the files, inspect every change, and download or install the result. The output is a normal WordPress plugin that you can continue maintaining with or without WP-Autoplugin.
 
-You can also use WP-Autoplugin to **fix bugs**, **add new features**, or **explain plugins** you've created with the tool. The **Explain Plugin** feature allows you to ask questions or obtain general overviews of generated plugins, helping you better understand their functionality and structure.
+### Modify existing plugins and themes safely
 
-## Complex Plugin Generation
+Ask WP-Autoplugin to fix a bug, add a feature, update an integration, or explain where a change should be made. It inspects the target code and stages the result separately rather than editing the installed files immediately.
 
-WP-Autoplugin's complex plugin mode enables the creation of sophisticated, multi-file plugins with:
+This makes it practical to work on custom plugins, internal tools, abandoned projects, and site-specific modifications without manually moving code between an editor and WordPress.
 
-- **Proper File Structure**: Organized directories and file hierarchies
-- **Object-Oriented Design**: Well-structured classes and namespaces
-- **Scalable Architecture**: Plugins designed for growth and maintenance
-- **Professional Standards**: Code that follows WordPress development best practices
+### Extend third-party code without editing it
 
-<details>
-<summary>Click to view complex plugin generation screenshot</summary>
+WP-Autoplugin can inspect the actions and filters exposed by an installed plugin or theme and plan a separate extension plugin around them.
 
-![Complex plugin generation interface](https://wp-autoplugin.com/screenshot-6.png)
+This is useful when you want to preserve update compatibility. When the requested behavior cannot be implemented reliably through the available hooks, the Plan explains the limitation instead of pretending that an extension is possible.
 
-</details>
+### Understand unfamiliar codebases
 
-## Specialized Models Configuration
+An Explain project gives you a durable conversation about an installed plugin or theme. You can ask where functionality lives, how data flows through the project, which hooks are available, or what would be involved in making a change.
 
-Optimize your plugin generation workflow by assigning different AI models to specific tasks:
+The agent can inspect additional files as the conversation develops, so you do not need to know which source files are relevant before asking.
 
-- **Planner Model**: Handles plugin analysis and extension planning
-- **Coder Model**: Focuses on code generation and implementation
-- **Reviewer Model**: Provides code explanations and reviews
+### Iterate without losing earlier work
 
-This approach allows you to:
-- Use reasoning models for planning complex architectures
-- Employ fast, cost-effective models for simple coding tasks
-- Leverage specialized models for code review and explanations
-- Optimize both performance and API costs
+Plans, generated revisions, manual edits, Reviews, conversations, usage records, and release actions are retained as part of the project.
 
-## Token Usage Tracking
+You can return after a reload, reopen a closed project, compare revisions, restore an earlier result as a new revision, or see exactly which Review applied to which version of the code.
 
-Monitor your API consumption with detailed usage information:
-- Real-time token count display during generation
-- Per-step token usage breakdown
-- Duration of each API request
+## Source-aware agents inside WordPress
 
-This helps you:
-- Control API costs effectively
-- Choose the most cost-efficient models for your needs
-- Understand the token impact of different generation modes
+When working with an existing plugin or theme, WP-Autoplugin does not need to place the entire codebase into one oversized prompt.
 
-<details>
-<summary>Click to view token usage information screenshot</summary>
+Instead, supported models can progressively explore the project using bounded, read-only source tools. The agent can:
 
-![Token usage information](https://wp-autoplugin.com/screenshot-7.png)
+* inspect target metadata and the project structure;
+* list and page through source files;
+* read only the relevant sections of a file;
+* search for literal text across supported source files;
+* discover WordPress actions and filters with their locations and surrounding code; and
+* inspect an installed parent theme separately when working with a child theme.
 
-</details>
+This allows the agent to follow the code where it leads. A task that begins with a REST route, for example, can continue into the callback, supporting classes, validation logic, and related hooks without sending every project file on every request.
 
-## Extend Third-Party Plugins and Themes with Hooks
+The tool loop runs through PHP, JavaScript, the WordPress REST API, and durable background jobs. It can pause between model turns, survive a page reload, and resume with the same model, reasoning effort, instructions, source fingerprint, and remaining tool budget.
 
-WP-Autoplugin allows you to easily extend **any plugin** or **theme** directly from the WordPress admin dashboard:
+The loop is deliberately bounded. Agents receive a limited source scope and tool budget rather than unrestricted access to the WordPress installation.
 
-- Click on the "**Extend Plugin**" action link for the plugin you'd like to enhance, or look for the "**Extend**" button on the Appearance > Themes page.
-- WP-Autoplugin will analyze the selected plugin or theme, extracting available action and filter hooks along with relevant contextual details.
-- Provide a description of the desired extension; WP-Autoplugin assesses the technical feasibility using available hooks.
-- A new extension plugin will be generated based on your description, allowing seamless integration with the existing functionality.
+![Annotated Agent activity panel showing source exploration](assets/screenshots/agent-activity.png)
 
-Demo video: [Extend a third-party plugin with WP-Autoplugin](https://www.youtube.com/watch?v=_9RnFcEGncY)
+### Focused edits instead of unnecessary rewrites
 
-## Auto-detect Fatal Errors
+WP-Autoplugin v1 regenerated an entire file even when a task required changing only a few lines.
 
-When you activate an AI-generated plugin, WP-Autoplugin will automatically detect fatal errors and deactivate the plugin to prevent site crashes. A message with the error details will be displayed, along with a link to fix the issue automatically with AI.
+For existing plugins and themes, v2 can generate exact, bounded search-and-replace operations. The server applies those operations to an immutable snapshot of the original file, validates the complete result, and stages only the approved Add, Update, and Delete paths.
 
-## Supported Models
+This reduces unrelated changes, makes diffs easier to review, and lowers the risk of the model accidentally replacing working code outside the requested scope.
 
-WP-Autoplugin supports 30+ AI models, including:
+![Annotated Code workspace showing a targeted modification](assets/screenshots/targeted-diff.png)
 
-- Claude Opus 4.8
-- Claude Opus 4.7
-- Claude Opus 4.6
-- Claude Opus 4.5
-- Claude Sonnet 4.6
-- Claude Sonnet 4.5
-- Claude Haiku 4.5
-- o3
-- o3-pro
-- GPT-5.5
-- GPT-5.5 Pro
-- GPT-5.4
-- GPT-5.4 Pro
-- GPT-5.4 mini
-- GPT-5.4 nano
-- GPT-5 Pro
-- GPT-5
-- GPT-5 mini
-- GPT-5 nano
-- GPT-4.1
-- GPT-4.1 mini
-- GPT-4o
-- GPT-4o mini
-- Google Gemini 3.1 Pro Preview
-- Google Gemini 3.5 Flash
-- Google Gemini 3 Flash Preview
-- Google Gemini 3.1 Flash Lite
-- Google Gemini 2.5 Pro
-- Google Gemini 2.5 Flash
-- Google Gemini 2.5 Flash Lite
-- xAI Grok 4.3
-- xAI Grok 4.3 Latest
-- xAI Grok Latest
-- xAI Grok Build 0.1
+## One workspace for every project
 
-While WP-Autoplugin is free to use, you may need to pay for API usage based on your chosen model.
+Every task opens as an IDE-style workspace tab. The same interface supports:
 
-## Custom Models
+* new plugins;
+* installed plugins;
+* standalone and child themes;
+* hook-based extension plugins; and
+* codebase explanation projects.
 
-WP-Autoplugin supports custom models: you can plug in any OpenAI-compatible API by providing the endpoint URL, model name, and API key. This feature allows you to use any model you have access to, including locally hosted models, or custom models you've trained yourself.
+The workspace is designed for tasks that may take more than one request or browser session:
 
-## BYOK (Bring Your Own Key)
+* tabs and their active jobs survive navigation and reloads;
+* closing a tab does not delete the project or cancel its work;
+* the project browser can search and paginate across open and closed projects; and
+* closed projects can be reopened with their Plans, conversations, revisions, Reviews, usage, and release history intact.
 
-To use WP-Autoplugin, you'll need an API key from an AI provider. Insert your key in the plugin settings to get started. Your API key remains on your server and is not shared with anyone.
+Background work runs through the bundled Action Scheduler integration, so longer operations do not depend on keeping one browser request open.
 
-Some AI platforms currently offer free plans and include SOTA models, like **Gemini 2.5 Pro** through [Google AI Studio](https://aistudio.google.com/). Refer to the respective websites for pricing information.
+## Plan → Code → Review
 
-## AI-Generated Plugins
+The workflow separates deciding what should change, producing the change, and evaluating the result.
 
-Plugins created by WP-Autoplugin are standard WordPress plugins:
+This makes each stage easier to inspect and gives administrators clear control over when the project moves forward.
 
-- They function independently and will continue to work even if WP-Autoplugin is deactivated or deleted.
-- You can install them on other WordPress sites without WP-Autoplugin.
-- While WP-Autoplugin provides a convenient listing screen for generated plugins, they can also be managed from the standard WordPress Plugins screen.
+### 1. Plan
 
-## Code Quality and Security
+Start by describing what you want to create, change, fix, or understand.
 
-WP-Autoplugin aims to generate code that adheres to WordPress coding standards. However, it's important to treat AI-generated code with the same caution you would apply to any third-party code. We strongly recommend:
+The Planner turns that request into a readable implementation Plan and, where applicable, a validated map of the files that should be added, updated, or deleted.
 
-- Reviewing and testing all generated code before use in a production environment.
-- Conducting thorough testing on a staging site before deployment.
-- Considering a professional security audit for critical applications.
+Before any code is generated, you can:
+
+* ask questions about the proposed approach;
+* clarify requirements;
+* request a revised Plan;
+* edit the Plan manually;
+* regenerate the structured file map after an edit; and
+* inspect the full lineage of earlier Plans.
+
+Plans are immutable and versioned. Revising one creates a successor instead of silently overwriting the original.
+
+This matters when a project changes direction. You can see what was originally proposed, what changed during discussion, and which Plan produced a particular code revision.
+
+For Hook Extension projects, planning begins by inspecting real actions, filters, and other integration points in the target. The result is a Plan for a separate plugin rather than a modification of the original code.
+
+When the requested behavior cannot be implemented safely through the available hooks, the Planner explains why.
+
+### 2. Code
+
+Code generation begins only when an administrator selects **Generate Code**.
+
+Generated code is staged inside WP-Autoplugin. It is not written directly to the installed plugin or theme.
+
+The Code workspace lets you:
+
+* browse the project as a file tree or a list of changes;
+* inspect Add, Update, and Delete operations;
+* edit files with WordPress CodeMirror;
+* compare staged files with their original versions;
+* review sanitized unified diffs;
+* follow per-file generation and validation progress;
+* edit several files and save them as one coherent successor revision;
+* navigate validation problems directly to the affected file;
+* restore an earlier revision without destroying later history;
+* regenerate from the latest Plan; and
+* work with PHP, JavaScript, CSS, JSON, HTML, SVG, XML, Markdown, and plain-text files.
+
+Each generated result is an immutable revision. Manual edits create another revision rather than altering the existing one in place.
+
+Generation is atomic. Files are checked individually and then validated as a complete project or change set. A failed, cancelled, conflicted, or noncompliant run does not leave behind a partial revision.
+
+For existing targets, WP-Autoplugin also checks whether the source changed after the task began. This helps prevent an older generated change from being applied over a newer plugin or theme version without warning.
+
+### 3. Review
+
+AI Review evaluates one exact code revision.
+
+The Reviewer produces a structured report containing:
+
+* an overall verdict;
+* a summary of the implementation;
+* suggested manual test cases; and
+* actionable findings ranked from P0 to P3.
+
+A finding can include the affected source location, an explanation of the problem, and a suggested fix.
+
+You can:
+
+* discuss the report with the Reviewer;
+* ask it to inspect a concern more closely;
+* request reconsideration or reprioritization;
+* dismiss and reopen findings with durable history;
+* fix one finding, a selected group, or all findings;
+* verify fixes against the resulting successor revision; and
+* see when a Review became stale because the code changed afterward.
+
+Because each Review is tied to a specific revision, an all-clear result cannot silently carry over after further edits. The workspace always shows whether the current code is still covered by the report.
+
+![Annotated Review workspace showing structured findings](assets/screenshots/review-findings.png)
+
+## Continue the conversation at every stage
+
+Plan, Code, Review, and Explain each include a durable conversation.
+
+This lets you work naturally instead of trying to fit every requirement into the first prompt.
+
+You can:
+
+* ask a question without changing the current Plan, revision, or Review;
+* request a change and create a validated successor artifact;
+* refer to earlier context with messages such as “Please make that change”;
+* override an earlier requirement with a newer, explicit instruction;
+* ask the Coder about an untouched target file before deciding to modify it; and
+* reload or reopen the project without losing the conversation.
+
+## Use screenshots and mockups as part of the request
+
+Every free-form composer accepts text, images, or both when the selected model supports vision.
+
+Images can be attached to:
+
+* initial Create, Modify, Fix, Hook Extension, and Explain requests;
+* Plan follow-ups;
+* Code questions and change requests;
+* Review conversations; and
+* Explain follow-ups.
+
+This is useful for tasks such as:
+
+* recreating an interface from a mockup;
+* fixing a layout shown in a screenshot;
+* explaining a visible error;
+* matching an existing admin screen; or
+* discussing a diagram alongside the code.
+
+WP-Autoplugin accepts verified JPEG, PNG, and WebP files and checks the selected model’s image capability before queueing the request.
+
+## Choose how a finished revision is released
+
+A generated revision remains separate from the installed target until an administrator chooses a release action.
+
+This gives you several ways to move forward depending on the project and the level of risk you are comfortable with.
+
+WP-Autoplugin can:
+
+* build a private ZIP containing one exact revision;
+* install a new plugin or hook extension in an inactive state;
+* activate an installed plugin as a separate action;
+* create an inactive fork of an existing plugin;
+* switch from the original plugin to its fork through an isolated activation flow;
+* install an inactive copy of a standalone or child theme;
+* produce replacement ZIPs for existing plugins and themes;
+* apply modifications directly to a target; and
+* roll back the latest supported direct modification when the affected files have not changed since release.
+
+You can therefore download the result for testing elsewhere, install it without activating it, keep it as a fork, or deliberately apply it to the original target.
+
+Review is strongly recommended but remains advisory. Release becomes available once a staged revision exists. Releasing without a current all-clear Review requires an explicit, recorded override.
+
+### Release checks
+
+Before packaging, installing, or applying a revision, WP-Autoplugin rechecks:
+
+* file paths;
+* original baselines;
+* source fingerprints;
+* plugin or theme headers;
+* WordPress and PHP requirements; and
+* the identity of the destination.
+
+For direct modifications, it stores complete before-and-after records before writing the first file. If a write fails partway through, it attempts to restore the original state.
+
+When appropriate, direct modifications also receive a deterministic semantic patch-version bump. The version change is handled by WP-Autoplugin rather than asking the model to edit headers correctly.
+
+### Theme safeguards
+
+Theme releases are intentionally more restrictive.
+
+WP-Autoplugin does not:
+
+* convert a parent theme into a generated child theme;
+* activate or switch themes;
+* copy Customizer settings;
+* copy Site Editor changes;
+* copy global styles or templates stored in the database; or
+* treat database-held theme configuration as part of the source files.
+
+Direct theme changes are blocked while the theme is active or while it is the parent of the active child theme.
+
+![Annotated release workspace showing release actions and safeguards](assets/screenshots/release-workspace.png)
+
+## Providers and models
+
+WP-Autoplugin can connect directly to:
+
+* OpenAI;
+* Anthropic;
+* Google Gemini;
+* xAI; and
+* custom OpenAI-compatible endpoints.
+
+Compatible models from these providers can be used for structured Plan, Code, and Review work.
+
+Model capabilities vary, so not every model supports source exploration, vision, structured output, or every project type.
+
+### Experimental ChatGPT Subscription support
+
+Administrators can optionally connect one site-wide ChatGPT account through a Codex device-authorization flow.
+
+This makes supported Codex models available through the connected account’s ChatGPT subscription entitlement and usage allowance. An OpenAI API key is not required for this provider.
+
+Availability depends on:
+
+* the connected account’s eligibility;
+* ChatGPT workspace policies;
+* currently available models; and
+* subscription usage limits.
+
+The account can be disconnected at any time.
+
+WP-Autoplugin provides separate model roles for:
+
+* Default;
+* Planner;
+* Coder; and
+* Reviewer.
+
+You can use one model for every stage or select models with different strengths and costs for each role. Supported models also expose per-role reasoning-effort controls.
+
+API usage may be billed by the selected provider.
+
+![Annotated settings screen showing providers, models, and instructions](assets/screenshots/settings-models.png)
+
+## Give agents project-specific instructions
+
+An installed plugin can include an exact root-level `AGENTS.md` file.
+
+When present, WP-Autoplugin automatically provides the complete file to agents working on that plugin, including Hook Extension projects that target it.
+
+This gives plugin authors a place to document information such as:
+
+* architectural boundaries;
+* coding conventions;
+* preferred APIs;
+* compatibility requirements;
+* testing expectations;
+* files that should not be changed; and
+* project-specific implementation guidance.
+
+Settings also provides site-wide **Custom instructions** for conventions and preferences that should apply across projects.
+
+These can cover naming, metadata, architecture, formatting, compatibility targets, and other persistent requirements.
+
+## See how much each project uses
+
+WP-Autoplugin records token usage for every provider call and aggregates it across the project.
+
+The token chip in the workspace header shows total input and output usage. It opens a breakdown by:
+
+* provider;
+* model; and
+* executed AI job.
+
+This makes it easier to understand which stages and models account for the project’s usage rather than seeing only an unexplained provider bill.
 
 ## Installation
 
-1. Download the latest release from the [Releases](https://github.com/WP-Autoplugin/wp-autoplugin/releases) page.
-2. Upload the plugin zip file through the 'Plugins' screen in WordPress, or unzip the file and upload the `wp-autoplugin` folder to the `/wp-content/plugins/` directory.
-3. Activate the plugin through the 'Plugins' screen in WordPress.
-4. Go to the WP-Autoplugin settings page and enter your API key(s).
-5. Choose your preferred AI model in the settings.
-6. Start generating plugins!
+1. Install and activate WP-Autoplugin.
+2. Open **WP-Autoplugin → Settings**.
+3. Configure at least one provider and select a default model, or connect the experimental ChatGPT Subscription provider.
+4. Open **WP-Autoplugin → Workspace** and create a project.
 
-## Screenshots
+## Development
 
-<details>
-<summary>Click to view screenshots</summary>
+Install the declared PHP and Node dependencies, then run:
 
-1. Generate plugin form
-![Generate plugin form](https://wp-autoplugin.com/screenshot-1.png)
+```sh
+npm run lint:js -- --no-fix
+npm run build
+find src/V2 -name '*.php' -print0 | xargs -0 -n1 php -l
+composer validate --strict --no-check-publish
+git diff --check
+```
 
-2. Review generated plan
-![Review generated plan](https://wp-autoplugin.com/screenshot-2.png)
+Frontend source changes must be made in `assets/v2/src/`.
 
-3. Review generated code
-![Review generated code](https://wp-autoplugin.com/screenshot-3.png)
+Commit the regenerated files in `assets/v2/build/`, including asset metadata and RTL CSS.
 
-4. Autoplugins listing screen
-![Autoplugins listing screen](https://wp-autoplugin.com/screenshot-4.png)
+Do not hand-edit generated bundles.
 
-5. Fix plugin form
-![Fix plugin form](https://wp-autoplugin.com/screenshot-5.png)
+## Privacy
 
-</details>
+WP-Autoplugin does not require a WP-Autoplugin account.
 
-Or watch the [WP-Autoplugin demo video on Youtube](https://www.youtube.com/watch?v=b36elwTLfa4) that shows how it generates a plugin and fixes a bug.
+The following data remains on the WordPress site:
 
-## Translations
+* provider credentials;
+* durable job snapshots;
+* generated revisions;
+* Reviews;
+* release records; and
+* project history.
 
-WP-Autoplugin is fully translatable. If you would like to contribute a translation, please create a pull request with the translation files. Currently, the plugin includes translations for the following languages:
-- English - `en_US`
-- Français (French) - `fr_FR`
-- Español (Spanish) - `es_ES`
-- Deutsch (German) - `de_DE`
-- Português (Portuguese) - `pt_PT`
-- Italiano (Italian) - `it_IT`
-- Magyar (Hungarian) - `hu_HU`
-- Nederlands (Dutch) - `nl_NL`
-- Polski (Polish) - `pl_PL`
-- Türkçe (Turkish) - `tr_TR`
-- Русский (Russian) - `ru_RU`
+To perform an AI task, WP-Autoplugin sends the configured provider the content required for that request. Depending on the task, this can include:
 
-## Licensing
+* the user’s instructions;
+* relevant source code;
+* attached prompt images;
+* project instructions from `AGENTS.md`; and
+* site-wide Custom instructions.
 
-WP-Autoplugin is licensed under the GPLv3 or later.
+Uninstall cleanup is enabled by default. It can be disabled when project data should remain available for a later reinstall.
 
-## Changelog
+Uninstalling WP-Autoplugin never deletes or reverts plugins or themes that were created or modified through the workspace.
 
-### 1.8.0
-- Updated translations (thanks ShutterStarTW)
-- New setting: AI output language (thanks ShutterStarTW)
-- Added support for new Google, Anthropic, OpenAI and xAI models
+See `readme.txt` for external-service disclosures.
 
-### 1.7.1
-- Added support for new models across all providers
+## License
 
-### 1.7
-- Added image input support for OpenAI, Anthropic and Google models
-- Added support for Claude Sonnet 4.5-20250929 model
-- Added support for GPT-5-Codex model and the OpenAI Responses API
-
-### 1.6
-- Added complex plugin mode for multi-file plugin generation
-- Added specialized model settings to delegate tasks to specific AI models
-- Added detailed token usage tracking and display
-- Improved plugin generation architecture
-- Enhanced UI with better progress indicators
-
-### 1.5
-- Added Extend Themes feature to extend existing themes with hooks
-- Added support for new AI models
-
-### 1.4.3
-- Added support for Google Gemini 2.5 Pro model
-- Fixed minor UI issue in the Fix Plugin form
-- Improved code generation step for the Fix Plugin feature to avoid fatal errors
-
-### 1.4.2 
-- Added a "Copy Hooks" button to use the extracted hooks with any LLM
-- Added CMD/CTRL + Enter shortcut to submit the forms
-- Fixed minor UI issues
-
-### 1.4.1
-- Added option to change model at every step
-- Fixed minor issues with the Extend Plugin feature
-
-### 1.4
-- Analyze and extend any third-party plugin
-
-### 1.3
-- Added new Explain Plugin feature
-- Refactored admin-side PHP & JS codes
-- Added new Google models
-
-### 1.2.1
-- Added support for reasoning models (o1, o3-mini, Claude 3.7 Sonnet Thinking)
-- Fixed PHPCS issues throughout the codebase
-
-### 1.2
-- Added support for any OpenAI-compatible API with the custom models option
-- Added translations for 10 more languages
-- Fixed PHP notice on "Add New Plugin" screen.
-
-### 1.1.2
-- Added support for Google Gemini Flash 2.0 Thinking model
-- Added support for xAI Grok-2-1212 model
-
-### 1.1.1
-- Added support for Claude 3.5 Sonnet-20241022, Gemini 2.0 Flash Experimental, and Gemini Experimental 1206 models
-- Some refactoring and code cleanup
-
-### 1.1
-- Added support for Claude 3.5 Haiku
-- Added support for xAI and its only current model, Grok-beta
-- Fixed an issue that prevented the code from being edited in the code editor
-- Fixed wrong model name for "chatgpt-4o-latest"
-- Improved the generator prompt for better code generation on lower-end models
-- Improved inline documentation
-
-### 1.0.6
-- Fixed Github updater class
-- Fixed a few bugs
-- Added i18n support and Hungarian translation
-- Adjusted prompt for better code generation
-- Added docblocks to the code
-
-### 1.0.5
-- Added update from GitHub feature
-- Reorganized files and folders and added Composer support
-- Fixed small bugs
-
-### 1.0.4
-- Added support for Google Gemini models
-
-### 1.0.3
-- Added support for gpt-4o-2024-08-06
-- Cleaned up prompts for better readability
-
-### 1.0.2
-- Added support for GPT-4o mini
-- Added support for the high-limit (8192 tokens) version of Claude 3.5 Sonnet
-
-### 1.0.1
-- Fixed max_tokens value for OpenAI models
-
-### 1.0
-- Initial release
+GPL-2.0-or-later.
